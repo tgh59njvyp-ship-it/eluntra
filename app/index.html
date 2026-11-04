@@ -19,6 +19,40 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231E4D3B'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' fill='%23F4F1EA' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E">
 </head>
 <body>
+<!-- Welcome / first page -->
+<div id="welcomeView" aria-label="Eluntraへようこそ">
+  <div class="w-inner">
+    <header class="w-head">
+      <span class="w-brand">Eluntra</span>
+      <button class="btn secondary sm" id="btnWelcomeLoginTop">ログイン</button>
+    </header>
+    <p class="w-kicker">BYOK AI CHAT</p>
+    <h1 class="w-title">8社のAIを、<br><span>自分のキー</span>で。</h1>
+    <p class="w-lead">OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
+    <div class="w-cta">
+      <button class="btn primary w-main-btn" id="btnWelcomeLogin">ログインして始める</button>
+      <button class="btn ghost w-guest-btn" id="btnWelcomeGuest">ログインせずに使う</button>
+    </div>
+    <p class="w-note">ログインすると、会話と設定をクラウドに保存して別の端末でも続きから使えます。</p>
+    <div class="w-provs" id="welcomeProvs"></div>
+    <section class="w-feats">
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
+        <div><h3>8社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek。モデル一覧はキーで自動取得します。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3"/><path d="M16.5 6.5 20 10"/><path d="M14 9l3 3"/></svg>
+        <div><h3>キーは端末の中だけ</h3><p>APIキーはあなたの端末内にのみ保存され、Eluntraのサーバーへ送られることはありません（同期の対象にも含みません）。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 6 6 0 0 0-11.7 1.2A4 4 0 0 0 7 19h10.5z"/><path d="M12 12v7"/><path d="M9 15.5 12 12l3 3.5"/></svg>
+        <div><h3>会話をクラウド同期</h3><p>GitHub / Google / Appleでログインすると、会話と設定を保存して、別の端末でも続きから使えます。</p></div>
+      </div>
+    </section>
+    <footer class="w-foot">Eluntra — 自分のキーで使うAIチャット</footer>
+  </div>
+</div>
+
 <div class="app">
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar" aria-label="サイドバー">

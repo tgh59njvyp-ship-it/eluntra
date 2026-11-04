@@ -10,7 +10,7 @@ import {
   type OAuthProvider,
 } from "./auth";
 import { callChat, fetchModels, testConnection } from "./api";
-import { findProvider } from "./providers";
+import { PROVIDERS, findProvider } from "./providers";
 import {
   SUGGESTIONS,
   applyTheme,
@@ -370,6 +370,8 @@ document.addEventListener("click", (e: Event) => {
       await logout();
       closeSheet("loginSheet");
       renderAccount();
+      localStorage.removeItem("eluntra_guest");
+      document.body.classList.add("show-welcome");
       toast("ログアウトしました");
     })();
     return;
@@ -530,6 +532,29 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
   }
 });
 
+/* ---------- 最初のページ（ウェルカム） ---------- */
+
+function enterApp(): void {
+  document.body.classList.remove("show-welcome");
+}
+
+function openLoginFromWelcome(): void {
+  renderAccount();
+  openSheet("loginSheet");
+}
+
+$("#btnWelcomeLogin").addEventListener("click", openLoginFromWelcome);
+$("#btnWelcomeLoginTop").addEventListener("click", openLoginFromWelcome);
+$("#btnWelcomeGuest").addEventListener("click", () => {
+  try {
+    localStorage.setItem("eluntra_guest", "1");
+  } catch {
+    /* ignore */
+  }
+  enterApp();
+  ($("#input") as HTMLTextAreaElement).focus();
+});
+
 /* ---------- 初期化 ---------- */
 
 (function init(): void {
@@ -543,13 +568,27 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
   renderAll();
   renderAccount();
   void autoFetchModels(state.conf.provider);
+  $("#welcomeProvs").innerHTML = PROVIDERS.map(
+    (p) =>
+      `<span class="w-prov"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>${esc(p.name)}</span>`,
+  ).join("");
+  let guest = false;
+  try {
+    guest = localStorage.getItem("eluntra_guest") === "1";
+  } catch {
+    guest = false;
+  }
+  if (!isLoggedIn() && !guest) document.body.classList.add("show-welcome");
   onAuthChange(renderAccount);
   void (async () => {
     const cb = await handleAuthCallback();
     if (cb.error) {
       toast("ログインできませんでした：" + cb.error + "（Appleは提供側の設定が完了するまで使えません）");
     }
-    if (cb.handled && !cb.error) toast("ログインしました");
+    if (cb.handled && !cb.error) {
+      toast("ログインしました");
+      enterApp();
+    }
     if (isLoggedIn()) {
       const pulled = await pullSync();
       if (pulled === "applied") {

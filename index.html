@@ -269,9 +269,68 @@ svg{display:block}
 .login-btn.apple{background:#000;border-color:#000;color:#fff}
 .login-note{font-size:12px;color:var(--text-2);line-height:1.6;margin-top:12px}
 .sync-line{font-size:12.5px;color:var(--text-2);margin-top:8px}
+
+/* ---------- Welcome（最初のページ） ---------- */
+#welcomeView{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;display:none}
+body.show-welcome #welcomeView{display:block}
+.w-inner{max-width:880px;margin:0 auto;padding:22px 22px 44px}
+.w-head{display:flex;align-items:center;justify-content:space-between}
+.w-brand{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--accent)}
+.w-kicker{margin-top:52px;font-size:12.5px;font-weight:700;letter-spacing:.3em;color:var(--accent)}
+.w-title{font-family:var(--serif);font-size:clamp(38px,9vw,64px);line-height:1.3;font-weight:600;margin-top:14px}
+.w-title span{color:var(--accent)}
+.w-lead{margin-top:18px;font-size:15.5px;line-height:1.75;color:var(--text-2);max-width:560px}
+.w-cta{margin-top:30px;display:flex;flex-direction:column;gap:10px;max-width:420px}
+.w-main-btn{height:50px;font-size:15.5px}
+.w-guest-btn{height:46px}
+.w-note{margin-top:14px;font-size:12.5px;color:var(--text-2);line-height:1.6}
+.w-provs{margin-top:34px;display:flex;flex-wrap:wrap;gap:8px}
+.w-prov{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 13px 6px 7px;font-size:13px;background:var(--surface)}
+.w-prov .mono-tile{width:24px;height:24px;border-radius:7px;font-size:10px}
+.w-feats{margin-top:44px;border-top:1px solid var(--line)}
+.w-feat{display:flex;gap:16px;padding:20px 2px;border-bottom:1px solid var(--line)}
+.w-feat .ic{width:26px;height:26px;flex:none;color:var(--accent);margin-top:2px}
+.w-feat h3{font-size:15.5px;font-weight:700}
+.w-feat p{margin-top:5px;font-size:13.5px;line-height:1.65;color:var(--text-2)}
+.w-foot{margin-top:30px;font-size:12px;color:var(--text-3);text-align:center}
+@media (min-width:760px){.w-cta{flex-direction:row;align-items:center}.w-main-btn{padding:0 26px}.w-feats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 28px;border-bottom:1px solid var(--line)}.w-feat{flex-direction:column;gap:10px;border-bottom:none}}
 </style>
 </head>
 <body>
+<!-- Welcome / first page -->
+<div id="welcomeView" aria-label="Eluntraへようこそ">
+  <div class="w-inner">
+    <header class="w-head">
+      <span class="w-brand">Eluntra</span>
+      <button class="btn secondary sm" id="btnWelcomeLoginTop">ログイン</button>
+    </header>
+    <p class="w-kicker">BYOK AI CHAT</p>
+    <h1 class="w-title">8社のAIを、<br><span>自分のキー</span>で。</h1>
+    <p class="w-lead">OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
+    <div class="w-cta">
+      <button class="btn primary w-main-btn" id="btnWelcomeLogin">ログインして始める</button>
+      <button class="btn ghost w-guest-btn" id="btnWelcomeGuest">ログインせずに使う</button>
+    </div>
+    <p class="w-note">ログインすると、会話と設定をクラウドに保存して別の端末でも続きから使えます。</p>
+    <div class="w-provs" id="welcomeProvs"></div>
+    <section class="w-feats">
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
+        <div><h3>8社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek。モデル一覧はキーで自動取得します。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3"/><path d="M16.5 6.5 20 10"/><path d="M14 9l3 3"/></svg>
+        <div><h3>キーは端末の中だけ</h3><p>APIキーはあなたの端末内にのみ保存され、Eluntraのサーバーへ送られることはありません（同期の対象にも含みません）。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 6 6 0 0 0-11.7 1.2A4 4 0 0 0 7 19h10.5z"/><path d="M12 12v7"/><path d="M9 15.5 12 12l3 3.5"/></svg>
+        <div><h3>会話をクラウド同期</h3><p>GitHub / Google / Appleでログインすると、会話と設定を保存して、別の端末でも続きから使えます。</p></div>
+      </div>
+    </section>
+    <footer class="w-foot">Eluntra — 自分のキーで使うAIチャット</footer>
+  </div>
+</div>
+
 <div class="app">
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar" aria-label="サイドバー">
@@ -876,11 +935,16 @@ document.addEventListener("click",e=>{
   const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");autoFetchModels(conf.provider);return}
   const mi=e.target.closest("[data-model]");if(mi){conf.models[conf.provider]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
 });
+function enterApp(){document.body.classList.remove("show-welcome")}
+function openLoginFromWelcome(){renderAccount();openSheet("loginSheet")}
+$("#btnWelcomeLogin").addEventListener("click",openLoginFromWelcome);
+$("#btnWelcomeLoginTop").addEventListener("click",openLoginFromWelcome);
+$("#btnWelcomeGuest").addEventListener("click",()=>{try{localStorage.setItem("eluntra_guest","1")}catch(e){}enterApp();$("#input").focus()});
 document.addEventListener("click",e=>{
   const lg=e.target.closest("[data-login]");if(lg){loginWith(lg.getAttribute("data-login"));return}
   const ol=e.target.closest("[data-open-login]");if(ol){renderAccount();openSheet("loginSheet");closeSidebar();return}
   if(e.target.closest("#btnSyncNow")){(async()=>{const pulled=await pullSync();if(pulled==="applied"){renderAll();toast("クラウドのデータを取り込みました")}const ok=await pushSync();renderAccount();toast(ok?"同期しました":"同期に失敗しました。通信状態を確認してください")})();return}
-  if(e.target.closest("#btnLogout")||e.target.closest("#btnLogoutSide")){(async()=>{await doLogout();closeSheet("loginSheet");renderAccount();toast("ログアウトしました")})();return}
+  if(e.target.closest("#btnLogout")||e.target.closest("#btnLogoutSide")){(async()=>{await doLogout();closeSheet("loginSheet");renderAccount();localStorage.removeItem("eluntra_guest");document.body.classList.add("show-welcome");toast("ログアウトしました")})();return}
 });
 $("#btnAccountTop").addEventListener("click",()=>{renderAccount();openSheet("loginSheet")});
 $("#btnNewChat").addEventListener("click",()=>{newSession();closeSidebar()});
@@ -932,10 +996,13 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
   renderAll();
   renderAccount();
   autoFetchModels(conf.provider);
+  $("#welcomeProvs").innerHTML=PROVIDERS.map(p=>'<span class="w-prov"><span class="mono-tile" style="background:'+p.color+'">'+p.mono+'</span>'+esc(p.name)+'</span>').join("");
+  let guestFlag=false;try{guestFlag=localStorage.getItem("eluntra_guest")==="1"}catch(e){}
+  if(!authSess&&!guestFlag)document.body.classList.add("show-welcome");
   (async()=>{
     const cb=await handleAuthCallback();
     if(cb.error)toast("ログインできませんでした："+cb.error+"（Appleは提供側の設定が完了するまで使えません）");
-    if(cb.handled&&!cb.error)toast("ログインしました");
+    if(cb.handled&&!cb.error){toast("ログインしました");enterApp()}
     if(authSess){
       const pulled=await pullSync();
       if(pulled==="applied"){renderAll();toast("クラウドのデータを取り込みました")}
