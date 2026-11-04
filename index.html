@@ -9,6 +9,13 @@
 <meta property="og:description" content="8社のAIを、自分のキーで。BYOK専用AIチャット。">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#FFFFFF">
+<meta name="description" content="OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャット。キーは端末内にのみ保存。ログインで会話をクラウド同期。">
+<meta property="og:title" content="Eluntra — 8社のAIを、自分のキーで">
+<meta property="og:description" content="8社のAIを自分のAPIキーで使うBYOKチャット。キーは端末内にのみ保存し、選んだ会社のAPIへ直接送信。ログインで会話をクラウド同期。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://simple-url-server.lovable.app/s/eluntra/">
+<meta property="og:image" content="https://simple-url-server.lovable.app/s/eluntra/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231E4D3B'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' fill='%23F4F1EA' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -664,6 +671,15 @@ async function testConnection(pid){
     return{ok:false,msg:"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
   }
 }
+const autoFetchTried={};
+async function autoFetchModels(pid,force){
+  const key=(keys[pid]||"").trim();if(!key)return;
+  if(!force&&fetchedModels[pid]&&fetchedModels[pid].length)return;
+  if(autoFetchTried[pid]&&!force)return;
+  autoFetchTried[pid]=1;
+  try{await fetchModels(pid);renderAll();if(document.querySelector("#modelSheet.on"))renderModelSheet($("#modelSearch").value)}
+  catch(e){/* 自動取得の失敗は静かに扱う */}
+}
 async function fetchModels(pid){
   const p=P(pid),key=(keys[pid]||"").trim();
   if(!key)throw new Error("キーが未設定です。先に設定で"+p.name+"のキーを保存してください。");
@@ -848,16 +864,16 @@ document.addEventListener("click",e=>{
   const sess=e.target.closest("[data-sess]");
   if(sess&&!e.target.closest("[data-del]")){currentId=sess.getAttribute("data-sess");renderAll();closeSidebar();return}
   const del=e.target.closest("[data-del]");if(del){e.stopPropagation();if(confirm("この会話を削除しますか？"))deleteSession(del.getAttribute("data-del"));return}
-  const pick=e.target.closest("[data-pick-prov]");if(pick){conf.provider=pick.getAttribute("data-pick-prov");save(LS.conf,conf);renderAll();toast(P(conf.provider).name+"に切り替えました");return}
+  const pick=e.target.closest("[data-pick-prov]");if(pick){conf.provider=pick.getAttribute("data-pick-prov");save(LS.conf,conf);renderAll();toast(P(conf.provider).name+"に切り替えました");autoFetchModels(conf.provider);return}
   const sugg=e.target.closest("[data-sugg]");if(sugg){$("#input").value=SUGGESTIONS[+sugg.getAttribute("data-sugg")];autoGrow($("#input"));$("#input").focus();return}
   const cp=e.target.closest("[data-copy]");if(cp){const s=curSession();const m=s&&s.messages[+cp.getAttribute("data-copy")];if(m){navigator.clipboard.writeText(m.content).then(()=>toast("コピーしました"))}return}
   const tk=e.target.closest("[data-toggle-key]");if(tk){$("#keybox-"+tk.getAttribute("data-toggle-key")).classList.toggle("on");return}
   const sk=e.target.closest("[data-show-key]");if(sk){const inp=$("#key-"+sk.getAttribute("data-show-key"));inp.type=inp.type==="password"?"text":"password";sk.textContent=inp.type==="password"?"表示":"隠す";return}
-  const sv=e.target.closest("[data-save-key]");if(sv){const pid=sv.getAttribute("data-save-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v}else{delete keys[pid]}delete tested[pid];save(LS.keys,keys);save(LS.tested,tested);renderSettings();renderAll();toast(v?P(pid).name+"のキーを保存しました":"キーを削除しました");return}
+  const sv=e.target.closest("[data-save-key]");if(sv){const pid=sv.getAttribute("data-save-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v}else{delete keys[pid]}delete tested[pid];save(LS.keys,keys);save(LS.tested,tested);renderSettings();renderAll();toast(v?P(pid).name+"のキーを保存しました":"キーを削除しました");if(v)autoFetchModels(pid,true);return}
   const ts=e.target.closest("[data-test-key]");if(ts){(async()=>{const pid=ts.getAttribute("data-test-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v;save(LS.keys,keys)}
     const box=$("#test-"+pid);box.className="test-result on";box.style.color="var(--text-2)";box.textContent="接続テスト中…";
     const r=await testConnection(pid);box.className="test-result on "+(r.ok?"ok":"ng");box.textContent=(r.ok?"成功：":"失敗：")+r.msg;renderAll()})();return}
-  const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");return}
+  const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");autoFetchModels(conf.provider);return}
   const mi=e.target.closest("[data-model]");if(mi){conf.models[conf.provider]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
 });
 document.addEventListener("click",e=>{
@@ -875,8 +891,8 @@ $("#btnSettingsSide").addEventListener("click",()=>openSettings());
 $("#btnSettingsTop").addEventListener("click",()=>openSettings());
 $("#btnTheme").addEventListener("click",toggleTheme);
 $("#btnTheme2").addEventListener("click",toggleTheme);
-$("#modelPillTop").addEventListener("click",openModelSheet);
-$("#modelPillBottom").addEventListener("click",openModelSheet);
+$("#modelPillTop").addEventListener("click",()=>{openModelSheet();autoFetchModels(conf.provider)});
+$("#modelPillBottom").addEventListener("click",()=>{openModelSheet();autoFetchModels(conf.provider)});
 $("#modelSearch").addEventListener("input",e=>renderModelSheet(e.target.value));
 $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchModels");btn.disabled=true;btn.textContent="取得中…";
   try{const ids=await fetchModels(conf.provider);renderModelSheet($("#modelSearch").value);renderAll();toast(ids.length+"件のモデルを取得しました")}
@@ -915,6 +931,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
   $("#tempRange").value=conf.temp;$("#tempVal").textContent=(+conf.temp).toFixed(1);
   renderAll();
   renderAccount();
+  autoFetchModels(conf.provider);
   (async()=>{
     const cb=await handleAuthCallback();
     if(cb.error)toast("ログインできませんでした："+cb.error+"（Appleは提供側の設定が完了するまで使えません）");

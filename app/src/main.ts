@@ -65,6 +65,28 @@ function setSendBtn(stop: boolean): void {
   }
 }
 
+/* ---------- モデル自動取得 ----------
+   キーがある会社は、起動時・切替時・モデル画面を開いた時に裏で一覧を取りにいく。
+   取得済みなら再取得しない（キー保存時は新しいキーで取り直す）。失敗しても静かに既定一覧のままにする。 */
+const autoFetchTried = new Set<string>();
+
+async function autoFetchModels(pid: string, force = false): Promise<void> {
+  const key = (state.keys[pid] || "").trim();
+  if (!key) return;
+  if (!force && state.fetchedModels[pid]?.length) return;
+  if (autoFetchTried.has(pid) && !force) return;
+  autoFetchTried.add(pid);
+  try {
+    await fetchModels(pid);
+    renderAll();
+    if (document.querySelector("#modelSheet.on")) {
+      renderModelSheet(($("#modelSearch") as HTMLInputElement).value);
+    }
+  } catch {
+    /* 自動取得の失敗は静かに扱う（手動の「一覧を取得」で再試行できる） */
+  }
+}
+
 function updateStreamingMsg(s: Session, aiMsg: Message): void {
   const col = $("#chatCol");
   const nodes = col.querySelectorAll(".msg");
@@ -230,6 +252,7 @@ document.addEventListener("click", (e: Event) => {
     persistConf();
     renderAll();
     toast(`${findProvider(state.conf.provider).name}に切り替えました`);
+    void autoFetchModels(state.conf.provider);
     return;
   }
   const sugg = target.closest<HTMLElement>("[data-sugg]");
@@ -279,6 +302,7 @@ document.addEventListener("click", (e: Event) => {
     renderSettings();
     renderAll();
     toast(v ? `${findProvider(pid).name}のキーを保存しました` : "キーを削除しました");
+    if (v) void autoFetchModels(pid, true);
     return;
   }
   const ts = target.closest<HTMLElement>("[data-test-key]");
@@ -312,6 +336,7 @@ document.addEventListener("click", (e: Event) => {
     persistConf();
     renderSettings();
     renderAll();
+    void autoFetchModels(state.conf.provider);
     toast(`${findProvider(state.conf.provider).name}を使う設定にしました`);
     return;
   }
@@ -381,8 +406,14 @@ $("#btnSettingsSide").addEventListener("click", () => openSettings());
  $("#btnSettingsTop").addEventListener("click", () => openSettings());
 $("#btnTheme").addEventListener("click", toggleTheme);
 $("#btnTheme2").addEventListener("click", toggleTheme);
-$("#modelPillTop").addEventListener("click", openModelSheet);
-$("#modelPillBottom").addEventListener("click", openModelSheet);
+ $("#modelPillTop").addEventListener("click", () => {
+  openModelSheet();
+  void autoFetchModels(state.conf.provider);
+});
+ $("#modelPillBottom").addEventListener("click", () => {
+  openModelSheet();
+  void autoFetchModels(state.conf.provider);
+});
 $("#modelSearch").addEventListener("input", (e: Event) => {
   renderModelSheet((e.target as HTMLInputElement).value);
 });
@@ -511,6 +542,7 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
   $("#tempVal").textContent = Number(state.conf.temp).toFixed(1);
   renderAll();
   renderAccount();
+  void autoFetchModels(state.conf.provider);
   onAuthChange(renderAccount);
   void (async () => {
     const cb = await handleAuthCallback();
