@@ -1,4 +1,14 @@
 import "./styles.css";
+import {
+  handleAuthCallback,
+  isLoggedIn,
+  loginWith,
+  logout,
+  onAuthChange,
+  pullSync,
+  pushSync,
+  type OAuthProvider,
+} from "./auth";
 import { callChat, fetchModels, testConnection } from "./api";
 import { findProvider } from "./providers";
 import {
@@ -9,7 +19,9 @@ import {
   currentTheme,
   openModelSheet,
   openSettings,
+  openSheet,
   openSidebar,
+  renderAccount,
   renderAll,
   renderModelSheet,
   renderSettings,
@@ -164,6 +176,7 @@ async function sendMessage(): Promise<void> {
   setSendBtn(false);
   persistSessions();
   renderAll();
+  if (!aiMsg.error && isLoggedIn()) void pushSync();
   if (aiMsg.error) showErrorBanner(aiMsg.error, p);
 }
 
@@ -302,6 +315,40 @@ document.addEventListener("click", (e: Event) => {
     toast(`${findProvider(state.conf.provider).name}を使う設定にしました`);
     return;
   }
+  const lg = target.closest<HTMLElement>("[data-login]");
+  if (lg) {
+    loginWith(lg.getAttribute("data-login") as OAuthProvider);
+    return;
+  }
+  const ol = target.closest<HTMLElement>("[data-open-login]");
+  if (ol) {
+    renderAccount();
+    openSheet("loginSheet");
+    closeSidebar();
+    return;
+  }
+  if (target.closest("#btnSyncNow")) {
+    void (async () => {
+      const pulled = await pullSync();
+      if (pulled === "applied") {
+        renderAll();
+        toast("クラウドのデータを取り込みました");
+      }
+      const ok = await pushSync();
+      renderAccount();
+      toast(ok ? "同期しました" : "同期に失敗しました。通信状態を確認してください");
+    })();
+    return;
+  }
+  if (target.closest("#btnLogout") || target.closest("#btnLogoutSide")) {
+    void (async () => {
+      await logout();
+      closeSheet("loginSheet");
+      renderAccount();
+      toast("ログアウトしました");
+    })();
+    return;
+  }
   const mi = target.closest<HTMLElement>("[data-model]");
   if (mi) {
     state.conf.models[state.conf.provider] = mi.getAttribute("data-model") as string;
@@ -326,8 +373,12 @@ $("#btnNewTop").addEventListener("click", () => {
 });
 $("#btnMenu").addEventListener("click", openSidebar);
 $("#scrim").addEventListener("click", closeSidebar);
+$("#btnAccountTop").addEventListener("click", () => {
+  renderAccount();
+  openSheet("loginSheet");
+});
 $("#btnSettingsSide").addEventListener("click", () => openSettings());
-$("#btnSettingsTop").addEventListener("click", () => openSettings());
+ $("#btnSettingsTop").addEventListener("click", () => openSettings());
 $("#btnTheme").addEventListener("click", toggleTheme);
 $("#btnTheme2").addEventListener("click", toggleTheme);
 $("#modelPillTop").addEventListener("click", openModelSheet);
@@ -443,6 +494,7 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "Escape") {
     closeSheet("modelSheet");
     closeSheet("settingsSheet");
+    closeSheet("loginSheet");
     closeSidebar();
   }
 });
@@ -458,4 +510,23 @@ document.addEventListener("keydown", (e: KeyboardEvent) => {
   ($("#tempRange") as HTMLInputElement).value = String(state.conf.temp);
   $("#tempVal").textContent = Number(state.conf.temp).toFixed(1);
   renderAll();
+  renderAccount();
+  onAuthChange(renderAccount);
+  void (async () => {
+    const cb = await handleAuthCallback();
+    if (cb.error) {
+      toast("ログインできませんでした：" + cb.error + "（Appleは提供側の設定が完了するまで使えません）");
+    }
+    if (cb.handled && !cb.error) toast("ログインしました");
+    if (isLoggedIn()) {
+      const pulled = await pullSync();
+      if (pulled === "applied") {
+        renderAll();
+        toast("クラウドのデータを取り込みました");
+      } else if (pulled === "none") {
+        await pushSync();
+      }
+      renderAccount();
+    }
+  })();
 })();

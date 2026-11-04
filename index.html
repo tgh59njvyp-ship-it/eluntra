@@ -247,6 +247,21 @@ svg{display:block}
   .sheet-panel.bottom{left:auto;right:24px;bottom:24px;width:440px;border-radius:20px}
   .sheet-panel.full{left:auto;right:0;top:0;bottom:0;width:560px;border-left:1px solid var(--line)}
 }
+
+/* ---------- Account / login ---------- */
+.sb-account{padding:12px 16px 2px;border-top:1px solid var(--line)}
+.acct-row{display:flex;align-items:center;gap:10px;min-width:0}
+.acct-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;background:var(--bg-sub)}
+.acct-initial{width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex:none}
+.acct-texts{flex:1;min-width:0}
+.acct-name{font-size:13.5px;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct-mail{font-size:11.5px;color:var(--text-2);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:48px;border-radius:12px;font-size:14.5px;font-weight:600;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);margin-top:10px}
+.login-btn svg{width:20px;height:20px;flex:none}
+.login-btn.github{background:#17171A;border-color:#17171A;color:#fff}
+.login-btn.apple{background:#000;border-color:#000;color:#fff}
+.login-note{font-size:12px;color:var(--text-2);line-height:1.6;margin-top:12px}
+.sync-line{font-size:12.5px;color:var(--text-2);margin-top:8px}
 </style>
 </head>
 <body>
@@ -267,6 +282,7 @@ svg{display:block}
     <div class="sessions" id="sessionList"></div>
     <div class="sb-sec">プロバイダー（タップでキー設定）</div>
     <div class="prov-status" id="provStatus"></div>
+    <div class="sb-account" id="accountBox"></div>
     <div class="sb-foot">
       <div class="sb-note">APIキーはこの端末のブラウザ内にのみ保存され、各社のAPIへ直接送られます。</div>
       <button class="icon-btn" id="btnTheme" title="ダークモード切替" aria-label="ダークモード切替">
@@ -295,6 +311,9 @@ svg{display:block}
       </button>
       <button class="icon-btn" id="btnNewTop" aria-label="新しいチャット">
         <svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnAccountTop" aria-label="アカウント">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>
       </button>
       <button class="icon-btn" id="btnSettingsTop" aria-label="設定">
         <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.51 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
@@ -342,6 +361,19 @@ svg{display:block}
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Login sheet -->
+<div class="sheet" id="loginSheet" role="dialog" aria-label="アカウント">
+  <div class="sheet-bg" data-close="loginSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2>アカウント</h2>
+      <button class="icon-btn" data-close="loginSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body" id="loginBody"></div>
   </div>
 </div>
 
@@ -528,6 +560,78 @@ function renderMsg(m,i,s){
   return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div><div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':md(m.content))+'</div></div>';
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
+
+/* ================= Auth（Supabase） ================= */
+const AUTH_URL="https://rzgldbedsjocmvqrfdhf.supabase.co";
+const AUTH_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6Z2xkYmVkc2pvY212cXJmZGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NzMzMzAsImV4cCI6MjEwOTA0OTMzMH0.3y77je51HEUxAV4E1yYN7UU3Cxgnrr7Elt2ingRwVsw";
+const BRAND_ICONS={
+ github:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>',
+ google:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>',
+ apple:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>'};
+const LOGOUT_SVG='<svg class="ic" viewBox="0 0 24 24"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+const CLOUD_SVG='<svg class="ic" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 6 6 0 0 0-11.7 1.2A4 4 0 0 0 7 19h10.5z"/><path d="M12 19v-6"/><path d="M9.5 15.5 12 13l2.5 2.5"/></svg>';
+let authSess=load("eluntra_auth",null);
+function lastSyncAt(){return Number(load("eluntra_last_sync",0))||0}
+function setLastSyncAt(t){save("eluntra_last_sync",t)}
+function currentUser(){return authSess?authSess.user:null}
+function storeAuth(v){authSess=v;if(v)save("eluntra_auth",v);else localStorage.removeItem("eluntra_auth");renderAccount()}
+function b64url(bytes){let bin="";bytes.forEach(b=>{bin+=String.fromCharCode(b)});return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+async function loginWith(provider){const rt=location.href.split("#")[0].split("?")[0];let url=AUTH_URL+"/auth/v1/authorize?provider="+provider+"&redirect_to="+encodeURIComponent(rt);
+  try{const verifier=b64url(crypto.getRandomValues(new Uint8Array(48)));const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier));sessionStorage.setItem("eluntra_pkce_verifier",verifier);url+="&code_challenge="+b64url(new Uint8Array(digest))+"&code_challenge_method=s256"}catch(e){}
+  location.href=url}
+function toAuthUser(u){const m=u.user_metadata||{};return{id:u.id,email:u.email||m.email||"",name:m.user_name||m.full_name||m.name||"",avatarUrl:m.avatar_url||m.picture||"",provider:(u.app_metadata||{}).provider||""}}
+async function fetchAuthUser(token){const r=await fetch(AUTH_URL+"/auth/v1/user",{headers:{apikey:AUTH_KEY,Authorization:"Bearer "+token}});if(!r.ok)throw new Error("user fetch failed");return toAuthUser(await r.json())}
+async function handleAuthCallback(){
+  const q=new URLSearchParams(location.search);const code=q.get("code");
+  if(code){history.replaceState(null,"",location.pathname);const verifier=sessionStorage.getItem("eluntra_pkce_verifier");sessionStorage.removeItem("eluntra_pkce_verifier");
+    if(!verifier)return{handled:true,error:"ログインの検証情報が見つかりませんでした。もう一度ログインしてください"};
+    try{const r=await fetch(AUTH_URL+"/auth/v1/token?grant_type=pkce",{method:"POST",headers:{apikey:AUTH_KEY,"Content-Type":"application/json"},body:JSON.stringify({auth_code:code,code_verifier:verifier})});
+      if(!r.ok)throw new Error("pkce failed");
+      const j=await r.json();storeAuth({accessToken:j.access_token,refreshToken:j.refresh_token,expiresAt:Date.now()+j.expires_in*1000,user:toAuthUser(j.user)});return{handled:true}}
+    catch(e){return{handled:true,error:"ログイン処理に失敗しました。もう一度お試しください"}}}
+  if(location.hash&&location.hash.includes("error")){const prm=new URLSearchParams(location.hash.slice(1));history.replaceState(null,"",location.pathname+location.search);return{handled:true,error:decodeURIComponent(prm.get("error_description")||"ログインに失敗しました")}}
+  if(!location.hash||!location.hash.includes("access_token"))return{handled:false};
+  const prm=new URLSearchParams(location.hash.slice(1));
+  const at=prm.get("access_token")||"",rt=prm.get("refresh_token")||"",ei=Number(prm.get("expires_in")||3600);
+  history.replaceState(null,"",location.pathname+location.search);
+  if(!at)return{handled:true,error:"ログイン情報を取得できませんでした"};
+  try{const user=await fetchAuthUser(at);storeAuth({accessToken:at,refreshToken:rt,expiresAt:Date.now()+ei*1000,user});return{handled:true}}
+  catch(e){return{handled:true,error:"ログイン処理に失敗しました。もう一度お試しください"}}}
+async function ensureFresh(){
+  if(!authSess)return false;
+  if(authSess.expiresAt-Date.now()>120000)return true;
+  if(!authSess.refreshToken){storeAuth(null);return false}
+  try{const r=await fetch(AUTH_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:AUTH_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:authSess.refreshToken})});
+    if(!r.ok)throw new Error("refresh failed");
+    const j=await r.json();storeAuth({accessToken:j.access_token,refreshToken:j.refresh_token,expiresAt:Date.now()+j.expires_in*1000,user:toAuthUser(j.user)});return true}
+  catch(e){storeAuth(null);return false}}
+async function doLogout(){if(authSess){try{await fetch(AUTH_URL+"/auth/v1/logout",{method:"POST",headers:{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken}})}catch(e){}}storeAuth(null)}
+function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp}}}
+function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;save(LS.conf,conf)}}
+async function syncHeaders(){if(!(await ensureFresh())||!authSess)return null;return{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken,"Content-Type":"application/json"}}
+async function pushSync(){const h=await syncHeaders();if(!h)return false;try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync",{method:"POST",headers:Object.assign({},h,{Prefer:"resolution=merge-duplicates"}),body:JSON.stringify({user_id:authSess.user.id,data:collectSync(),updated_at:new Date().toISOString()})});if(!r.ok)return false;setLastSyncAt(Date.now());return true}catch(e){return false}}
+async function pullSync(){const h=await syncHeaders();if(!h)return"none";try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync?select=data,updated_at&user_id=eq."+authSess.user.id,{headers:h});if(!r.ok)return"none";const rows=await r.json();if(!rows.length)return"none";const ct=new Date(rows[0].updated_at).getTime();if(ct>lastSyncAt()+1000){applySync(rows[0].data);setLastSyncAt(ct);return"applied"}return"exists"}catch(e){return"none"}}
+function renderAccount(){
+  const box=$("#accountBox"),body=$("#loginBody");if(!box||!body)return;
+  const user=currentUser();
+  if(!user){
+    box.innerHTML='<button class="btn primary" style="width:100%" data-open-login>ログイン</button><p class="login-note" style="margin-top:8px">ログインすると会話をクラウドに保存できます</p>';
+    body.innerHTML='<p class="set-desc">会話と設定（APIキーを除く）をクラウドに保存して、別の端末でも続きから使えるようになります。APIキーは端末の中にだけ保存され、クラウドには送りません。</p>'
+      +'<button class="login-btn github" data-login="github">'+BRAND_ICONS.github+'<span>GitHubでログイン</span></button>'
+      +'<button class="login-btn" data-login="google">'+BRAND_ICONS.google+'<span>Googleでログイン</span></button>'
+      +'<button class="login-btn apple" data-login="apple">'+BRAND_ICONS.apple+'<span>Appleでログイン</span></button>'
+      +'<p class="login-note">ログインはSupabase Authを通して行われます。Appleログインは提供側の設定が完了したあとに使えます（未設定の間はエラーになります）。</p>';
+    return}
+  const initial=esc((user.name||user.email||"?").charAt(0).toUpperCase());
+  const avatar=user.avatarUrl?'<img class="acct-avatar" src="'+esc(user.avatarUrl)+'" alt="">':'<span class="acct-initial">'+initial+'</span>';
+  box.innerHTML='<div class="acct-row">'+avatar+'<div class="acct-texts"><div class="acct-name">'+esc(user.name||"ログイン中")+'</div><div class="acct-mail">'+esc(user.email)+'</div></div><button class="icon-btn" id="btnLogoutSide" aria-label="ログアウト" title="ログアウト">'+LOGOUT_SVG+'</button></div>';
+  const sync=lastSyncAt();
+  body.innerHTML='<div class="acct-row">'+avatar+'<div class="acct-texts"><div class="acct-name">'+esc(user.name||"ログイン中")+'</div><div class="acct-mail">'+esc(user.email)+'</div></div></div>'
+    +'<p class="sync-line">'+(sync?("最終同期："+new Date(sync).toLocaleString("ja-JP")):"まだクラウドに保存していません")+'</p>'
+    +'<button class="btn primary" id="btnSyncNow" style="width:100%;margin-top:12px">'+CLOUD_SVG+'<span>今すぐ同期する</span></button>'
+    +'<button class="btn danger" id="btnLogout" style="width:100%;margin-top:10px">'+LOGOUT_SVG+'<span>ログアウト</span></button>'
+    +'<p class="login-note">同期されるのは会話と設定だけです。APIキーはこの端末の中にだけ残ります。</p>'}
+
 function renderAll(){ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
 
 /* ================= API ================= */
@@ -662,6 +766,7 @@ async function sendMessage(){
   generating=false;abortCtl=null;setSendBtn(false);
   save(LS.sess,sessions);renderChat();
   if(aiMsg.error){showErrorBanner(aiMsg.error,p)}
+  else if(authSess){pushSync()}
 }
 function updateStreamingMsg(s,aiMsg){
   const col=$("#chatCol");const nodes=col.querySelectorAll(".msg");
@@ -755,6 +860,13 @@ document.addEventListener("click",e=>{
   const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");return}
   const mi=e.target.closest("[data-model]");if(mi){conf.models[conf.provider]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
 });
+document.addEventListener("click",e=>{
+  const lg=e.target.closest("[data-login]");if(lg){loginWith(lg.getAttribute("data-login"));return}
+  const ol=e.target.closest("[data-open-login]");if(ol){renderAccount();openSheet("loginSheet");closeSidebar();return}
+  if(e.target.closest("#btnSyncNow")){(async()=>{const pulled=await pullSync();if(pulled==="applied"){renderAll();toast("クラウドのデータを取り込みました")}const ok=await pushSync();renderAccount();toast(ok?"同期しました":"同期に失敗しました。通信状態を確認してください")})();return}
+  if(e.target.closest("#btnLogout")||e.target.closest("#btnLogoutSide")){(async()=>{await doLogout();closeSheet("loginSheet");renderAccount();toast("ログアウトしました")})();return}
+});
+$("#btnAccountTop").addEventListener("click",()=>{renderAccount();openSheet("loginSheet")});
 $("#btnNewChat").addEventListener("click",()=>{newSession();closeSidebar()});
 $("#btnNewTop").addEventListener("click",()=>newSession());
 $("#btnMenu").addEventListener("click",openSidebar);
@@ -792,7 +904,7 @@ $("#btnWipe").addEventListener("click",()=>{if(!confirm("キー・会話・設�
   [LS.keys,LS.tested,LS.models,LS.conf,LS.sess].forEach(k=>localStorage.removeItem(k));
   keys={};tested={};fetchedModels={};sessions=[];currentId=null;conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},{});PROVIDERS.forEach(p=>conf.models[p.id]=p.def);
   renderSettings();renderAll();toast("すべて削除しました")});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSheet");closeSheet("settingsSheet");closeSidebar()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSheet");closeSheet("settingsSheet");closeSheet("loginSheet");closeSidebar()}});
 
 /* ================= Init ================= */
 (function init(){
@@ -802,6 +914,18 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
   $("#sysPrompt").value=conf.system||"";
   $("#tempRange").value=conf.temp;$("#tempVal").textContent=(+conf.temp).toFixed(1);
   renderAll();
+  renderAccount();
+  (async()=>{
+    const cb=await handleAuthCallback();
+    if(cb.error)toast("ログインできませんでした："+cb.error+"（Appleは提供側の設定が完了するまで使えません）");
+    if(cb.handled&&!cb.error)toast("ログインしました");
+    if(authSess){
+      const pulled=await pullSync();
+      if(pulled==="applied"){renderAll();toast("クラウドのデータを取り込みました")}
+      else if(pulled==="none")await pushSync();
+      renderAccount();
+    }
+  })();
 })();
 </script>
 </body>

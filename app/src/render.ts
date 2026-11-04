@@ -1,3 +1,4 @@
+import { BRAND_ICONS, currentUser, lastSyncAt } from "./auth";
 import { md } from "./markdown";
 import { PROVIDERS, findProvider } from "./providers";
 import {
@@ -106,6 +107,49 @@ export function scrollBottom(smooth = true): void {
   requestAnimationFrame(() => {
     sc.scrollTo({ top: sc.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   });
+}
+
+const LOGOUT_SVG = '<svg class="ic" viewBox="0 0 24 24"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+const CLOUD_SVG = '<svg class="ic" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 6 6 0 0 0-11.7 1.2A4 4 0 0 0 7 19h10.5z"/><path d="M12 19v-6"/><path d="M9.5 15.5 12 13l2.5 2.5"/></svg>';
+
+/** サイドバーのアカウント欄と、ログインシートの中身を描く */
+export function renderAccount(): void {
+  const box = $("#accountBox");
+  const body = $("#loginBody");
+  if (!box || !body) return;
+  const user = currentUser();
+  if (!user) {
+    box.innerHTML =
+      `<button class="btn primary" style="width:100%" data-open-login>ログイン</button>` +
+      `<p class="login-note" style="margin-top:8px">ログインすると会話をクラウドに保存できます</p>`;
+    body.innerHTML =
+      `<p class="set-desc">会話と設定（APIキーを除く）をクラウドに保存して、別の端末でも続きから使えるようになります。APIキーは端末の中にだけ保存され、クラウドには送りません。</p>` +
+      `<button class="login-btn github" data-login="github">${BRAND_ICONS.github}<span>GitHubでログイン</span></button>` +
+      `<button class="login-btn" data-login="google">${BRAND_ICONS.google}<span>Googleでログイン</span></button>` +
+      `<button class="login-btn apple" data-login="apple">${BRAND_ICONS.apple}<span>Appleでログイン</span></button>` +
+      `<p class="login-note">ログインはSupabase Authを通して行われます。Appleログインは提供側の設定が完了したあとに使えます（未設定の間はエラーになります）。</p>`;
+    return;
+  }
+  const initial = esc((user.name || user.email || "?").charAt(0).toUpperCase());
+  const avatar = user.avatarUrl
+    ? `<img class="acct-avatar" src="${esc(user.avatarUrl)}" alt="">`
+    : `<span class="acct-initial">${initial}</span>`;
+  box.innerHTML =
+    `<div class="acct-row">${avatar}<div class="acct-texts">` +
+    `<div class="acct-name">${esc(user.name || "ログイン中")}</div>` +
+    `<div class="acct-mail">${esc(user.email)}</div></div>` +
+    `<button class="icon-btn" id="btnLogoutSide" aria-label="ログアウト" title="ログアウト">${LOGOUT_SVG}</button></div>`;
+  const sync = lastSyncAt();
+  body.innerHTML =
+    `<div class="acct-row">${avatar}<div class="acct-texts">` +
+    `<div class="acct-name">${esc(user.name || "ログイン中")}</div>` +
+    `<div class="acct-mail">${esc(user.email)}</div></div></div>` +
+    `<p class="sync-line">${
+      sync ? `最終同期：${new Date(sync).toLocaleString("ja-JP")}` : "まだクラウドに保存していません"
+    }</p>` +
+    `<button class="btn primary" id="btnSyncNow" style="width:100%;margin-top:12px">${CLOUD_SVG}<span>今すぐ同期する</span></button>` +
+    `<button class="btn danger" id="btnLogout" style="width:100%;margin-top:10px">${LOGOUT_SVG}<span>ログアウト</span></button>` +
+    `<p class="login-note">同期されるのは会話と設定だけです。APIキーはこの端末の中にだけ残ります。</p>`;
 }
 
 export function renderAll(): void {
