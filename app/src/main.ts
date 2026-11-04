@@ -543,9 +543,7 @@ function openLoginFromWelcome(): void {
   openSheet("loginSheet");
 }
 
-$("#btnWelcomeLogin").addEventListener("click", openLoginFromWelcome);
-$("#btnWelcomeLoginTop").addEventListener("click", openLoginFromWelcome);
-$("#btnWelcomeGuest").addEventListener("click", () => {
+function enterAsGuest(): void {
   try {
     localStorage.setItem("eluntra_guest", "1");
   } catch {
@@ -553,7 +551,14 @@ $("#btnWelcomeGuest").addEventListener("click", () => {
   }
   enterApp();
   ($("#input") as HTMLTextAreaElement).focus();
-});
+}
+
+document
+  .querySelectorAll(".w-login-btn")
+  .forEach((b) => b.addEventListener("click", openLoginFromWelcome));
+document
+  .querySelectorAll(".w-guest-btn")
+  .forEach((b) => b.addEventListener("click", enterAsGuest));
 
 /* ---------- 初期化 ---------- */
 
@@ -568,6 +573,10 @@ $("#btnWelcomeGuest").addEventListener("click", () => {
   renderAll();
   renderAccount();
   void autoFetchModels(state.conf.provider);
+  $("#welcomeKeyLinks").innerHTML = PROVIDERS.map(
+    (p) =>
+      `<a class="w-keylink" href="${p.getKeyUrl}" target="_blank" rel="noopener"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>${esc(p.name)}のキー取得</a>`,
+  ).join("");
   $("#welcomeProvs").innerHTML = PROVIDERS.map(
     (p) =>
       `<span class="w-prov"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>${esc(p.name)}</span>`,

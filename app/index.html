@@ -16,6 +16,12 @@
 <meta property="og:url" content="https://simple-url-server.lovable.app/s/eluntra/">
 <meta property="og:image" content="https://simple-url-server.lovable.app/s/eluntra/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Eluntra">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231E4D3B'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' fill='%23F4F1EA' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -24,18 +30,21 @@
   <div class="w-inner">
     <header class="w-head">
       <span class="w-brand">Eluntra</span>
-      <button class="btn secondary sm" id="btnWelcomeLoginTop">ログイン</button>
+      <nav class="w-nav">
+        <a href="#w-how">使い方</a><a href="#w-features">特徴</a><a href="#w-faq">FAQ</a>
+        <button class="btn secondary sm w-login-btn" id="btnWelcomeLoginTop">ログイン</button>
+      </nav>
     </header>
     <p class="w-kicker">BYOK AI CHAT</p>
     <h1 class="w-title">8社のAIを、<br><span>自分のキー</span>で。</h1>
     <p class="w-lead">OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
     <div class="w-cta">
-      <button class="btn primary w-main-btn" id="btnWelcomeLogin">ログインして始める</button>
+      <button class="btn primary w-main-btn w-login-btn" id="btnWelcomeLogin">ログインして始める</button>
       <button class="btn ghost w-guest-btn" id="btnWelcomeGuest">ログインせずに使う</button>
     </div>
     <p class="w-note">ログインすると、会話と設定をクラウドに保存して別の端末でも続きから使えます。</p>
     <div class="w-provs" id="welcomeProvs"></div>
-    <section class="w-feats">
+    <section class="w-feats" id="w-features">
       <div class="w-feat">
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
         <div><h3>8社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek。モデル一覧はキーで自動取得します。</p></div>
@@ -48,8 +57,63 @@
         <svg class="ic" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .9-8.9 6 6 0 0 0-11.7 1.2A4 4 0 0 0 7 19h10.5z"/><path d="M12 12v7"/><path d="M9 15.5 12 12l3 3.5"/></svg>
         <div><h3>会話をクラウド同期</h3><p>GitHub / Google / Appleでログインすると、会話と設定を保存して、別の端末でも続きから使えます。</p></div>
       </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+        <div><h3>モデルは自動取得</h3><p>キーを入れると、そのキーで使えるモデル一覧を自動で取り込みます。新しいモデルも一覧から選ぶだけです。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+        <div><h3>ストリーミング応答</h3><p>回答は生成されながら逐次表示。長文でも待ち時間を感じにくく、途中で止めることもできます。</p></div>
+      </div>
+      <div class="w-feat">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M4 19h16"/></svg>
+        <div><h3>書き出しと削除</h3><p>会話はMarkdownやJSONで書き出せます。キー・会話・設定のすべてを、設定からいつでも削除できます。</p></div>
+      </div>
     </section>
-    <footer class="w-foot">Eluntra — 自分のキーで使うAIチャット</footer>
+    <section class="w-section" id="w-how">
+      <p class="w-sec-kicker">HOW IT WORKS</p>
+      <h2 class="w-h2">使い方は、3ステップ</h2>
+      <ol class="w-steps">
+        <li><span class="w-step-num">1</span><div><h3>APIキーを取得する</h3><p>使いたいAI会社の公式ページでAPIキーを発行します。下のリンクから各社の取得ページへ進めます（無料枠のある会社もあります）。</p></div></li>
+        <li><span class="w-step-num">2</span><div><h3>Eluntraにキーを設定する</h3><p>アプリの設定にキーを貼って「接続テスト」。キーはあなたの端末の中にだけ保存されます。</p></div></li>
+        <li><span class="w-step-num">3</span><div><h3>モデルを選んで話す</h3><p>そのキーで使えるモデル一覧は自動で取得されます。あとは選んで話しかけるだけです。</p></div></li>
+      </ol>
+      <div class="w-keylinks" id="welcomeKeyLinks"></div>
+    </section>
+    <section class="w-section" id="w-security">
+      <p class="w-sec-kicker">SECURITY</p>
+      <h2 class="w-h2">セキュリティとプライバシー</h2>
+      <div class="w-sec-body">
+        <p><b>キーの保存場所。</b>APIキーはお使いの端末のブラウザ内にのみ保存され、Eluntra側のサーバーへ送信・保存されることはありません。通信は、あなたのブラウザから各AI会社の公式APIへ直接行われます。</p>
+        <p><b>同期の対象。</b>ログイン時のクラウド同期は、会話と設定だけが対象です。APIキーは同期対象に含まれません。同期データはSupabaseに保存され、自分のデータだけが読み書きできるよう制限されています。</p>
+        <p><b>データの削除。</b>設定の「すべて削除」から、端末内のキー・会話・設定をいつでも消せます。ログアウトすれば、この端末でのログイン状態も解けます。</p>
+      </div>
+    </section>
+    <section class="w-section" id="w-faq">
+      <p class="w-sec-kicker">FAQ</p>
+      <h2 class="w-h2">よくある質問</h2>
+      <div class="w-faqs">
+        <details class="w-faq"><summary>利用料金はかかりますか？</summary><p>Eluntra自体は無料です。AIの利用については、各社のAPI料金または無料枠の範囲で、あなた自身の契約が適用されます。</p></details>
+        <details class="w-faq"><summary>ログインは必須ですか？</summary><p>いいえ。「ログインせずに使う」でも、チャットの全機能が使えます。ログインすると、会話と設定をクラウドに保存して別の端末でも続きから使えます。</p></details>
+        <details class="w-faq"><summary>APIキーは安全ですか？</summary><p>キーは端末のブラウザ内にのみ保存され、選んだAI会社のAPIへ直接送られます。途中のサーバーに残ることはありません。共用端末では、使用後に設定からキーを削除してください。</p></details>
+        <details class="w-faq"><summary>どのモデルが使えますか？</summary><p>キーを設定すると、そのキーで実際に使えるモデル一覧を自動で取得します。一覧にないモデルも、モデルIDを直接指定して使えます。</p></details>
+        <details class="w-faq"><summary>会話の内容は学習に使われますか？</summary><p>Eluntraが会話を収集することはありません。入力した内容の取り扱いは、送信先である各AI会社のAPI利用規約・ポリシーに従います。</p></details>
+      </div>
+    </section>
+    <div class="w-cta-band">
+      <p class="w-cta-lead">まずは、自分のキーで。</p>
+      <div class="w-cta">
+        <button class="btn primary w-main-btn w-login-btn">ログインして始める</button>
+        <button class="btn ghost w-guest-btn2 w-guest-btn">ログインせずに使う</button>
+      </div>
+    </div>
+    <footer class="w-foot">
+      <nav class="w-foot-nav">
+        <a href="#w-how">使い方</a><a href="#w-features">特徴</a><a href="#w-security">セキュリティ</a><a href="#w-faq">FAQ</a><a href="https://github.com/tgh59njvyp-ship-it/eluntra" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <p>OpenAI、Gemini、Claudeなどの名称は各社の商標です。Eluntraは各社の公式APIを利用するクライアントアプリです。</p>
+      <p class="w-copy">© 2026 Eluntra</p>
+    </footer>
   </div>
 </div>
 
