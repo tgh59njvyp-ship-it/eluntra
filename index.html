@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eluntra — 8社のAIを、自分のキーで</title>
+<meta name="description" content="Eluntraは、OpenAI・Gemini・Anthropic・Mistral・Groq・OpenRouter・Cohere・DeepSeekの8社を自分のAPIキー（BYOK）で使うAIチャットサービスです。キーは端末内にのみ保存されます。">
+<meta property="og:title" content="Eluntra">
+<meta property="og:description" content="8社のAIを、自分のキーで。BYOK専用AIチャット。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F4F1EA">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231E4D3B'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' fill='%23F4F1EA' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#F4F1EA; --surface:#FFFEFA; --bg-sub:#ECE8DE;
+  --ink:#1A1814; --text-2:#5F594E; --text-3:#8A8375;
+  --line:#DDD6C6; --line-strong:#C6BCA4;
+  --accent:#1E4D3B; --accent-ink:#FFFFFF; --accent-soft:#E3EDE6;
+  --error:#B3261E; --error-bg:#FDF0EF; --success:#1E6B4A;
+  --shadow:0 16px 40px rgba(20,16,8,.22);
+  --serif:"Hiragino Mincho ProN","Yu Mincho","YuMincho",Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+  --mono:ui-monospace,"SF Mono","IBM Plex Mono",Menlo,monospace;
+}
+[data-theme="dark"]{
+  --bg:#14120F; --surface:#1D1A16; --bg-sub:#1A1713;
+  --ink:#EDE8DD; --text-2:#B3AB9C; --text-3:#7E776A;
+  --line:#322D26; --line-strong:#4A4438;
+  --accent:#8FC1A6; --accent-ink:#10201A; --accent-soft:#1C2E25;
+  --error:#FF9A92; --error-bg:#33201E; --success:#7ED3A8;
+  --shadow:0 16px 40px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);font-size:15.5px;line-height:1.75;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;color:inherit;background:none;border:none}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,textarea,select{font-family:inherit;font-size:16px;color:var(--ink)}
+a{color:var(--accent);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg{display:block}
+.ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.sm{width:18px;height:18px}
+
+/* ---------- layout ---------- */
+.app{display:flex;height:100dvh;overflow:hidden}
+.sidebar{width:288px;flex:none;background:var(--bg-sub);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:40}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.scrim{position:fixed;inset:0;background:rgba(15,12,6,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:35}
+.scrim.on{opacity:1;pointer-events:auto}
+
+/* sidebar */
+.sb-head{padding:20px 20px 12px}
+.logo{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:.04em;line-height:1.2}
+.logo-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:12px;font-size:14.5px;font-weight:600;border:1px solid transparent;transition:background .15s,border-color .15s;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.secondary{background:var(--surface);border-color:var(--line-strong)}
+.btn.ghost{border-color:transparent;color:var(--text-2)}
+.btn.ghost:hover{background:var(--bg-sub);color:var(--ink)}
+.btn.danger{background:var(--error);color:#fff}
+.btn.sm{height:36px;padding:0 12px;font-size:13.5px;border-radius:8px}
+.btn.block{width:100%}
+.sb-new{padding:4px 16px 12px}
+.sb-sec{padding:12px 20px 6px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--text-3)}
+.sessions{flex:1;overflow-y:auto;padding:0 8px}
+.sess{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border-radius:8px;font-size:14px;line-height:1.45;color:var(--ink)}
+.sess:hover{background:var(--surface)}
+.sess.on{background:var(--surface);font-weight:600;box-shadow:inset 2px 0 0 var(--accent)}
+.sess .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess .del{opacity:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--text-3)}
+.sess:hover .del,.sess.on .del{opacity:1}
+.sess .del:hover{color:var(--error);background:var(--error-bg)}
+@media(hover:none){.sess .del{opacity:.6}}
+.prov-status{padding:0 12px 8px}
+.pstat{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:6px 8px;border-radius:8px;font-size:13.5px}
+.pstat:hover{background:var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line-strong);flex:none;margin-left:auto}
+.dot.set{background:#C08A1E}
+.dot.ok{background:var(--success)}
+.sb-foot{border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px}
+.sb-note{font-size:11.5px;color:var(--text-3);line-height:1.5;flex:1}
+.mono-tile{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;flex:none;letter-spacing:.02em}
+.mono-tile.sm{width:28px;height:28px;border-radius:7px;font-size:10.5px}
+
+/* topbar (mobile) */
+.topbar{display:none;align-items:center;gap:8px;padding:10px 12px calc(10px);border-bottom:1px solid var(--line);background:var(--bg);padding-top:calc(10px + env(safe-area-inset-top))}
+.icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink)}
+.icon-btn:hover{background:var(--bg-sub)}
+.model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--surface);border:1px solid var(--line-strong);border-radius:999px;text-align:left}
+.model-pill .mp-name{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .mp-model{font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .chev{margin-left:auto;color:var(--text-3)}
+
+/* chat */
+.chat-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain}
+.chat-col{max-width:780px;margin:0 auto;padding:24px 20px 32px}
+.empty{padding:32px 0 8px}
+.empty h1{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.45;letter-spacing:.02em}
+.empty p.lead{color:var(--text-2);margin-top:12px;max-width:34em}
+.empty .sec-label{margin:28px 0 10px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--text-3)}
+.prov-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.prov-cell{display:flex;align-items:center;gap:12px;padding:14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface);text-align:left;width:100%}
+.prov-cell:hover{background:var(--accent-soft)}
+.prov-cell.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.prov-cell .pc-name{font-size:14.5px;font-weight:600;line-height:1.35}
+.prov-cell .pc-state{font-size:12px;color:var(--text-2);line-height:1.35}
+.prov-cell .dot{margin-left:auto}
+.sugg{display:flex;flex-direction:column}
+.sugg button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 4px;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--ink)}
+.sugg button:hover{color:var(--accent)}
+.sugg .n{font-family:var(--mono);font-size:12px;color:var(--text-3)}
+.msg{padding:20px 0;border-bottom:1px solid var(--line)}
+.msg:last-child{border-bottom:none}
+.msg-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.msg-role{font-size:13px;font-weight:700;letter-spacing:.04em}
+.msg-meta{font-family:var(--mono);font-size:11.5px;color:var(--text-3)}
+.msg-tools{margin-left:auto;display:flex;gap:4px}
+.msg-tools button{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--text-3)}
+.msg-tools button:hover{background:var(--bg-sub);color:var(--ink)}
+.msg-body{font-size:15.5px;line-height:1.85;word-break:break-word;overflow-wrap:anywhere}
+.msg-body p{margin:0 0 12px}
+.msg-body p:last-child{margin-bottom:0}
+.msg-body ul,.msg-body ol{margin:0 0 12px;padding-left:1.4em}
+.msg-body li{margin:4px 0}
+.msg-body code{font-family:var(--mono);font-size:.86em;background:var(--bg-sub);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+.msg-body pre{background:#171512;color:#EDE8DD;border-radius:12px;padding:14px 16px;overflow-x:auto;margin:0 0 12px}
+.msg-body pre code{background:none;border:none;padding:0;color:inherit;font-size:13px;line-height:1.65}
+.msg-body h3,.msg-body h4{font-size:16px;margin:16px 0 8px}
+.msg-body strong{font-weight:700}
+.msg-body blockquote{border-left:3px solid var(--line-strong);padding-left:12px;color:var(--text-2);margin:0 0 12px}
+.msg-body table{border-collapse:collapse;margin:0 0 12px;font-size:14px}
+.msg-body th,.msg-body td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.typing{display:inline-flex;gap:5px;padding:6px 0}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--text-3);animation:tp 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.banner{display:flex;gap:12px;align-items:flex-start;background:var(--error-bg);border:1px solid var(--error);color:var(--ink);border-radius:12px;padding:14px 16px;margin:16px 0;font-size:14px;line-height:1.65}
+.banner .ic{color:var(--error);margin-top:2px}
+.banner b{color:var(--error)}
+
+/* composer */
+.composer{border-top:1px solid var(--line);background:var(--bg);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.composer-in{max-width:780px;margin:0 auto}
+.sysbar{display:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.sysbar.on{display:block}
+.sysbar label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--text-3);display:block;margin-bottom:6px}
+.sysbar textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:10px 12px;min-height:64px;resize:vertical;line-height:1.6}
+.sysbar .row{display:flex;align-items:center;gap:12px;margin-top:10px;font-size:13px;color:var(--text-2)}
+.sysbar input[type=range]{flex:1;accent-color:var(--accent)}
+.input-box{display:flex;gap:8px;align-items:flex-end;background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;padding:8px}
+.input-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input-box textarea{flex:1;border:none;background:none;resize:none;min-height:28px;max-height:150px;line-height:1.6;padding:7px 8px;outline:none}
+.send-btn{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex:none}
+.send-btn:hover{filter:brightness(1.07)}
+.send-btn.stop{background:var(--error);color:#fff}
+.composer-meta{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--text-3);flex-wrap:wrap}
+.composer-meta .sep{opacity:.6}
+.meta-btn{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 8px;border-radius:8px;color:var(--text-2);font-size:12px}
+.meta-btn:hover{background:var(--bg-sub);color:var(--ink)}
+.meta-btn .ic{width:15px;height:15px}
+.spacer{flex:1}
+
+/* sheets / modal */
+.sheet{position:fixed;inset:0;z-index:60;display:none}
+.sheet.on{display:block}
+.sheet-bg{position:absolute;inset:0;background:rgba(15,12,6,.45)}
+.sheet-panel{position:absolute;background:var(--bg);display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.sheet-panel.bottom{left:0;right:0;bottom:0;max-height:82dvh;border-radius:20px 20px 0 0;animation:up .22s ease}
+.sheet-panel.full{inset:0;animation:up .22s ease}
+@keyframes up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+.sheet-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.sheet-head h2{font-size:17px;font-weight:700;flex:1}
+.sheet-body{overflow-y:auto;padding:16px 20px calc(24px + env(safe-area-inset-bottom))}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line-strong);margin:10px auto 2px}
+
+/* settings */
+.set-sec{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--text-3);margin:24px 0 10px}
+.set-sec:first-child{margin-top:4px}
+.set-desc{font-size:13.5px;color:var(--text-2);line-height:1.7;margin-bottom:12px}
+.prov-row{border-top:1px solid var(--line);padding:16px 0}
+.prov-row:last-of-type{border-bottom:1px solid var(--line)}
+.prov-row-head{display:flex;align-items:center;gap:12px}
+.prov-row-head .pr-name{font-size:15px;font-weight:700;line-height:1.35}
+.prov-row-head .pr-model{font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.35}
+.prov-row-head .st{margin-left:auto;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--bg-sub);color:var(--text-2);border:1px solid var(--line)}
+.prov-row-head .st.ok{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.prov-row-head .st.set{color:#8A5E0B;border-color:#D9B45B;background:#FBF3DC}
+[data-theme="dark"] .prov-row-head .st.set{color:#E8C56D;background:#2D2410}
+.key-box{margin-top:12px;display:none}
+.key-box.on{display:block}
+.key-line{display:flex;gap:8px}
+.key-line input{flex:1;min-width:0;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);padding:0 12px;font-family:var(--mono);font-size:13.5px}
+.key-line input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.key-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.test-result{font-size:13px;line-height:1.6;margin-top:10px;display:none}
+.test-result.on{display:block}
+.test-result.ok{color:var(--success)}
+.test-result.ng{color:var(--error)}
+.get-key{font-size:13px}
+.field{margin-top:12px}
+.field label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+.field textarea{width:100%;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);padding:10px 12px;min-height:72px;resize:vertical;line-height:1.6}
+.field input[type=range]{width:100%;accent-color:var(--accent)}
+
+/* model sheet */
+.model-search{width:100%;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);padding:0 12px;margin-bottom:8px}
+.model-item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:13px 4px;border-bottom:1px solid var(--line)}
+.model-item .mi-id{font-family:var(--mono);font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-item .check{color:var(--accent);opacity:0}
+.model-item.on .check{opacity:1}
+.model-item.on .mi-id{font-weight:700}
+.custom-model{display:flex;gap:8px;margin-top:16px}
+.custom-model input{flex:1;min-width:0;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);padding:0 12px;font-family:var(--mono);font-size:13.5px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(8px);background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:.2s;z-index:90;max-width:88vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+@media(max-width:860px){
+  .sidebar{position:fixed;top:0;bottom:0;left:0;transform:translateX(-100%);transition:transform .22s ease;box-shadow:var(--shadow)}
+  .sidebar.on{transform:none}
+  .topbar{display:flex}
+  .empty h1{font-size:25px}
+  .prov-grid{grid-template-columns:1fr}
+  .chat-col{padding:16px 16px 24px}
+}
+@media(min-width:861px){
+  .sheet-panel.bottom{left:auto;right:24px;bottom:24px;width:440px;border-radius:20px}
+  .sheet-panel.full{left:auto;right:0;top:0;bottom:0;width:560px;border-left:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar" aria-label="サイドバー">
+    <div class="sb-head">
+      <div class="logo">Eluntra</div>
+      <div class="logo-sub">8社のAIを、自分のキーで使うチャット</div>
+    </div>
+    <div class="sb-new">
+      <button class="btn primary block" id="btnNewChat">
+        <svg class="ic sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        新しいチャット
+      </button>
+    </div>
+    <div class="sb-sec">会話</div>
+    <div class="sessions" id="sessionList"></div>
+    <div class="sb-sec">プロバイダー（タップでキー設定）</div>
+    <div class="prov-status" id="provStatus"></div>
+    <div class="sb-foot">
+      <div class="sb-note">APIキーはこの端末のブラウザ内にのみ保存され、各社のAPIへ直接送られます。</div>
+      <button class="icon-btn" id="btnTheme" title="ダークモード切替" aria-label="ダークモード切替">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSettingsSide" title="設定" aria-label="設定">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.51 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="btnMenu" aria-label="メニュー">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <button class="model-pill" id="modelPillTop">
+        <span class="mono-tile sm" id="pillMono">OA</span>
+        <span style="flex:1;min-width:0">
+          <span class="mp-name" id="pillName">OpenAI</span><br>
+          <span class="mp-model" id="pillModel">gpt-4o-mini</span>
+        </span>
+        <svg class="ic sm chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <button class="icon-btn" id="btnNewTop" aria-label="新しいチャット">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSettingsTop" aria-label="設定">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.51 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-col" id="chatCol"></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-in">
+        <div class="sysbar" id="sysbar">
+          <label for="sysPrompt">システムプロンプト</label>
+          <textarea id="sysPrompt" placeholder="例：あなたは簡潔に答えるアシスタントです。"></textarea>
+          <div class="row">
+            <span>Temperature</span>
+            <input type="range" id="tempRange" min="0" max="2" step="0.1" value="0.7">
+            <span id="tempVal" style="font-family:var(--mono)">0.7</span>
+          </div>
+        </div>
+        <div class="input-box">
+          <textarea id="input" rows="1" placeholder="メッセージを入力…" enterkeyhint="send"></textarea>
+          <button class="send-btn" id="btnSend" aria-label="送信">
+            <svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+        <div class="composer-meta">
+          <button class="meta-btn" id="modelPillBottom">
+            <span class="mono-tile sm" id="pillMono2" style="width:20px;height:20px;font-size:8.5px;border-radius:5px">OA</span>
+            <span id="pillLabel2">OpenAI ・ gpt-4o-mini</span>
+            <svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <span class="sep">|</span>
+          <button class="meta-btn" id="btnSys">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+            システム
+          </button>
+          <button class="meta-btn" id="btnExport">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            書き出し
+          </button>
+          <span class="spacer"></span>
+          <span id="keyStateLabel">キー未設定</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Model sheet -->
+<div class="sheet" id="modelSheet" role="dialog" aria-label="モデル選択">
+  <div class="sheet-bg" data-close="modelSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2 id="modelSheetTitle">モデルを選択</h2>
+      <button class="btn secondary sm" id="btnFetchModels">一覧を取得</button>
+      <button class="icon-btn" data-close="modelSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <input class="model-search" id="modelSearch" placeholder="モデルを検索（モデルIDの一部）">
+      <div id="modelList"></div>
+      <div class="custom-model">
+        <input id="customModel" placeholder="カスタムモデルIDを直接入力">
+        <button class="btn secondary" id="btnCustomModel">使う</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-2);margin-top:14px;line-height:1.7">「一覧を取得」は、設定済みのキーで各社のモデル一覧APIを呼び、実際に使えるモデルだけに更新します。キーが未設定の場合は標準モデルから選べます。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet" id="settingsSheet" role="dialog" aria-label="設定">
+  <div class="sheet-bg" data-close="settingsSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>設定 ・ APIキー（BYOK）</h2>
+      <button class="icon-btn" data-close="settingsSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <p class="set-desc">Eluntraは月額なしのBYOK専用です。使う会社のAPIキーを貼るだけで、その会社のモデルと直接通信します。キーはこの端末のブラウザ内（localStorage）にのみ保存され、Eluntraのサーバーには送られません（そもそもサーバーがありません）。料金は各社の従量課金がそのまま適用されます。</p>
+      <div class="set-sec">プロバイダー 8社</div>
+      <div id="provSettings"></div>
+      <div class="set-sec">表示</div>
+      <button class="btn secondary" id="btnTheme2">ダークモード切替</button>
+      <div class="set-sec">データ</div>
+      <p class="set-desc">会話・キー・設定はすべてこの端末内に保存されています。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
+        <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+/* ================= Providers (8) ================= */
+const PROVIDERS=[
+ {id:"openai",name:"OpenAI",mono:"OA",color:"#191919",type:"openai",base:"https://api.openai.com/v1",
+  getKeyUrl:"https://platform.openai.com/api-keys",keyHint:"sk-… で始まるキー",
+  models:["gpt-4o","gpt-4o-mini","gpt-4.1","gpt-4.1-mini","gpt-4.1-nano","o4-mini"],def:"gpt-4o-mini"},
+ {id:"gemini",name:"Google Gemini",mono:"Ge",color:"#1A56DB",type:"gemini",base:"https://generativelanguage.googleapis.com/v1beta",
+  getKeyUrl:"https://aistudio.google.com/apikey",keyHint:"Google AI Studioで無料取得できます",
+  models:["gemini-3.5-flash-lite","gemini-2.5-flash","gemini-2.5-pro","gemini-2.0-flash","gemini-2.0-flash-lite"],def:"gemini-3.5-flash-lite"},
+ {id:"anthropic",name:"Anthropic",mono:"An",color:"#B45A2D",type:"anthropic",base:"https://api.anthropic.com/v1",
+  getKeyUrl:"https://console.anthropic.com/settings/keys",keyHint:"sk-ant-… で始まるキー",
+  models:["claude-sonnet-4-20250514","claude-3-7-sonnet-20250224","claude-3-5-sonnet-20241022","claude-3-5-haiku-20241022"],def:"claude-sonnet-4-20250514"},
+ {id:"mistral",name:"Mistral AI",mono:"Mi",color:"#E85D04",type:"openai",base:"https://api.mistral.ai/v1",
+  getKeyUrl:"https://console.mistral.ai/api-keys",keyHint:"MistralコンソールのAPIキー",
+  models:["mistral-large-latest","mistral-medium-latest","mistral-small-latest","open-mistral-nemo","codestral-latest"],def:"mistral-small-latest"},
+ {id:"groq",name:"Groq",mono:"Gr",color:"#3A3A3A",type:"openai",base:"https://api.groq.com/openai/v1",
+  getKeyUrl:"https://console.groq.com/keys",keyHint:"gsk_… で始まるキー（無料枠あり）",
+  models:["llama-3.3-70b-versatile","llama-3.1-8b-instant","qwen-qwq-32b","deepseek-r1-distill-llama-70b","gemma2-9b-it"],def:"llama-3.3-70b-versatile"},
+ {id:"openrouter",name:"OpenRouter",mono:"OR",color:"#5B4BC4",type:"openai",base:"https://openrouter.ai/api/v1",
+  getKeyUrl:"https://openrouter.ai/settings/keys",keyHint:"sk-or-… で始まるキー（無料モデルあり）",
+  models:["openai/gpt-4o-mini","anthropic/claude-3.5-sonnet","google/gemini-2.0-flash-001","meta-llama/llama-3.3-70b-instruct","deepseek/deepseek-chat","qwen/qwen-2.5-72b-instruct"],def:"openai/gpt-4o-mini"},
+ {id:"cohere",name:"Cohere",mono:"Co",color:"#0F4C3A",type:"cohere",base:"https://api.cohere.com",
+  getKeyUrl:"https://dashboard.cohere.com/api-keys",keyHint:"Cohereダッシュボードのキー（試用キーあり）",
+  models:["command-a-03-2025","command-r7b-12-2024","command-r-plus-08-2024","command-r-08-2024"],def:"command-a-03-2025"},
+ {id:"deepseek",name:"DeepSeek",mono:"De",color:"#2B4BFF",type:"openai",base:"https://api.deepseek.com/v1",
+  getKeyUrl:"https://platform.deepseek.com/api_keys",keyHint:"sk-… で始まるキー",
+  models:["deepseek-chat","deepseek-reasoner"],def:"deepseek-chat"},
+];
+const P=id=>PROVIDERS.find(p=>p.id===id);
+
+/* ================= State ================= */
+const LS={keys:"eluntra_keys",tested:"eluntra_tested",models:"eluntra_models",conf:"eluntra_conf",sess:"eluntra_sessions",theme:"eluntra_theme"};
+const load=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let keys=load(LS.keys,{});
+let tested=load(LS.tested,{});
+let fetchedModels=load(LS.models,{});
+let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},load(LS.conf,{}));
+PROVIDERS.forEach(p=>{if(!conf.models[p.id])conf.models[p.id]=p.def});
+let sessions=load(LS.sess,[]);
+let currentId=null;
+let abortCtl=null;
+let generating=false;
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2600)}
+function curProv(){return P(conf.provider)}
+function curModel(){return conf.models[conf.provider]||curProv().def}
+function modelList(pid){return fetchedModels[pid]&&fetchedModels[pid].length?fetchedModels[pid]:P(pid).models}
+function keyState(pid){if(tested[pid])return"ok";if(keys[pid])return"set";return"none"}
+function stateLabel(pid){return keyState(pid)==="ok"?"接続OK":keyState(pid)==="set"?"設定済み":"未設定"}
+
+/* ================= Markdown (minimal, safe) ================= */
+function md(src){
+  const blocks=[];let s=String(src||"");
+  s=s.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{blocks.push("<pre><code>"+esc(c.replace(/\n$/,""))+"</code></pre>");return "\u0001"+(blocks.length-1)+"\u0001"});
+  const lines=s.split("\n");let html="",inUl=false,inOl=false,inQ=false;
+  const closeLists=()=>{if(inUl){html+="</ul>";inUl=false}if(inOl){html+="</ol>";inOl=false}if(inQ){html+="</blockquote>";inQ=false}};
+  const inline=t=>esc(t).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  for(const raw of lines){
+    const line=raw;
+    if(/^\u0001\d+\u0001$/.test(line.trim())){closeLists();html+=blocks[+line.trim().slice(1,-1)];continue}
+    if(/^#{1,4}\s/.test(line)){closeLists();const lv=line.match(/^#+/)[0].length;html+="<h"+(lv+2)+">"+inline(line.replace(/^#+\s/,""))+"</h"+(lv+2)+">";continue}
+    if(/^\s*[-*]\s+/.test(line)){if(!inUl){closeLists();html+="<ul>";inUl=true}html+="<li>"+inline(line.replace(/^\s*[-*]\s+/,""))+"</li>";continue}
+    if(/^\s*\d+[.)]\s+/.test(line)){if(!inOl){closeLists();html+="<ol>";inOl=true}html+="<li>"+inline(line.replace(/^\s*\d+[.)]\s+/,""))+"</li>";continue}
+    if(/^>\s?/.test(line)){if(!inQ){closeLists();html+="<blockquote>";inQ=true}html+=inline(line.replace(/^>\s?/,""))+"<br>";continue}
+    closeLists();
+    if(line.trim()===""){continue}
+    html+="<p>"+inline(line)+"</p>";
+  }
+  closeLists();return html;
+}
+
+/* ================= Sessions ================= */
+function curSession(){return sessions.find(s=>s.id===currentId)||null}
+function newSession(){
+  const s={id:uid(),title:"新しいチャット",provider:conf.provider,model:curModel(),messages:[],created:Date.now()};
+  sessions.unshift(s);currentId=s.id;save(LS.sess,sessions);renderAll();$("#input").focus();
+}
+function ensureSession(){if(!curSession()){if(sessions.length){currentId=sessions[0].id}else{newSession();return}}}
+function deleteSession(id){
+  sessions=sessions.filter(s=>s.id!==id);
+  if(currentId===id)currentId=sessions.length?sessions[0].id:null;
+  save(LS.sess,sessions);renderAll();
+}
+
+/* ================= Rendering ================= */
+function renderPills(){
+  const p=curProv(),m=curModel();
+  $("#pillMono").textContent=p.mono;$("#pillMono").style.background=p.color;
+  $("#pillMono2").textContent=p.mono;$("#pillMono2").style.background=p.color;
+  $("#pillName").textContent=p.name;$("#pillModel").textContent=m;
+  $("#pillLabel2").textContent=p.name+" ・ "+m;
+  const ks=keyState(p.id);
+  $("#keyStateLabel").textContent=ks==="ok"?"キー接続OK":ks==="set"?"キー設定済み（未テスト）":"キー未設定 — 設定から追加";
+}
+function renderProvStatus(){
+  $("#provStatus").innerHTML=PROVIDERS.map(p=>{
+    const st=keyState(p.id);
+    return '<button class="pstat" data-open-settings="'+p.id+'"><span class="mono-tile sm" style="background:'+p.color+'">'+p.mono+'</span><span>'+esc(p.name)+'</span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
+  }).join("");
+}
+function renderSessions(){
+  const el=$("#sessionList");
+  if(!sessions.length){el.innerHTML='<p style="padding:8px 12px;font-size:13px;color:var(--text-3)">まだ会話がありません</p>';return}
+  el.innerHTML=sessions.map(s=>'<button class="sess '+(s.id===currentId?"on":"")+'" data-sess="'+s.id+'"><span class="t">'+esc(s.title)+'</span><span class="del" data-del="'+s.id+'" role="button" aria-label="削除"><svg class="ic sm" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13h10l1-13"/></svg></span></button>').join("");
+}
+const SUGGESTIONS=["今日の献立を、冷蔵庫の残り物で考えて","この英文を自然な日本語にして： The early bird catches the worm.","PythonでCSVを読み込むコードを書いて","小学生にも分かるように、相対性理論を説明して"];
+function renderChat(){
+  const col=$("#chatCol");const s=curSession();
+  if(!s||!s.messages.length){
+    const provCells=PROVIDERS.map(p=>{
+      const st=keyState(p.id);
+      return '<button class="prov-cell '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'"><span class="mono-tile" style="background:'+p.color+'">'+p.mono+'</span><span><span class="pc-name">'+esc(p.name)+'</span><br><span class="pc-state">'+stateLabel(p.id)+' ・ '+esc(conf.models[p.id])+'</span></span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
+    }).join("");
+    col.innerHTML='<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。まず使う会社を選んでください。</p>'
+      +'<div class="sec-label">プロバイダーを選ぶ（8社）</div><div class="prov-grid">'+provCells+'</div>'
+      +'<div class="sec-label">たとえば</div><div class="sugg">'+SUGGESTIONS.map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
+    return;
+  }
+  col.innerHTML=s.messages.map((m,i)=>renderMsg(m,i,s)).join("");
+  scrollBottom(false);
+}
+function renderMsg(m,i,s){
+  const isUser=m.role==="user";
+  const head=isUser
+    ?'<span class="mono-tile sm" style="background:var(--ink);color:var(--bg)">You</span><span class="msg-role">あなた</span>'
+    :'<span class="mono-tile sm" style="background:'+P(s.providerAtSend||s.provider)?.color+'">'+(P(s.providerAtSend||s.provider)?.mono||"AI")+'</span><span class="msg-role">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+'</span><span class="msg-meta">'+esc(m.model||"")+'</span>';
+  const tools=isUser?"":'<span class="msg-tools"><button data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>';
+  return '<div class="msg"><div class="msg-head">'+head+tools+'</div><div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':md(m.content))+'</div></div>';
+}
+function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
+function renderAll(){ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
+
+/* ================= API ================= */
+function friendlyError(status,bodyText,p){
+  let detail="";try{const j=JSON.parse(bodyText);detail=j.error?.message||j.message||""}catch(e){detail=String(bodyText||"").slice(0,160)}
+  if(status===401||status===403)return "キーが正しくないか、権限がありません。対処：設定で「"+p.name+"」のキーを貼り直し、「接続テスト」を押してください。"+(detail?"（詳細："+detail+"）":"");
+  if(status===404)return "モデルが見つかりませんでした。対処：モデル選択で別のモデルを選ぶか、「一覧を取得」で使えるモデルに更新してください。"+(detail?"（詳細："+detail+"）":"");
+  if(status===429)return "利用上限（レート制限）に達しました。対処：少し待って再送するか、各社の利用状況を確認してください。"+(detail?"（詳細："+detail+"）":"");
+  if(status===400)return "リクエストが受け付けられませんでした。対処：モデル名と入力内容を確認してください。"+(detail?"（詳細："+detail+"）":"");
+  return "通信エラー（"+status+"）が発生しました。対処：電波とキーを確認して再送してください。"+(detail?"（詳細："+detail+"）":"");
+}
+async function fetchWithTimeout(url,opts,ms=90000){
+  const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort("timeout"),ms);
+  const outer=abortCtl?abortCtl.signal:null;
+  try{return await fetch(url,{...opts,signal:outer||ctl.signal})}finally{clearTimeout(timer)}
+}
+async function testConnection(pid){
+  const p=P(pid),key=(keys[pid]||"").trim();
+  if(!key)return{ok:false,msg:"キーが未入力です。上の欄にキーを貼ってください。"};
+  try{
+    let res;
+    if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
+    else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
+    else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
+    else{res=await fetch(p.base+"/models",{headers:{Authorization:"Bearer "+key}})}
+    if(res.ok){tested[pid]=true;save(LS.tested,tested);return{ok:true,msg:"接続できました。このキーでチャットできます。"}}
+    const t=await res.text();delete tested[pid];save(LS.tested,tested);
+    return{ok:false,msg:friendlyError(res.status,t,p)};
+  }catch(e){
+    return{ok:false,msg:"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
+  }
+}
+async function fetchModels(pid){
+  const p=P(pid),key=(keys[pid]||"").trim();
+  if(!key)throw new Error("キーが未設定です。先に設定で"+p.name+"のキーを保存してください。");
+  let res;
+  if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
+  else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
+  else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
+  else{res=await fetch(p.base+"/models",{headers:{Authorization:"Bearer "+key}})}
+  if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+  const j=await res.json();
+  let ids=[];
+  if(p.type==="gemini"){ids=(j.models||[]).map(m=>String(m.name||"").replace(/^models\//,"")).filter(id=>id&&!id.includes("embedding")&&!id.includes("aqa"))}
+  else{ids=(j.data||j.models||[]).map(m=>typeof m==="string"?m:(m.id||m.name||"")).filter(Boolean)}
+  if(p.type==="openai"&&pid==="openai"){ids=ids.filter(id=>/^(gpt-|o\d|chatgpt-)/.test(id))}
+  ids=[...new Set(ids)].sort();
+  if(!ids.length)throw new Error("モデル一覧が空でした。標準モデルのまま使ってください。");
+  fetchedModels[pid]=ids;save(LS.models,fetchedModels);
+  if(!ids.includes(conf.models[pid])){/* keep user model even if not listed */}
+  tested[pid]=true;save(LS.tested,tested);
+  return ids;
+}
+/* --- chat calls --- */
+async function callOpenAI(p,key,model,history,onDelta){
+  const msgs=[];if(conf.system)msgs.push({role:"system",content:conf.system});
+  history.forEach(m=>msgs.push({role:m.role,content:m.content}));
+  const res=await fetchWithTimeout(p.base+"/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify({model,messages:msgs,temperature:+conf.temp,stream:true})});
+  if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+  const reader=res.body.getReader();const dec=new TextDecoder();let buf="",full="";
+  while(true){const{done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n");buf=lines.pop();
+    for(const line of lines){const t=line.trim();if(!t.startsWith("data:"))continue;const d=t.slice(5).trim();if(d==="[DONE]")continue;
+      try{const j=JSON.parse(d);const delta=j.choices?.[0]?.delta?.content||"";if(delta){full+=delta;onDelta(full)}}catch(e){}}}
+  return full;
+}
+async function callGemini(p,key,model,history,onDelta){
+  const contents=history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+  const body={contents,generationConfig:{temperature:+conf.temp}};
+  if(conf.system)body.systemInstruction={parts:[{text:conf.system}]};
+  const url=p.base+"/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse&key="+encodeURIComponent(key);
+  const res=await fetchWithTimeout(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+  const reader=res.body.getReader();const dec=new TextDecoder();let buf="",full="";
+  while(true){const{done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n");buf=lines.pop();
+    for(const line of lines){const t=line.trim();if(!t.startsWith("data:"))continue;const d=t.slice(5).trim();if(!d||d==="[DONE]")continue;
+      try{const j=JSON.parse(d);const txt=(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||"").join("");if(txt){full+=txt;onDelta(full)}}catch(e){}}}
+  if(!full)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  return full;
+}
+async function callAnthropic(p,key,model,history,onDelta){
+  const msgs=history.map(m=>({role:m.role,content:m.content}));
+  const body={model,max_tokens:4096,messages:msgs,temperature:+conf.temp};
+  if(conf.system)body.system=conf.system;
+  const res=await fetchWithTimeout(p.base+"/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+  const j=await res.json();const full=(j.content||[]).map(c=>c.text||"").join("");
+  if(!full)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  onDelta(full);return full;
+}
+async function callCohere(p,key,model,history,onDelta){
+  const msgs=history.map(m=>({role:m.role,content:m.content}));
+  const body={model,messages:conf.system?[{role:"system",content:conf.system},...msgs]:msgs,temperature:+conf.temp};
+  const res=await fetchWithTimeout(p.base+"/v2/chat",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify(body)});
+  if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+  const j=await res.json();const full=(j.message?.content||[]).map(c=>c.text||"").join("");
+  if(!full)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  onDelta(full);return full;
+}
+async function sendMessage(){
+  const ta=$("#input");const text=ta.value.trim();if(!text||generating)return;
+  ensureSession();const s=curSession();const p=curProv();const model=curModel();
+  s.provider=conf.provider;s.model=model;
+  s.messages.push({role:"user",content:text});
+  if(s.messages.length===1)s.title=text.slice(0,28);
+  ta.value="";autoGrow(ta);
+  const aiMsg={role:"assistant",content:"",model,pending:true};
+  s.messages.push(aiMsg);s.providerAtSend=p.id;
+  save(LS.sess,sessions);renderSessions();renderChat();
+  const key=(keys[p.id]||"").trim();
+  if(!key){
+    aiMsg.pending=false;
+    aiMsg.content="__NOKEY__";
+    renderChatWithNoKey(p);save(LS.sess,sessions);return;
+  }
+  generating=true;abortCtl=new AbortController();setSendBtn(true);
+  const histForCall=s.messages.slice(0,-1).filter(m=>m.content&&m.content!=="__NOKEY__");
+  const onDelta=full=>{aiMsg.content=full;aiMsg.pending=false;updateStreamingMsg(s,aiMsg)};
+  try{
+    let full="";
+    if(p.type==="openai")full=await callOpenAI(p,key,model,histForCall,onDelta);
+    else if(p.type==="gemini")full=await callGemini(p,key,model,histForCall,onDelta);
+    else if(p.type==="anthropic")full=await callAnthropic(p,key,model,histForCall,onDelta);
+    else if(p.type==="cohere")full=await callCohere(p,key,model,histForCall,onDelta);
+    aiMsg.content=full;aiMsg.pending=false;
+  }catch(e){
+    aiMsg.pending=false;
+    if(e&&e.name==="AbortError"){aiMsg.content=aiMsg.content||"（生成を止めました）"}
+    else{aiMsg.content="";aiMsg.error=e.message||String(e)}
+  }
+  generating=false;abortCtl=null;setSendBtn(false);
+  save(LS.sess,sessions);renderChat();
+  if(aiMsg.error){showErrorBanner(aiMsg.error,p)}
+}
+function updateStreamingMsg(s,aiMsg){
+  const col=$("#chatCol");const nodes=col.querySelectorAll(".msg");
+  const idx=s.messages.indexOf(aiMsg);const node=nodes[idx];
+  if(!node){renderChat();return}
+  const body=node.querySelector(".msg-body");if(body)body.innerHTML=md(aiMsg.content);
+  scrollBottom(true);
+}
+function renderChatWithNoKey(p){
+  renderChat();
+  const col=$("#chatCol");
+  const div=document.createElement("div");div.className="banner";
+  div.innerHTML='<svg class="ic" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>'+esc(p.name)+'のAPIキーが未設定です。</b><br>対処：設定を開いてキーを貼り、「接続テスト」で確認してください。キーは<a href="'+p.getKeyUrl+'" target="_blank" rel="noopener">公式ページ</a>で取得できます。<br><button class="btn primary sm" style="margin-top:10px" onclick="openSettings(\''+p.id+'\')">設定を開く</button></div>';
+  col.appendChild(div);scrollBottom(false);
+  const s=curSession();if(s){const last=s.messages[s.messages.length-1];if(last&&last.content==="__NOKEY__"){last.content="（"+p.name+"のキーが未設定のため送信できませんでした。設定からキーを追加してください）"}}
+}
+function showErrorBanner(msg,p){
+  const col=$("#chatCol");const div=document.createElement("div");div.className="banner";
+  div.innerHTML='<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg><div><b>エラー</b><br>'+esc(msg)+'<br><button class="btn secondary sm" style="margin-top:10px" onclick="openSettings(\''+p.id+'\')">設定でキーを確認</button></div>';
+  col.appendChild(div);scrollBottom(false);
+}
+function setSendBtn(stop){
+  const b=$("#btnSend");
+  if(stop){b.classList.add("stop");b.innerHTML='<svg class="ic" viewBox="0 0 24 24" style="stroke:#fff"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';b.setAttribute("aria-label","停止")}
+  else{b.classList.remove("stop");b.innerHTML='<svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';b.setAttribute("aria-label","送信")}
+}
+
+/* ================= Settings UI ================= */
+function renderSettings(){
+  $("#provSettings").innerHTML=PROVIDERS.map(p=>{
+    const st=keyState(p.id);
+    const stCls=st==="ok"?"ok":st==="set"?"set":"";
+    return '<div class="prov-row" id="prov-'+p.id+'">'
+      +'<div class="prov-row-head"><span class="mono-tile" style="background:'+p.color+'">'+p.mono+'</span>'
+      +'<span><span class="pr-name">'+esc(p.name)+'</span><br><span class="pr-model">'+esc(conf.models[p.id])+'</span></span>'
+      +'<span class="st '+stCls+'">'+stateLabel(p.id)+'</span>'
+      +'<button class="icon-btn" data-toggle-key="'+p.id+'" aria-label="キー設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>'
+      +'<div class="key-box" id="keybox-'+p.id+'">'
+      +'<div class="key-line"><input type="password" id="key-'+p.id+'" placeholder="'+esc(p.keyHint)+'" value="'+esc(keys[p.id]||"")+'" autocomplete="off" spellcheck="false">'
+      +'<button class="btn secondary" data-show-key="'+p.id+'">表示</button></div>'
+      +'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
+      +'<button class="btn secondary sm" data-test-key="'+p.id+'">接続テスト</button>'
+      +'<button class="btn ghost sm" data-use-prov="'+p.id+'">この会社を使う</button>'
+      +'<a class="get-key" href="'+p.getKeyUrl+'" target="_blank" rel="noopener">キーを取得する</a></div>'
+      +'<div class="test-result" id="test-'+p.id+'"></div>'
+      +'</div></div>';
+  }).join("");
+}
+function openSheet(id){$("#"+id).classList.add("on")}
+function closeSheet(id){$("#"+id).classList.remove("on")}
+function openSettings(focusPid){
+  renderSettings();openSheet("settingsSheet");closeSidebar();
+  if(focusPid){const box=$("#keybox-"+focusPid);if(box){box.classList.add("on");setTimeout(()=>{box.scrollIntoView({behavior:"smooth",block:"center"});const inp=$("#key-"+focusPid);if(inp)inp.focus()},80)}}
+}
+window.openSettings=openSettings;
+
+/* ================= Model sheet ================= */
+function renderModelSheet(filter=""){
+  const p=curProv();$("#modelSheetTitle").textContent=p.name;
+  const list=modelList(p.id).filter(m=>!filter||m.toLowerCase().includes(filter.toLowerCase()));
+  $("#modelList").innerHTML=list.length?list.map(m=>'<button class="model-item '+(m===curModel()?"on":"")+'" data-model="'+esc(m)+'"><span class="mi-id">'+esc(m)+'</span><svg class="ic sm check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button>').join(""):'<p style="padding:16px 0;color:var(--text-2);font-size:14px">一致するモデルがありません。下のカスタム入力で直接指定できます。</p>';
+}
+function openModelSheet(){renderModelSheet();$("#modelSearch").value="";openSheet("modelSheet")}
+
+/* ================= Sidebar / theme ================= */
+function openSidebar(){$("#sidebar").classList.add("on");$("#scrim").classList.add("on")}
+function closeSidebar(){$("#sidebar").classList.remove("on");$("#scrim").classList.remove("on")}
+function applyTheme(t){document.documentElement.setAttribute("data-theme",t);save(LS.theme,t)}
+function toggleTheme(){const cur=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";applyTheme(cur);toast(cur==="dark"?"ダークモードにしました":"ライトモードにしました")}
+
+/* ================= Composer ================= */
+function autoGrow(ta){ta.style.height="auto";ta.style.height=Math.min(ta.scrollHeight,150)+"px"}
+
+/* ================= Events ================= */
+document.addEventListener("click",e=>{
+  const close=e.target.closest("[data-close]");if(close){closeSheet(close.getAttribute("data-close"));return}
+  const os=e.target.closest("[data-open-settings]");if(os){openSettings(os.getAttribute("data-open-settings"));return}
+  const sess=e.target.closest("[data-sess]");
+  if(sess&&!e.target.closest("[data-del]")){currentId=sess.getAttribute("data-sess");renderAll();closeSidebar();return}
+  const del=e.target.closest("[data-del]");if(del){e.stopPropagation();if(confirm("この会話を削除しますか？"))deleteSession(del.getAttribute("data-del"));return}
+  const pick=e.target.closest("[data-pick-prov]");if(pick){conf.provider=pick.getAttribute("data-pick-prov");save(LS.conf,conf);renderAll();toast(P(conf.provider).name+"に切り替えました");return}
+  const sugg=e.target.closest("[data-sugg]");if(sugg){$("#input").value=SUGGESTIONS[+sugg.getAttribute("data-sugg")];autoGrow($("#input"));$("#input").focus();return}
+  const cp=e.target.closest("[data-copy]");if(cp){const s=curSession();const m=s&&s.messages[+cp.getAttribute("data-copy")];if(m){navigator.clipboard.writeText(m.content).then(()=>toast("コピーしました"))}return}
+  const tk=e.target.closest("[data-toggle-key]");if(tk){$("#keybox-"+tk.getAttribute("data-toggle-key")).classList.toggle("on");return}
+  const sk=e.target.closest("[data-show-key]");if(sk){const inp=$("#key-"+sk.getAttribute("data-show-key"));inp.type=inp.type==="password"?"text":"password";sk.textContent=inp.type==="password"?"表示":"隠す";return}
+  const sv=e.target.closest("[data-save-key]");if(sv){const pid=sv.getAttribute("data-save-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v}else{delete keys[pid]}delete tested[pid];save(LS.keys,keys);save(LS.tested,tested);renderSettings();renderAll();toast(v?P(pid).name+"のキーを保存しました":"キーを削除しました");return}
+  const ts=e.target.closest("[data-test-key]");if(ts){(async()=>{const pid=ts.getAttribute("data-test-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v;save(LS.keys,keys)}
+    const box=$("#test-"+pid);box.className="test-result on";box.style.color="var(--text-2)";box.textContent="接続テスト中…";
+    const r=await testConnection(pid);box.className="test-result on "+(r.ok?"ok":"ng");box.textContent=(r.ok?"成功：":"失敗：")+r.msg;renderAll()})();return}
+  const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");return}
+  const mi=e.target.closest("[data-model]");if(mi){conf.models[conf.provider]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
+});
+$("#btnNewChat").addEventListener("click",()=>{newSession();closeSidebar()});
+$("#btnNewTop").addEventListener("click",()=>newSession());
+$("#btnMenu").addEventListener("click",openSidebar);
+$("#scrim").addEventListener("click",closeSidebar);
+$("#btnSettingsSide").addEventListener("click",()=>openSettings());
+$("#btnSettingsTop").addEventListener("click",()=>openSettings());
+$("#btnTheme").addEventListener("click",toggleTheme);
+$("#btnTheme2").addEventListener("click",toggleTheme);
+$("#modelPillTop").addEventListener("click",openModelSheet);
+$("#modelPillBottom").addEventListener("click",openModelSheet);
+$("#modelSearch").addEventListener("input",e=>renderModelSheet(e.target.value));
+$("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchModels");btn.disabled=true;btn.textContent="取得中…";
+  try{const ids=await fetchModels(conf.provider);renderModelSheet($("#modelSearch").value);renderAll();toast(ids.length+"件のモデルを取得しました")}
+  catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="一覧を取得"}});
+$("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
+$("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});
+$("#sysPrompt").addEventListener("input",e=>{conf.system=e.target.value;save(LS.conf,conf)});
+$("#tempRange").addEventListener("input",e=>{conf.temp=+e.target.value;$("#tempVal").textContent=(+e.target.value).toFixed(1);save(LS.conf,conf)});
+$("#btnSend").addEventListener("click",()=>{if(generating){if(abortCtl)abortCtl.abort()}else sendMessage()});
+$("#input").addEventListener("input",e=>autoGrow(e.target));
+$("#input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();sendMessage()}});
+function exportChat(){
+  const s=curSession();if(!s||!s.messages.length){toast("書き出す会話がありません");return}
+  const txt="# "+s.title+"\n\n"+s.messages.map(m=>(m.role==="user"?"## あなた":"## "+(P(s.provider)?.name||"AI")+"（"+(m.model||"")+"）")+"\n\n"+m.content).join("\n\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/markdown"}));a.download="eluntra-chat.md";a.click();URL.revokeObjectURL(a.href);
+}
+$("#btnExport").addEventListener("click",exportChat);
+$("#btnExportAll").addEventListener("click",()=>{
+  const data={exportedAt:new Date().toISOString(),conf,sessions,providers:Object.keys(keys)};
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="eluntra-data.json";a.click();URL.revokeObjectURL(a.href);
+  toast("書き出しました（キー本体は含みません）");
+});
+$("#btnWipe").addEventListener("click",()=>{if(!confirm("キー・会話・設定をすべて削除しますか？この操作は戻せません。"))return;
+  [LS.keys,LS.tested,LS.models,LS.conf,LS.sess].forEach(k=>localStorage.removeItem(k));
+  keys={};tested={};fetchedModels={};sessions=[];currentId=null;conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},{});PROVIDERS.forEach(p=>conf.models[p.id]=p.def);
+  renderSettings();renderAll();toast("すべて削除しました")});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSheet");closeSheet("settingsSheet");closeSidebar()}});
+
+/* ================= Init ================= */
+(function init(){
+  const savedTheme=load(LS.theme,null);
+  const prefersDark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(savedTheme||(prefersDark?"dark":"light"));
+  $("#sysPrompt").value=conf.system||"";
+  $("#tempRange").value=conf.temp;$("#tempVal").textContent=(+conf.temp).toFixed(1);
+  renderAll();
+})();
+</script>
+</body>
+</html>
