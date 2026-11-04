@@ -1,0 +1,285 @@
+import { findProvider } from "./providers";
+import {
+  persistModels,
+  persistTested,
+  runtime,
+  state,
+} from "./state";
+import type { Message, Provider, TestResult } from "./types";
+
+/** HTTPステータスから、日本語＋対処法つきのエラー文を作る */
+export function friendlyError(status: number, bodyText: string, p: Provider): string {
+  let detail = "";
+  try {
+    const j = JSON.parse(bodyText) as { error?: { message?: string }; message?: string };
+    detail = j.error?.message || j.message || "";
+  } catch {
+    detail = String(bodyText || "").slice(0, 160);
+  }
+  const tail = detail ? `（詳細：${detail}）` : "";
+  if (status === 401 || status === 403)
+    return `キーが正しくないか、権限がありません。対処：設定で「${p.name}」のキーを貼り直し、「接続テスト」を押してください。${tail}`;
+  if (status === 404)
+    return `モデルが見つかりませんでした。対処：モデル選択で別のモデルを選ぶか、「一覧を取得」で使えるモデルに更新してください。${tail}`;
+  if (status === 429)
+    return `利用上限（レート制限）に達しました。対処：少し待って再送するか、各社の利用状況を確認してください。${tail}`;
+  if (status === 400)
+    return `リクエストが受け付けられませんでした。対処：モデル名と入力内容を確認してください。${tail}`;
+  return `通信エラー（${status}）が発生しました。対処：電波とキーを確認して再送してください。${tail}`;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  opts: RequestInit,
+  ms = 90000,
+): Promise<Response> {
+  const ctl = new AbortController();
+  const timer = window.setTimeout(() => ctl.abort("timeout"), ms);
+  try {
+    return await fetch(url, { ...opts, signal: runtime.abortCtl?.signal ?? ctl.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function modelsRequest(p: Provider, key: string): Promise<Response> {
+  if (p.type === "gemini") {
+    return fetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
+  }
+  if (p.type === "anthropic") {
+    return fetch(`${p.base}/models`, {
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+    });
+  }
+  if (p.type === "cohere") {
+    return fetch("https://api.cohere.com/v1/models", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+  }
+  return fetch(`${p.base}/models`, { headers: { Authorization: `Bearer ${key}` } });
+}
+
+/** モデル一覧APIで疎通確認する */
+export async function testConnection(pid: string): Promise<TestResult> {
+  const p = findProvider(pid);
+  const key = (state.keys[pid] || "").trim();
+  if (!key) return { ok: false, msg: "キーが未入力です。上の欄にキーを貼ってください。" };
+  try {
+    const res = await modelsRequest(p, key);
+    if (res.ok) {
+      state.tested[pid] = true;
+      persistTested();
+      return { ok: true, msg: "接続できました。このキーでチャットできます。" };
+    }
+    const t = await res.text();
+    delete state.tested[pid];
+    persistTested();
+    return { ok: false, msg: friendlyError(res.status, t, p) };
+  } catch {
+    return {
+      ok: false,
+      msg: "通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）",
+    };
+  }
+}
+
+/** 自分のキーで実際に使えるモデル一覧を取得して保存する */
+export async function fetchModels(pid: string): Promise<string[]> {
+  const p = findProvider(pid);
+  const key = (state.keys[pid] || "").trim();
+  if (!key) throw new Error(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
+  const res = await modelsRequest(p, key);
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  const j = (await res.json()) as {
+    models?: Array<{ id?: string; name?: string } | string>;
+    data?: Array<{ id?: string; name?: string } | string>;
+  };
+  let ids: string[] = [];
+  if (p.type === "gemini") {
+    ids = (j.models || [])
+      .map((m) => (typeof m === "string" ? m : m.name || "").replace(/^models\//, ""))
+      .filter((id) => id && !id.includes("embedding") && !id.includes("aqa"));
+  } else {
+    ids = (j.data || j.models || []).map((m) =>
+      typeof m === "string" ? m : m.id || m.name || "",
+    ).filter(Boolean);
+  }
+  if (pid === "openai") ids = ids.filter((id) => /^(gpt-|o\d|chatgpt-)/.test(id));
+  ids = [...new Set(ids)].sort();
+  if (!ids.length) throw new Error("モデル一覧が空でした。標準モデルのまま使ってください。");
+  state.fetchedModels[pid] = ids;
+  persistModels();
+  state.tested[pid] = true;
+  persistTested();
+  return ids;
+}
+
+/* ---------- チャット送信（会社ごとの形式差をここで吸収） ---------- */
+
+type OnDelta = (full: string) => void;
+
+async function readSse(
+  res: Response,
+  pick: (json: never) => string,
+): Promise<string> {
+  if (!res.body) throw new Error("応答の読み取りに失敗しました。対処：もう一度送ってください。");
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const d = t.slice(5).trim();
+      if (!d || d === "[DONE]") continue;
+      try {
+        const txt = pick(JSON.parse(d) as never);
+        if (txt) {
+          full += txt;
+        }
+      } catch {
+        /* 途中行のパース失敗は無視して読み進める */
+      }
+    }
+  }
+  return full;
+}
+
+/** OpenAI互換（OpenAI / Mistral / Groq / OpenRouter / DeepSeek） */
+export async function callOpenAI(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  const msgs: Array<{ role: string; content: string }> = [];
+  if (state.conf.system) msgs.push({ role: "system", content: state.conf.system });
+  history.forEach((m) => msgs.push({ role: m.role, content: m.content }));
+  const res = await fetchWithTimeout(`${p.base}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model, messages: msgs, temperature: state.conf.temp, stream: true }),
+  });
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  let full = "";
+  full = await readSse(res, (j: { choices?: Array<{ delta?: { content?: string } }> }) => {
+    const delta = j.choices?.[0]?.delta?.content || "";
+    if (delta) {
+      full += delta;
+      onDelta(full);
+    }
+    return delta;
+  });
+  return full;
+}
+
+/** Google Gemini（streamGenerateContent / SSE） */
+export async function callGemini(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  const contents = history.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: { temperature: state.conf.temp },
+  };
+  if (state.conf.system) body.systemInstruction = { parts: [{ text: state.conf.system }] };
+  const url = `${p.base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  let full = "";
+  full = await readSse(
+    res,
+    (j: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }) => {
+      const txt = (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || "").join("");
+      if (txt) {
+        full += txt;
+        onDelta(full);
+      }
+      return txt;
+    },
+  );
+  if (!full) throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  return full;
+}
+
+/** Anthropic（Messages API、非ストリーミング） */
+export async function callAnthropic(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  const msgs = history.map((m) => ({ role: m.role, content: m.content }));
+  const body: Record<string, unknown> = {
+    model, max_tokens: 4096, messages: msgs, temperature: state.conf.temp,
+  };
+  if (state.conf.system) body.system = state.conf.system;
+  const res = await fetchWithTimeout(`${p.base}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  const j = (await res.json()) as { content?: Array<{ text?: string }> };
+  const full = (j.content || []).map((c) => c.text || "").join("");
+  if (!full) throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  onDelta(full);
+  return full;
+}
+
+/** Cohere（Chat API v2、非ストリーミング） */
+export async function callCohere(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  const msgs = history.map((m) => ({ role: m.role, content: m.content }));
+  const body = {
+    model,
+    messages: state.conf.system
+      ? [{ role: "system", content: state.conf.system }, ...msgs]
+      : msgs,
+    temperature: state.conf.temp,
+  };
+  const res = await fetchWithTimeout(`${p.base}/v2/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  const j = (await res.json()) as { message?: { content?: Array<{ text?: string }> } };
+  const full = (j.message?.content || []).map((c) => c.text || "").join("");
+  if (!full) throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+  onDelta(full);
+  return full;
+}
+
+/** プロバイダー種別に応じて送信関数を選ぶ */
+export function callChat(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  switch (p.type) {
+    case "gemini":
+      return callGemini(p, key, model, history, onDelta);
+    case "anthropic":
+      return callAnthropic(p, key, model, history, onDelta);
+    case "cohere":
+      return callCohere(p, key, model, history, onDelta);
+    default:
+      return callOpenAI(p, key, model, history, onDelta);
+  }
+}

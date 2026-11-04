@@ -1,7 +1,12 @@
 # Eluntra
 
 8社のAIを、自分のAPIキー（BYOK）で使うAIチャットサービス。
-単一の `index.html` だけで動く静的サイトで、サーバーはありません。
+サーバーはありません（ブラウザから各社APIへ直接接続）。
+
+## 2つの版があります
+
+- **単一HTML版**（ルートの `index.html`）: ビルド不要、この1枚でそのまま動く静的サイト
+- **TypeScript版**（`app/`）: Vite + TypeScript（strict）のプロジェクト版。機能は単一HTML版と同一で、保存データ（localStorage）も互換。今後の機能追加・改修はこちらを正として進めます（詳細は `app/README.md`）
 
 ## 対応プロバイダー（8社）
 
@@ -33,7 +38,8 @@
 
 ## ファイル
 
-- `index.html` — 本体（これ1枚で動作）
+- `index.html` — 単一HTML版の本体（これ1枚で動作）
+- `app/` — TypeScript版（Viteプロジェクト、`app/src/` にソース一式）
 - `DESIGN.md` — デザインシステム定義
 - `README.md` — このファイル
 

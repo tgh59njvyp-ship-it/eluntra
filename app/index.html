@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Eluntra — 8社のAIを、自分のキーで</title>
+<meta name="description" content="Eluntraは、OpenAI・Gemini・Anthropic・Mistral・Groq・OpenRouter・Cohere・DeepSeekの8社を自分のAPIキー（BYOK）で使うAIチャットサービスです。キーは端末内にのみ保存されます。">
+<meta property="og:title" content="Eluntra">
+<meta property="og:description" content="8社のAIを、自分のキーで。BYOK専用AIチャット。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F4F1EA">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231E4D3B'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' fill='%23F4F1EA' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar" aria-label="サイドバー">
+    <div class="sb-head">
+      <div class="logo">Eluntra</div>
+      <div class="logo-sub">8社のAIを、自分のキーで使うチャット</div>
+    </div>
+    <div class="sb-new">
+      <button class="btn primary block" id="btnNewChat">
+        <svg class="ic sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        新しいチャット
+      </button>
+    </div>
+    <div class="sb-sec">会話</div>
+    <div class="sessions" id="sessionList"></div>
+    <div class="sb-sec">プロバイダー（タップでキー設定）</div>
+    <div class="prov-status" id="provStatus"></div>
+    <div class="sb-foot">
+      <div class="sb-note">APIキーはこの端末のブラウザ内にのみ保存され、各社のAPIへ直接送られます。</div>
+      <button class="icon-btn" id="btnTheme" title="ダークモード切替" aria-label="ダークモード切替">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSettingsSide" title="設定" aria-label="設定">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.51 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="btnMenu" aria-label="メニュー">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <button class="model-pill" id="modelPillTop">
+        <span class="mono-tile sm" id="pillMono">OA</span>
+        <span style="flex:1;min-width:0">
+          <span class="mp-name" id="pillName">OpenAI</span><br>
+          <span class="mp-model" id="pillModel">gpt-4o-mini</span>
+        </span>
+        <svg class="ic sm chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <button class="icon-btn" id="btnNewTop" aria-label="新しいチャット">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSettingsTop" aria-label="設定">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.51 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.23.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-col" id="chatCol"></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-in">
+        <div class="sysbar" id="sysbar">
+          <label for="sysPrompt">システムプロンプト</label>
+          <textarea id="sysPrompt" placeholder="例：あなたは簡潔に答えるアシスタントです。"></textarea>
+          <div class="row">
+            <span>Temperature</span>
+            <input type="range" id="tempRange" min="0" max="2" step="0.1" value="0.7">
+            <span id="tempVal" style="font-family:var(--mono)">0.7</span>
+          </div>
+        </div>
+        <div class="input-box">
+          <textarea id="input" rows="1" placeholder="メッセージを入力…" enterkeyhint="send"></textarea>
+          <button class="send-btn" id="btnSend" aria-label="送信">
+            <svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+        <div class="composer-meta">
+          <button class="meta-btn" id="modelPillBottom">
+            <span class="mono-tile sm" id="pillMono2" style="width:20px;height:20px;font-size:8.5px;border-radius:5px">OA</span>
+            <span id="pillLabel2">OpenAI ・ gpt-4o-mini</span>
+            <svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <span class="sep">|</span>
+          <button class="meta-btn" id="btnSys">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+            システム
+          </button>
+          <button class="meta-btn" id="btnExport">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            書き出し
+          </button>
+          <span class="spacer"></span>
+          <span id="keyStateLabel">キー未設定</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Model sheet -->
+<div class="sheet" id="modelSheet" role="dialog" aria-label="モデル選択">
+  <div class="sheet-bg" data-close="modelSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2 id="modelSheetTitle">モデルを選択</h2>
+      <button class="btn secondary sm" id="btnFetchModels">一覧を取得</button>
+      <button class="icon-btn" data-close="modelSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <input class="model-search" id="modelSearch" placeholder="モデルを検索（モデルIDの一部）">
+      <div id="modelList"></div>
+      <div class="custom-model">
+        <input id="customModel" placeholder="カスタムモデルIDを直接入力">
+        <button class="btn secondary" id="btnCustomModel">使う</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-2);margin-top:14px;line-height:1.7">「一覧を取得」は、設定済みのキーで各社のモデル一覧APIを呼び、実際に使えるモデルだけに更新します。キーが未設定の場合は標準モデルから選べます。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet" id="settingsSheet" role="dialog" aria-label="設定">
+  <div class="sheet-bg" data-close="settingsSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>設定 ・ APIキー（BYOK）</h2>
+      <button class="icon-btn" data-close="settingsSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <p class="set-desc">Eluntraは月額なしのBYOK専用です。使う会社のAPIキーを貼るだけで、その会社のモデルと直接通信します。キーはこの端末のブラウザ内（localStorage）にのみ保存され、Eluntraのサーバーには送られません（そもそもサーバーがありません）。料金は各社の従量課金がそのまま適用されます。</p>
+      <div class="set-sec">プロバイダー 8社</div>
+      <div id="provSettings"></div>
+      <div class="set-sec">表示</div>
+      <button class="btn secondary" id="btnTheme2">ダークモード切替</button>
+      <div class="set-sec">データ</div>
+      <p class="set-desc">会話・キー・設定はすべてこの端末内に保存されています。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
+        <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
