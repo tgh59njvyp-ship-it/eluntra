@@ -36,8 +36,10 @@ export function renderPills(): void {
   $("#pillModel").textContent = m;
   $("#pillLabel2").textContent = `${p.name} ・ ${m}`;
   const ks = keyState(p.id);
-  $("#keyStateLabel").textContent =
-    ks === "ok" ? "キー接続OK" : ks === "set" ? "キー設定済み（未テスト）" : "キー未設定 — 設定から追加";
+  const pill = $("#keyStateLabel");
+  pill.textContent =
+    ks === "ok" ? "キー接続OK" : ks === "set" ? "キー設定済み（未テスト）" : "キーを設定すると使えます";
+  pill.className = "key-pill" + (ks === "ok" ? " ok" : "");
 }
 
 export function renderProvStatus(): void {
@@ -70,7 +72,8 @@ export function renderChat(): void {
       return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}"><span class="mono-tile" style="background:${p.color}">${p.mono}</span><span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
     }).join("");
     col.innerHTML =
-      '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。まず使う会社を選んでください。</p>' +
+      '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>' +
+      '<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>' +
       '<div class="sec-label">プロバイダーを選ぶ（8社）</div><div class="prov-grid">' +
       provCells +
       '</div>' +
@@ -95,7 +98,7 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const tools = isUser
     ? ""
     : `<span class="msg-tools"><button data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>`;
-  return `<div class="msg"><div class="msg-head">${head}${tools}</div><div class="msg-body">${m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div></div>`;
+  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div><div class="msg-body">${m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div></div>`;
 }
 
 export function scrollBottom(smooth = true): void {
@@ -160,6 +163,12 @@ export function openSettings(focusPid?: string): void {
   renderSettings();
   openSheet("settingsSheet");
   closeSidebar();
+  if (!focusPid) {
+    /* 指定がなければ、いま使っている会社のキー欄を最初から開いておく */
+    document
+      .querySelector(`#keybox-${state.conf.provider}`)
+      ?.classList.add("on");
+  }
   if (focusPid) {
     const box = document.querySelector<HTMLElement>(`#keybox-${focusPid}`);
     if (box) {

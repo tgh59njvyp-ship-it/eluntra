@@ -362,6 +362,9 @@ $("#btnCustomModel").addEventListener("click", () => {
   closeSheet("modelSheet");
   toast(`モデルを ${v} にしました`);
 });
+$("#keyStateLabel").addEventListener("click", () => {
+  openSettings(state.conf.provider);
+});
 $("#btnSys").addEventListener("click", () => {
   $("#sysbar").classList.toggle("on");
 });
