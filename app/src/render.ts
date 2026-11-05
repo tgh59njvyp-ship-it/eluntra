@@ -1,4 +1,5 @@
 import { BRAND_ICONS, currentUser, lastSyncAt } from "./auth";
+import { LOGOS, logoTile } from "./logos";
 import { md } from "./markdown";
 import { PROVIDERS, findProvider } from "./providers";
 import {
@@ -28,11 +29,9 @@ export function renderPills(): void {
   const p = curProv();
   const m = curModel();
   const mono = $("#pillMono");
-  mono.textContent = p.mono;
-  mono.style.background = p.color;
+  mono.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${LOGOS[p.id] || ""}</svg>`;
   const mono2 = $("#pillMono2");
-  mono2.textContent = p.mono;
-  mono2.style.background = p.color;
+  mono2.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${LOGOS[p.id] || ""}</svg>`;
   $("#pillName").textContent = p.name;
   $("#pillModel").textContent = m;
   $("#pillLabel2").textContent = `${p.name} ・ ${m}`;
@@ -46,7 +45,7 @@ export function renderPills(): void {
 export function renderProvStatus(): void {
   $("#provStatus").innerHTML = PROVIDERS.map((p) => {
     const st = keyState(p.id);
-    return `<button class="pstat" data-open-settings="${p.id}"><span class="mono-tile sm" style="background:${p.color}">${p.mono}</span><span>${esc(p.name)}</span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
+    return `<button class="pstat" data-open-settings="${p.id}">${logoTile(p.id, true)}<span>${esc(p.name)}</span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
   }).join("");
 }
 
@@ -70,7 +69,7 @@ export function renderChat(): void {
   if (!s || !s.messages.length) {
     const provCells = PROVIDERS.map((p) => {
       const st = keyState(p.id);
-      return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}"><span class="mono-tile" style="background:${p.color}">${p.mono}</span><span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
+      return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}">${logoTile(p.id)}<span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
     }).join("");
     col.innerHTML =
       '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>' +
@@ -95,7 +94,7 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const prov = PROVIDERS.find((x) => x.id === provId);
   const head = isUser
     ? '<span class="mono-tile sm" style="background:var(--ink);color:var(--bg)">You</span><span class="msg-role">あなた</span>'
-    : `<span class="mono-tile sm" style="background:${prov?.color ?? "#333"}">${prov?.mono ?? "AI"}</span><span class="msg-role">${esc(prov?.name ?? "AI")}</span><span class="msg-meta">${esc(m.model || "")}</span>`;
+    : `${logoTile(prov?.id ?? "", true)}<span class="msg-role">${esc(prov?.name ?? "AI")}</span><span class="msg-meta">${esc(m.model || "")}</span>`;
   const tools = isUser
     ? ""
     : `<span class="msg-tools"><button data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>`;
@@ -186,7 +185,7 @@ export function renderSettings(): void {
     const stCls = st === "ok" ? "ok" : st === "set" ? "set" : "";
     return (
       `<div class="prov-row" id="prov-${p.id}">` +
-      `<div class="prov-row-head"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>` +
+      `<div class="prov-row-head">${logoTile(p.id)}` +
       `<span><span class="pr-name">${esc(p.name)}</span><br><span class="pr-model">${esc(state.conf.models[p.id])}</span></span>` +
       `<span class="st ${stCls}">${stateLabel(p.id)}</span>` +
       `<button class="icon-btn" data-toggle-key="${p.id}" aria-label="キー設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>` +

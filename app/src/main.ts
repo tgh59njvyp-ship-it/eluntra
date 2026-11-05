@@ -10,6 +10,7 @@ import {
   type OAuthProvider,
 } from "./auth";
 import { callChat, fetchModels, testConnection } from "./api";
+import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
 import {
   SUGGESTIONS,
@@ -575,11 +576,11 @@ document
   void autoFetchModels(state.conf.provider);
   $("#welcomeKeyLinks").innerHTML = PROVIDERS.map(
     (p) =>
-      `<a class="w-keylink" href="${p.getKeyUrl}" target="_blank" rel="noopener"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>${esc(p.name)}のキー取得</a>`,
+      `<a class="w-keylink" href="${p.getKeyUrl}" target="_blank" rel="noopener">${logoTile(p.id, true)}${esc(p.name)}のキー取得</a>`,
   ).join("");
   $("#welcomeProvs").innerHTML = PROVIDERS.map(
     (p) =>
-      `<span class="w-prov"><span class="mono-tile" style="background:${p.color}">${p.mono}</span>${esc(p.name)}</span>`,
+      `<span class="w-prov">${logoTile(p.id, true)}${esc(p.name)}</span>`,
   ).join("");
   let guest = false;
   try {

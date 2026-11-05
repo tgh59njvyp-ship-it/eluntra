@@ -312,3 +312,11 @@ body.show-welcome #welcomeView{display:block}
 .w-foot p{font-size:12px;line-height:1.7;color:var(--text-3)}
 .w-copy{margin-top:8px}
 @media (max-width:560px){.w-nav a{display:none}}
+
+/* ---------- Provider logo tiles（公式ロゴ） ---------- */
+.logo-tile{width:40px;height:40px;border-radius:10px;background:#fff;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.logo-tile svg{width:62%;height:62%;display:block}
+.logo-tile.sm{width:28px;height:28px;border-radius:7px}
+.w-prov .logo-tile{width:24px;height:24px;border-radius:7px}
+.w-keylink .logo-tile{width:24px;height:24px;border-radius:7px}
+@media (max-width:760px){.prov-cell .logo-tile{width:32px;height:32px;border-radius:8px}}
