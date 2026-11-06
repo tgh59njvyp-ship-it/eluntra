@@ -270,6 +270,7 @@ interface SyncData {
   conf: { provider: string; models: Record<string, string>; system: string; temp: number; agent?: boolean };
   notes?: Note[];
   code?: string;
+  codes?: Record<string, string>;
 }
 
 function collectSyncData(): SyncData {
@@ -284,7 +285,8 @@ function collectSyncData(): SyncData {
       agent: state.conf.agent,
     },
     notes: state.notes,
-    code: load<string>(CODE_LS_KEY, ""),
+    code: (load<Record<string, string>>("eluntra_codes", {})).html || load<string>(CODE_LS_KEY, ""),
+    codes: load<Record<string, string>>("eluntra_codes", {}),
   };
 }
 
@@ -306,7 +308,10 @@ function applySyncData(data: SyncData): void {
     state.notes = data.notes;
     persistNotes();
   }
-  if (typeof data.code === "string" && data.code) {
+  if (data.codes && typeof data.codes === "object") {
+    save("eluntra_codes", data.codes);
+    if (typeof data.codes.html === "string") save(CODE_LS_KEY, data.codes.html);
+  } else if (typeof data.code === "string" && data.code) {
     save(CODE_LS_KEY, data.code);
   }
 }

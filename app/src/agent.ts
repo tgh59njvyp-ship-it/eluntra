@@ -82,7 +82,7 @@ return TOOL_DEFS.find((t) => t.name === name)?.label?? name;
 /* ---------- ツールの実行 ---------- */
 
 /** 隔離iframe（sandbox属性、同一オリジン不許可）でJSを実行する */
-function runSandboxedJs(code: string): Promise<string> {
+export function runSandboxedJs(code: string): Promise<string> {
 return new Promise((resolve) => {
 const id = Math.random().toString(36).slice(2);
 const iframe = document.createElement("iframe");

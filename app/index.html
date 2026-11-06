@@ -297,22 +297,55 @@
   <div class="sheet-panel full">
     <div class="sheet-head">
       <h2>コード</h2>
-      <button class="btn secondary sm" id="btnCodeDownload">HTMLを書き出し</button>
+      <button class="btn secondary sm" id="btnCodeDownload">書き出し</button>
       <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="code-tabs">
       <button class="code-tab on" id="tabCodeEdit">編集</button>
-      <button class="code-tab" id="tabCodePrev">プレビュー</button>
+      <button class="code-tab" id="tabCodePrev"><span id="tabCodePrevLabel">プレビュー</span></button>
+      <button class="code-tab" id="tabCodePub">公開</button>
     </div>
     <div class="sheet-body code-body">
-      <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
-      <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+      <div class="code-toolbar">
+        <select id="codeLang" aria-label="言語を選ぶ">
+          <option value="html">HTML</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="css">CSS</option>
+          <option value="json">JSON</option>
+          <option value="markdown">Markdown</option>
+        </select>
+        <button class="btn primary sm" id="btnCodeRun">プレビュー</button>
+      </div>
+      <div class="code-editor-wrap">
+        <div class="code-gutter" id="codeGutter">1</div>
+        <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+      </div>
+      <div class="code-outpane" id="codeOutPane">
+        <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+        <pre id="codeOutput"></pre>
+        <div id="codeMd" class="msg-body"></div>
+      </div>
+      <div class="code-publish" id="codePublish">
+        <div class="code-pub-bar">
+          <p>Simple URL Serverの公開フォームです。「コードをコピー」してフォームに貼るか、書き出したHTMLファイルを選ぶと、そのままサイトとして公開できます。</p>
+          <button class="btn secondary sm" id="btnCopyCode">コードをコピー</button>
+        </div>
+        <script src="https://tgh59njvyp-ship-it.github.io/simple-url-server-redesigned/embed.js" data-key="sus_mj4ty7z6hyb8tw2iw33xcwvd"></script>
+      </div>
+      <div class="code-chips">
+        <button class="preset-chip" data-preset="fix">バグを直す</button>
+        <button class="preset-chip" data-preset="improve">改善する</button>
+        <button class="preset-chip" data-preset="comment">コメントを付ける</button>
+        <button class="preset-chip" data-preset="example">実行例を出す</button>
+      </div>
       <div class="code-ai">
         <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
         <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
       </div>
       <p class="code-status" id="codeStatus"></p>
-      <p class="set-desc">単一HTMLファイルとして編集します。AIが返すコードは自動で反映され、プレビューで確認できます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
+      <p class="set-desc">言語ごとに別々に保存されます。JavaScriptとPythonはその場で実行でき、HTML・CSS・Markdownはプレビュー、JSONは整形・検証ができます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>

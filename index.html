@@ -372,15 +372,37 @@ body.show-welcome #welcomeView{display:block}
 .code-tab{flex:1;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text-2);font-size:13.5px;font-weight:600}
 .code-tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .code-body{flex:1;display:flex;flex-direction:column;overflow:hidden;gap:10px}
-#codeEditor{flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:12.5px;line-height:1.6;padding:12px;resize:none}
+#codeEditor{flex:1;width:100%;border:0;border-radius:0 12px 12px 0;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:12.5px;line-height:1.6;padding:12px;resize:none}
 #codeEditor:focus{border-color:var(--accent);outline:none}
-#codePreview{display:none;flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:#fff}
-.code-body.show-prev #codeEditor{display:none}
-.code-body.show-prev #codePreview{display:block}
+#codePreview{display:none;width:100%;height:100%;border:0;background:#fff}
+.code-body.show-out .code-editor-wrap{display:none}
+.code-body.show-out .code-outpane{display:block}
 .code-ai{display:flex;gap:8px}
 .code-ai input{flex:1;min-width:0;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 12px;font-size:14px;font-family:inherit}
 .code-ai input:focus{border-color:var(--accent);outline:none}
 .code-status{font-size:13px;color:var(--text-2);min-height:1.2em}
+
+.code-publish{display:none;flex:1;overflow-y:auto}
+.code-body.show-pub #codeEditor{display:none}
+.code-body.show-pub #codePreview{display:none}
+.code-body.show-pub #codePublish{display:block}
+.code-pub-bar{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
+.code-pub-bar p{flex:1;font-size:13px;color:var(--text-2);line-height:1.6}
+.code-publish iframe{margin:0 auto}
+
+.code-toolbar{display:flex;gap:8px;align-items:center}
+#codeLang{height:38px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 10px;font-size:14px;font-family:inherit}
+.code-editor-wrap{flex:1;display:flex;border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--surface)}
+.code-gutter{padding:12px 8px 12px 10px;text-align:right;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--text-3);background:var(--bg-sub);border-right:1px solid var(--line);white-space:pre;overflow:hidden;user-select:none;min-width:38px}
+#codeEditor:focus{outline:none}
+.code-outpane{display:none;flex:1;border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:#fff}
+.code-body.show-out .code-outpane{display:flex;flex-direction:column}
+#codeOutput{display:none;flex:1;margin:0;padding:14px;font-family:var(--mono);font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word;overflow-y:auto;background:#171512;color:#EDE8DD}
+#codeMd{display:none;flex:1;padding:16px;overflow-y:auto}
+.code-chips{display:flex;gap:6px;flex-wrap:wrap}
+.preset-chip{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text-2);font-size:12.5px}
+.preset-chip:active{background:var(--accent-soft);color:var(--accent)}
+.code-body.show-pub .code-editor-wrap{display:none}
 </style>
 </head>
 <body>
@@ -650,22 +672,55 @@ body.show-welcome #welcomeView{display:block}
   <div class="sheet-panel full">
     <div class="sheet-head">
       <h2>コード</h2>
-      <button class="btn secondary sm" id="btnCodeDownload">HTMLを書き出し</button>
+      <button class="btn secondary sm" id="btnCodeDownload">書き出し</button>
       <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="code-tabs">
       <button class="code-tab on" id="tabCodeEdit">編集</button>
-      <button class="code-tab" id="tabCodePrev">プレビュー</button>
+      <button class="code-tab" id="tabCodePrev"><span id="tabCodePrevLabel">プレビュー</span></button>
+      <button class="code-tab" id="tabCodePub">公開</button>
     </div>
     <div class="sheet-body code-body">
-      <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
-      <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+      <div class="code-toolbar">
+        <select id="codeLang" aria-label="言語を選ぶ">
+          <option value="html">HTML</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="css">CSS</option>
+          <option value="json">JSON</option>
+          <option value="markdown">Markdown</option>
+        </select>
+        <button class="btn primary sm" id="btnCodeRun">プレビュー</button>
+      </div>
+      <div class="code-editor-wrap">
+        <div class="code-gutter" id="codeGutter">1</div>
+        <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+      </div>
+      <div class="code-outpane" id="codeOutPane">
+        <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+        <pre id="codeOutput"></pre>
+        <div id="codeMd" class="msg-body"></div>
+      </div>
+      <div class="code-publish" id="codePublish">
+        <div class="code-pub-bar">
+          <p>Simple URL Serverの公開フォームです。「コードをコピー」してフォームに貼るか、書き出したHTMLファイルを選ぶと、そのままサイトとして公開できます。</p>
+          <button class="btn secondary sm" id="btnCopyCode">コードをコピー</button>
+        </div>
+        <script src="https://tgh59njvyp-ship-it.github.io/simple-url-server-redesigned/embed.js" data-key="sus_mj4ty7z6hyb8tw2iw33xcwvd"></script>
+      </div>
+      <div class="code-chips">
+        <button class="preset-chip" data-preset="fix">バグを直す</button>
+        <button class="preset-chip" data-preset="improve">改善する</button>
+        <button class="preset-chip" data-preset="comment">コメントを付ける</button>
+        <button class="preset-chip" data-preset="example">実行例を出す</button>
+      </div>
       <div class="code-ai">
         <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
         <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
       </div>
       <p class="code-status" id="codeStatus"></p>
-      <p class="set-desc">単一HTMLファイルとして編集します。AIが返すコードは自動で反映され、プレビューで確認できます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
+      <p class="set-desc">言語ごとに別々に保存されます。JavaScriptとPythonはその場で実行でき、HTML・CSS・Markdownはプレビュー、JSONは整形・検証ができます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>
@@ -824,68 +879,305 @@ function renderMsg(m,i,s){
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
 
 
-/* ================= コードモード ================= */
-const CODE_LS_KEY="eluntra_code";
-const DEFAULT_CODE="<!DOCTYPE html>\n<html lang=\"ja\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>マイ・ページ</title>\n<style>\n body { font-family: sans-serif; background: #FBFAF7; color: #1B1B18; padding: 32px 20px;}\n h1 { font-size: 28px;}\n button { background: #1E4D3B; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 16px;}\n</style>\n</head>\n<body>\n <h1>こんにちは</h1>\n <p>これは最初のページです。下の欄からAIに作り直してもらえます。</p>\n <p>押した回数: <b id=\"n\">0</b></p>\n <button id=\"b\">押してみる</button>\n <script>\n let n = 0;\n document.getElementById(\"b\").onclick = () => {\n n++;\n document.getElementById(\"n\").textContent = n;\n};\n <\/script>\n</body>\n</html>";
-function getCode(){return load(CODE_LS_KEY,DEFAULT_CODE)}
-function setCode(v,sync){save(CODE_LS_KEY,v);if(sync!==false&&authSess)pushSync()}
+
+
+
+
+/* ================= コードモード（多言語・コード特化） ================= */
+const CODES_LS_KEY = "eluntra_codes";
+const LANG_LS_KEY = "eluntra_code_lang";
+const OLD_CODE_LS_KEY = "eluntra_code";
+const STARTER_HTML = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>マイ・ページ</title>
+<style>
+body { font-family: sans-serif; background: #FBFAF7; color: #1B1B18; padding: 32px 20px;}
+h1 { font-size: 28px;}
+button { background: #1E4D3B; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 16px;}
+</style>
+</head>
+<body>
+<h1>こんにちは</h1>
+<p>これは最初のページです。下の欄からAIに作り直してもらえます。</p>
+<p>押した回数: <b id="n">0</b></p>
+<button id="b">押してみる</button>
+<script>
+let n = 0;
+document.getElementById("b").onclick = () => {
+n++;
+document.getElementById("n").textContent = n;
+};
+<\/script>
+</body>
+</html>`;
+const LANGS = [
+{ id: "html", name: "HTML", fence: "html", ext: "html", run: "preview", runLabel: "プレビュー", starter: STARTER_HTML},
+{ id: "javascript", name: "JavaScript", fence: "javascript", ext: "js", run: "js", runLabel: "実行する",
+starter: "// JavaScriptのサンプル\nconst scores = [72, 85, 90, 68, 95];\nconst total = scores.reduce((a, b) => a + b, 0);\nconsole.log(\"合計:\", total);\nconsole.log(\"平均:\", total / scores.length);\nconsole.log(\"最高:\", Math.max(...scores));"},
+{ id: "typescript", name: "TypeScript", fence: "typescript", ext: "ts", run: "none", runLabel: "",
+starter: "// TypeScriptのサンプル（編集とAI生成に対応。実行はJavaScript欄で）\ninterface User {\n name: string;\n score: number;\n}\n\nfunction rank(users) {\n return users\n.slice()\n.sort((a, b) => b.score - a.score)\n.map((u, i) => (i + 1) + \"位: \" + u.name + \" (\" + u.score + \")\");\n}"},
+{ id: "python", name: "Python", fence: "python", ext: "py", run: "python", runLabel: "実行する",
+starter: "# Pythonのサンプル（ブラウザ内蔵のPythonで実行されます）\nscores = [72, 85, 90, 68, 95]\nprint(\"合計:\", sum(scores))\nprint(\"平均:\", sum(scores) / len(scores))\nprint(\"最高:\", max(scores))"},
+{ id: "css", name: "CSS", fence: "css", ext: "css", run: "css", runLabel: "プレビュー",
+starter: "/* CSSのサンプル（右のプレビュー用ページに適用されます） */\n.card {\n border: 2px solid #1E4D3B;\n background: #EAF3EE;\n}\nbutton {\n background: #1E4D3B;\n border-radius: 999px;\n}"},
+{ id: "json", name: "JSON", fence: "json", ext: "json", run: "json", runLabel: "整形・検証",
+starter: "{\n \"app\": \"Eluntra\",\n \"version\": 4,\n \"features\": [\"chat\", \"agent\", \"code\"],\n \"dark\": false\n}"},
+{ id: "markdown", name: "Markdown", fence: "markdown", ext: "md", run: "md", runLabel: "プレビュー",
+starter: "# メモ\n\n## 今日やること\n\n- **買い物**：牛乳と卵\n- 散歩 30分\n- 本を10ページ読む\n\n> 無理のない範囲で。"}
+];
+function langById(id){ return LANGS.find(l => l.id === id) || LANGS[0];}
+let curLang = load(LANG_LS_KEY, "html");
+if (!LANGS.some(l => l.id === curLang)) curLang = "html";
+function codeIsLoggedIn(){ return !!authSess; }
+function getCodes(){
+const codes = load(CODES_LS_KEY, {});
+if (!codes.html){ const old = load(OLD_CODE_LS_KEY, ""); if (old) codes.html = old;}
+return codes;
+}
+function setCodes(codes){ save(CODES_LS_KEY, codes);}
+function currentCode(){ const codes = getCodes(); return codes[curLang]?? langById(curLang).starter;}
+function persistEditor(sync = true){
+const codes = getCodes(); codes[curLang] = $("#codeEditor").value; setCodes(codes);
+if (sync && codeIsLoggedIn()) pushSync();
+}
+function getCode(){ return getCodes().html?? STARTER_HTML;}
 function extractCode(text){
-const fenced=text.match(/```(?:html|HTML)?\s*\n([\s\S]*?)```/);
-if(fenced&&fenced[1].trim())return fenced[1].trim();
-const i=text.search(/<!DOCTYPE html|<html[\s>]/i);
-if(i>=0)return text.slice(i).trim();
+const fenced = text.match(/```(?:\w+)?\s*\n([\s\S]*?)```/);
+if (fenced && fenced[1].trim()) return fenced[1].trim();
+const docStart = text.search(/<!DOCTYPE html|<html[\s>]/i);
+if (docStart >= 0) return text.slice(docStart).trim();
 return null;
 }
-function refreshCodePreview(){$("#codePreview").srcdoc=$("#codeEditor").value}
-function setCodeTab(preview){
-$("#tabCodeEdit").classList.toggle("on",!preview);
-$("#tabCodePrev").classList.toggle("on",preview);
-document.querySelector(".code-body").classList.toggle("show-prev",preview);
-if(preview)refreshCodePreview();
+function setCodeStatus(msg){ $("#codeStatus").textContent = msg;}
+function setCodeTab(tab){
+$("#tabCodeEdit").classList.toggle("on", tab === "edit");
+$("#tabCodePrev").classList.toggle("on", tab === "out");
+$("#tabCodePub").classList.toggle("on", tab === "pub");
+const body = document.querySelector(".code-body");
+body.classList.toggle("show-out", tab === "out");
+body.classList.toggle("show-pub", tab === "pub");
+if (tab === "out") runOrPreview(false);
 }
-function openCode(){$("#codeEditor").value=getCode();setCodeTab(false);openSheet("codeSheet")}
-let codeAiBusy=false;
+function updateGutter(){
+const ed = $("#codeEditor");
+const lines = ed.value.split("\n").length;
+let html = "";
+for (let i = 1; i <= lines; i++) html += i + "\n";
+const g = $("#codeGutter");
+g.textContent = html;
+g.scrollTop = ed.scrollTop;
+}
+function applyLangUI(){
+const lang = langById(curLang);
+$("#codeLang").value = curLang;
+const runBtn = $("#btnCodeRun");
+if (lang.run === "none"){ runBtn.style.display = "none";}
+else { runBtn.style.display = ""; runBtn.textContent = lang.runLabel;}
+$("#tabCodePrevLabel").textContent = (lang.run === "js" || lang.run === "python")? "実行結果": "プレビュー";
+updateGutter();
+}
+function switchLang(id){
+if (id === curLang) return;
+persistEditor(false);
+curLang = id;
+save(LANG_LS_KEY, curLang);
+$("#codeEditor").value = currentCode();
+applyLangUI();
+setCodeStatus(id === "typescript"? "TypeScriptは編集とAI生成に対応しています（実行はJavaScript欄でできます）。": "");
+if (codeIsLoggedIn()) pushSync();
+}
+function openCode(){
+$("#codeEditor").value = currentCode();
+applyLangUI();
+setCodeTab("edit");
+openSheet("codeSheet");
+}
+function showOutput(text){
+const pre = $("#codeOutput");
+pre.style.display = "block";
+$("#codePreview").style.display = "none";
+$("#codeMd").style.display = "none";
+pre.textContent = text;
+}
+function showFrame(html){
+const frame = $("#codePreview");
+frame.style.display = "block";
+$("#codeOutput").style.display = "none";
+$("#codeMd").style.display = "none";
+frame.srcdoc = html;
+}
+function showMd(html){
+const box = $("#codeMd");
+box.style.display = "block";
+$("#codePreview").style.display = "none";
+$("#codeOutput").style.display = "none";
+box.innerHTML = html;
+}
+const CSS_DEMO = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>
+body{font-family:sans-serif;padding:24px;color:#1B1B18;background:#fff}
+.card{border:1px solid #D8D6CC;border-radius:14px;padding:18px;margin:14px 0}
+button{background:#5C5C55;color:#fff;border:0;border-radius:10px;padding:10px 18px}
+</style><style id="userCss"></style></head><body>
+<h1>見出しの例</h1><p>本文の例です。リンクは <a href="#">こちら</a>。</p>
+<div class="card"><h2>カードの例</h2><p>このカードとボタンに、左のCSSが適用されます。</p><button>ボタンの例</button></div>
+<ul><li>リスト1</li><li>リスト2</li></ul></body></html>`;
+let pyodidePromise = null;
+function loadPyodideOnce(){
+if (pyodidePromise) return pyodidePromise;
+pyodidePromise = new Promise((resolve, reject) => {
+const start = () => {
+if (!window.loadPyodide){ reject(new Error("Pythonの読み込みに失敗しました")); return;}
+window.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"}).then(resolve, reject);
+};
+if (window.loadPyodide){ start(); return;}
+const script = document.createElement("script");
+script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+script.onload = start;
+script.onerror = () => reject(new Error("Pythonの読み込みに失敗しました。通信状態を確認してください。"));
+document.head.appendChild(script);
+});
+return pyodidePromise;
+}
+async function runOrPreview(switchTab = true){
+const lang = langById(curLang);
+const code = $("#codeEditor").value;
+if (switchTab) setCodeTab("out");
+switch (lang.run) {
+case "preview":
+showFrame(code); setCodeStatus("プレビューを更新しました。"); return;
+case "css": {
+const doc = new DOMParser().parseFromString(CSS_DEMO, "text/html");
+const styleEl = doc.querySelector("#userCss");
+if (styleEl) styleEl.textContent = code;
+showFrame("<!DOCTYPE html>\n" + doc.documentElement.outerHTML);
+setCodeStatus("サンプルページにCSSを適用しました。"); return;
+}
+case "md":
+showMd(md(code)); setCodeStatus("プレビューを更新しました。"); return;
+case "json":
+try {
+const parsed = JSON.parse(code);
+showOutput(JSON.stringify(parsed, null, 2));
+setCodeStatus("正しいJSONです。整形して表示しています。");
+} catch (e) {
+showOutput("");
+setCodeStatus("JSONの形式が正しくありません：" + (e instanceof Error? e.message: String(e)));
+}
+return;
+case "js": {
+setCodeStatus("実行中…");
+const out = await runSandboxedJs(code);
+showOutput(out); setCodeStatus("実行しました。"); return;
+}
+case "python": {
+setCodeStatus("Pythonを準備中…（初回は読み込みに時間がかかります）");
+try {
+const py = await loadPyodideOnce();
+const lines = [];
+py.setStdout({ batched: t => lines.push(t)});
+py.setStderr({ batched: t => lines.push(t)});
+setCodeStatus("実行中…");
+await py.runPythonAsync(code);
+showOutput(lines.join("\n") || "（出力なし）");
+setCodeStatus("実行しました。");
+} catch (e) {
+showOutput("");
+const msg = e instanceof Error? e.message: String(e);
+setCodeStatus("実行できませんでした：" + msg.split("\n").slice(-3).join(" "));
+}
+return;
+}
+default: return;
+}
+}
+let codeAiBusy = false;
+const CODE_PRESETS = {
+fix: "このコードのバグを探して直してください。直した箇所と原因を、コードの後に短く教えてください。",
+improve: "このコードを、動作を変えずに読みやすく・効率よく書き直してください。",
+comment: "このコードに、処理の流れが分かる日本語のコメントを付けてください（動作は変えないでください）。",
+example: "このコードの使い方と、実行例（サンプルデータと期待する出力）を教えてください。"
+};
 async function codeAiGenerate(){
-if(codeAiBusy)return;
-const input=$("#codePrompt"),status=$("#codeStatus");
-const inst=input.value.trim();
-if(!inst){status.textContent="AIへの依頼を入力してください（例：ダークな時計のページにして）。";return}
-const p=curProv();const key=(keys[p.id]||"").trim();
-if(!key){status.textContent=p.name+"のキーが未設定です。対処：設定でキーを貼ってから、もう一度押してください。";return}
-codeAiBusy=true;const btn=$("#btnCodeAI");btn.disabled=true;
-status.textContent="AIが作成中です…";
-const prompt="あなたは腕の良いフロントエンド開発者です。次の依頼に沿って、単一HTMLファイルとして完結するコードを作成（または修正）してください。説明は最小限にし、完成したコード全体を必ず ```html のコードブロックで返してください。\n\n\n"+inst+"\n\n\n```html\n"+$("#codeEditor").value+"\n```";
-const onDelta=partial=>{status.textContent="AIが作成中です…（"+partial.length+"文字）"};
-try{
-let full="";
-const hist=[{role:"user",content:prompt}];
-if(p.type==="openai")full=await callOpenAI(p,key,curModel(),hist,onDelta);
-else if(p.type==="gemini")full=await callGemini(p,key,curModel(),hist,onDelta);
-else if(p.type==="anthropic")full=await callAnthropic(p,key,curModel(),hist,onDelta);
-else if(p.type==="cohere")full=await callCohere(p,key,curModel(),hist,onDelta);
-const code=extractCode(full);
-if(!code){status.textContent="AIの回答にコードが含まれていなかったため、反映しませんでした。依頼を具体的にして、もう一度お試しください。";return}
-$("#codeEditor").value=code;setCode(code);setCodeTab(true);
-status.textContent="反映しました。プレビューで確認できます。";
-input.value="";toast("コードを反映しました");
-}catch(e){status.textContent=e.message||String(e)}
-finally{codeAiBusy=false;btn.disabled=false}
+if (codeAiBusy) return;
+const input = $("#codePrompt");
+const inst = input.value.trim();
+if (!inst){ setCodeStatus("AIへの依頼を入力してください（例：ダークな時計のページにして）。"); return;}
+const p = curProv();
+const key = (keys[p.id] || "").trim();
+if (!key){ setCodeStatus(p.name + "のキーが未設定です。対処：設定でキーを貼ってから、もう一度押してください。"); return;}
+const lang = langById(curLang);
+codeAiBusy = true;
+const btn = $("#btnCodeAI");
+btn.disabled = true;
+setCodeStatus("AIが作成中です…");
+const prompt = "あなたは" + lang.name + "のシニアエンジニアです。次の依頼に沿って、" + lang.name + "のコードを作成（または修正）してください。" +
+"完成したコード全体を必ず ```" + lang.fence + " のコードブロックで返し、説明は最小限にしてください。\n\n" +
+"\n" + inst + "\n\n\n```" + lang.fence + "\n" + $("#codeEditor").value + "\n```";
+try {
+const full = await callChat(p, key, curModel(), [{ role: "user", content: prompt}], partial => {
+setCodeStatus("AIが作成中です…（" + partial.length + "文字）");
+});
+const code = extractCode(full);
+if (!code){ setCodeStatus("AIの回答にコードが含まれていなかったため、反映しませんでした。依頼を具体的にして、もう一度お試しください。"); return;}
+$("#codeEditor").value = code;
+persistEditor();
+updateGutter();
+setCodeStatus("反映しました。");
+input.value = "";
+toast("コードを反映しました");
+if (lang.run!== "none") setCodeTab("out");
+} catch (e) {
+setCodeStatus(e instanceof Error? e.message: String(e));
+} finally {
+codeAiBusy = false;
+btn.disabled = false;
+}
+}
+async function copyCode(){
+try { await navigator.clipboard.writeText($("#codeEditor").value); toast("コードをコピーしました");}
+catch (e) { $("#codeEditor").select(); toast("コピーできませんでした。編集欄で長押ししてコピーしてください");}
 }
 function downloadCode(){
-const blob=new Blob([$("#codeEditor").value],{type:"text/html"});
-const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="eluntra-code.html";a.click();
-setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+const lang = langById(curLang);
+const blob = new Blob([$("#codeEditor").value], { type: "text/plain"});
+const a = document.createElement("a");
+a.href = URL.createObjectURL(blob);
+a.download = "eluntra-code." + lang.ext;
+a.click();
+setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 function initCode(){
-$("#codeEditor").addEventListener("input",()=>setCode($("#codeEditor").value,false));
-$("#codeEditor").addEventListener("blur",()=>{if(authSess)pushSync()});
-$("#tabCodeEdit").addEventListener("click",()=>setCodeTab(false));
-$("#tabCodePrev").addEventListener("click",()=>setCodeTab(true));
-$("#btnCodeAI").addEventListener("click",codeAiGenerate);
-$("#codePrompt").addEventListener("keydown",e=>{if(e.key==="Enter")codeAiGenerate()});
-$("#btnCodeDownload").addEventListener("click",downloadCode);
-$("#btnCodeClose").addEventListener("click",()=>closeSheet("codeSheet"));
-$("#btnCode").addEventListener("click",openCode);
+const ed = $("#codeEditor");
+ed.addEventListener("input", () => { persistEditor(false); updateGutter();});
+ed.addEventListener("scroll", () => { $("#codeGutter").scrollTop = ed.scrollTop;});
+ed.addEventListener("blur", () => { if (codeIsLoggedIn()) pushSync();});
+ed.addEventListener("keydown", e => {
+if (e.key === "Tab"){
+e.preventDefault();
+ed.setRangeText(" ", ed.selectionStart, ed.selectionEnd, "end");
+persistEditor(false); updateGutter();
+}
+});
+$("#codeLang").addEventListener("change", e => switchLang(e.target.value));
+$("#btnCodeRun").addEventListener("click", () => runOrPreview(true));
+$("#tabCodeEdit").addEventListener("click", () => setCodeTab("edit"));
+$("#tabCodePrev").addEventListener("click", () => setCodeTab("out"));
+$("#tabCodePub").addEventListener("click", () => setCodeTab("pub"));
+$("#btnCopyCode").addEventListener("click", copyCode);
+document.querySelectorAll("[data-preset]").forEach(chip => {
+chip.addEventListener("click", () => {
+const input = $("#codePrompt");
+input.value = CODE_PRESETS[chip.getAttribute("data-preset")] || "";
+input.focus();
+});
+});
+$("#btnCodeAI").addEventListener("click", codeAiGenerate);
+$("#codePrompt").addEventListener("keydown", e => { if (e.key === "Enter") codeAiGenerate();});
+$("#btnCodeDownload").addEventListener("click", downloadCode);
+$("#btnCodeClose").addEventListener("click", () => closeSheet("codeSheet"));
 }
 
 /* ================= Auth（Supabase） ================= */
