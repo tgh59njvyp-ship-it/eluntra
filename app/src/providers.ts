@@ -1,6 +1,6 @@
 import type { Provider } from "./types";
 
-/** 対応プロバイダー8社の定義。キーは各社のAPIへブラウザから直接送る（BYOK）。 */
+/** 対応プロバイダー10社の定義。キーは各社のAPIへブラウザから直接送る（BYOK）。 */
 export const PROVIDERS: Provider[] = [
   {
     id: "openai", name: "OpenAI", mono: "OA", color: "#191919", type: "openai",
@@ -50,6 +50,21 @@ export const PROVIDERS: Provider[] = [
     getKeyUrl: "https://dashboard.cohere.com/api-keys", keyHint: "Cohereダッシュボードのキー（試用キーあり）",
     models: ["command-a-03-2025", "command-r7b-12-2024", "command-r-plus-08-2024", "command-r-08-2024"],
     def: "command-a-03-2025",
+  },
+  {
+    id: "cloudflare", name: "Cloudflare Workers AI", mono: "CF", color: "#F38020", type: "openai",
+    base: "https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1",
+    getKeyUrl: "https://dash.cloudflare.com/profile/api-tokens", keyHint: "APIトークン",
+    models: ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct", "@cf/qwen/qwen1.5-14b-chat", "@cf/mistral/mistral-7b-instruct-v0.2"],
+    def: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    dualKey: true,
+  },
+  {
+    id: "sambanova", name: "SambaNova Cloud", mono: "SN", color: "#EE7624", type: "openai",
+    base: "https://api.sambanova.ai/v1",
+    getKeyUrl: "https://cloud.sambanova.ai/apis", keyHint: "SambaNova CloudのAPIキー",
+    models: ["Meta-Llama-3.3-70B-Instruct", "Meta-Llama-3.1-8B-Instruct", "DeepSeek-R1", "Qwen2.5-72B-Instruct"],
+    def: "Meta-Llama-3.3-70B-Instruct",
   },
   {
     id: "deepseek", name: "DeepSeek", mono: "De", color: "#2B4BFF", type: "openai",

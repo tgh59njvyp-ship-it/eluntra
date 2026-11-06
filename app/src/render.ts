@@ -10,6 +10,7 @@ import {
   keyState,
   modelList,
   persistConf,
+  splitSavedKey,
   state,
   stateLabel,
 } from "./state";
@@ -72,9 +73,9 @@ export function renderChat(): void {
       return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}">${logoTile(p.id)}<span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
     }).join("");
     col.innerHTML =
-      '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>' +
+      '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>' +
       '<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>' +
-      '<div class="sec-label">プロバイダーを選ぶ（8社）</div><div class="prov-grid">' +
+      '<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">' +
       provCells +
       '</div>' +
       '<div class="sec-label">たとえば</div><div class="sugg">' +
@@ -98,7 +99,10 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const tools = isUser
     ? ""
     : `<span class="msg-tools"><button data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>`;
-  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div><div class="msg-body">${m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div></div>`;
+  const stepsHtml = m.steps && m.steps.length
+    ? `<div class="msg-steps">${m.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("")}</div>`
+    : "";
+  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div>${stepsHtml}<div class="msg-body">${m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div></div>`;
 }
 
 export function scrollBottom(smooth = true): void {
@@ -152,6 +156,8 @@ export function renderAccount(): void {
 }
 
 export function renderAll(): void {
+  const ag = document.querySelector<HTMLElement>("#btnAgent");
+  if (ag) ag.classList.toggle("on", state.conf.agent);
   ensureSession();
   renderPills();
   renderProvStatus();
@@ -190,7 +196,10 @@ export function renderSettings(): void {
       `<span class="st ${stCls}">${stateLabel(p.id)}</span>` +
       `<button class="icon-btn" data-toggle-key="${p.id}" aria-label="キー設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>` +
       `<div class="key-box" id="keybox-${p.id}">` +
-      `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(state.keys[p.id] || "")}" autocomplete="off" spellcheck="false">` +
+      (p.dualKey
+        ? `<div class="key-line" style="margin-bottom:8px"><input type="text" id="acct-${p.id}" placeholder="Account ID" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").acct)}" autocomplete="off" spellcheck="false"></div>`
+        : "") +
+      `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").token)}" autocomplete="off" spellcheck="false">` +
       `<button class="btn secondary" data-show-key="${p.id}">表示</button></div>` +
       `<div class="key-actions"><button class="btn primary sm" data-save-key="${p.id}">保存</button>` +
       `<button class="btn secondary sm" data-test-key="${p.id}">接続テスト</button>` +
@@ -199,6 +208,22 @@ export function renderSettings(): void {
       `<div class="test-result" id="test-${p.id}"></div>` +
       `</div></div>`
     );
+  }).join("");
+  renderNotes();
+}
+
+/** メモ一覧（エージェントが保存。ログイン時はSupabaseへ同期） */
+export function renderNotes(): void {
+  const box = document.querySelector<HTMLElement>("#notesList");
+  if (!box) return;
+  if (!state.notes.length) {
+    box.innerHTML = '<p class="set-desc">まだメモはありません。エージェントに「調べてメモに保存して」と頼むと、ここに残ります。</p>';
+    return;
+  }
+  box.innerHTML = state.notes.map((n) => {
+    const d = new Date(n.created);
+    const when = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `<div class="note-row"><div class="note-main"><div class="note-title">${esc(n.title)}</div><div class="note-meta">${when} ・ ${esc(n.content.slice(0, 60))}</div></div><button class="btn ghost sm" data-del-note="${n.id}">削除</button></div>`;
   }).join("");
 }
 

@@ -1,5 +1,5 @@
-import { persistConf, persistSessions, state } from "./state";
-import type { Session } from "./types";
+import { persistConf, persistNotes, persistSessions, state } from "./state";
+import type { Note, Session } from "./types";
 
 /**
  * Supabase Auth（共用プロジェクト）を使ったログインとクラウド同期。
@@ -267,7 +267,8 @@ export async function logout(): Promise<void> {
 interface SyncData {
   version: 1;
   sessions: Session[];
-  conf: { provider: string; models: Record<string, string>; system: string; temp: number };
+  conf: { provider: string; models: Record<string, string>; system: string; temp: number; agent?: boolean };
+  notes?: Note[];
 }
 
 function collectSyncData(): SyncData {
@@ -279,7 +280,9 @@ function collectSyncData(): SyncData {
       models: state.conf.models,
       system: state.conf.system,
       temp: state.conf.temp,
+      agent: state.conf.agent,
     },
+    notes: state.notes,
   };
 }
 
@@ -294,7 +297,12 @@ function applySyncData(data: SyncData): void {
     state.conf.models = { ...state.conf.models, ...(data.conf.models || {}) };
     state.conf.system = data.conf.system || "";
     state.conf.temp = typeof data.conf.temp === "number" ? data.conf.temp : state.conf.temp;
+    if (typeof data.conf.agent === "boolean") state.conf.agent = data.conf.agent;
     persistConf();
+  }
+  if (Array.isArray(data.notes)) {
+    state.notes = data.notes;
+    persistNotes();
   }
 }
 

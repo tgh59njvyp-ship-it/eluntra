@@ -18,6 +18,8 @@ export interface Provider {
   keyHint: string;
   /** 標準モデル一覧（キーで実取得するまでの初期値） */
   models: string[];
+  /** Account IDなど第2の入力欄が必要な会社（Cloudflare） */
+  dualKey?: boolean;
   /** 既定モデル */
   def: string;
 }
@@ -30,6 +32,16 @@ export interface Message {
   model?: string;
   pending?: boolean;
   error?: string;
+  /** エージェントが実行した手順（表示用） */
+  steps?: string[];
+}
+
+/** エージェントが保存するメモ（ログイン時はSupabaseへ同期） */
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  created: number;
 }
 
 export interface Session {
@@ -49,6 +61,8 @@ export interface Config {
   models: Record<string, string>;
   system: string;
   temp: number;
+  /** エージェントモード（ツール実行ループ） */
+  agent: boolean;
 }
 
 export type KeyState = "ok" | "set" | "none";

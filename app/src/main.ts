@@ -9,6 +9,7 @@ import {
   pushSync,
   type OAuthProvider,
 } from "./auth";
+import { runAgent } from "./agent";
 import { callChat, fetchModels, testConnection } from "./api";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
@@ -27,6 +28,7 @@ import {
   renderModelSheet,
   renderSettings,
   scrollBottom,
+  renderNotes,
 } from "./render";
 import { md } from "./markdown";
 import {
@@ -38,8 +40,11 @@ import {
   ensureSession,
   load,
   persistConf,
+  joinSavedKey,
   persistKeys,
+  persistNotes,
   persistSessions,
+  splitSavedKey,
   persistTested,
   resetAllData,
   runtime,
@@ -99,6 +104,16 @@ function updateStreamingMsg(s: Session, aiMsg: Message): void {
   }
   const body = node.querySelector(".msg-body");
   if (body) body.innerHTML = md(aiMsg.content);
+  if (aiMsg.steps && aiMsg.steps.length) {
+    const html = aiMsg.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("");
+    let box = node.querySelector(".msg-steps");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "msg-steps";
+      node.insertBefore(box, body);
+    }
+    box.innerHTML = html;
+  }
   scrollBottom(true);
 }
 
@@ -138,6 +153,15 @@ function showErrorBanner(msg: string, p: Provider): void {
     "')\">設定でキーを確認</button></div>";
   col.appendChild(div);
   scrollBottom(false);
+}
+
+/** 設定欄の入力を読む（CloudflareはAccount IDとトークンを結合） */
+function readKeyInput(pid: string): string {
+  const keyInp = document.querySelector<HTMLInputElement>(`#key-${pid}`);
+  const token = (keyInp?.value || "").trim();
+  if (!findProvider(pid).dualKey) return token;
+  const acctInp = document.querySelector<HTMLInputElement>(`#acct-${pid}`);
+  return joinSavedKey(pid, (acctInp?.value || "").trim(), token);
 }
 
 async function sendMessage(): Promise<void> {
@@ -182,6 +206,24 @@ async function sendMessage(): Promise<void> {
     updateStreamingMsg(s, aiMsg);
   };
   try {
+    if (state.conf.agent) {
+      const r = await runAgent(p, key, model, histForCall, (steps) => {
+        aiMsg.steps = steps;
+        aiMsg.pending = false;
+        aiMsg.content = aiMsg.content || "エージェントが作業中です…";
+        updateStreamingMsg(s, aiMsg);
+      });
+      aiMsg.steps = r.steps;
+      aiMsg.content = r.text;
+      aiMsg.pending = false;
+      runtime.generating = false;
+      runtime.abortCtl = null;
+      setSendBtn(false);
+      persistSessions();
+      renderAll();
+      if (isLoggedIn()) void pushSync();
+      return;
+    }
     const full = await callChat(p, key, model, histForCall, onDelta);
     aiMsg.content = full;
     aiMsg.pending = false;
@@ -229,6 +271,16 @@ document.addEventListener("click", (e: Event) => {
   const os = target.closest<HTMLElement>("[data-open-settings]");
   if (os) {
     openSettings(os.getAttribute("data-open-settings") as string);
+    return;
+  }
+  const dn = target.closest<HTMLElement>("[data-del-note]");
+  if (dn) {
+    const nid = dn.getAttribute("data-del-note") as string;
+    state.notes = state.notes.filter((n) => n.id !== nid);
+    persistNotes();
+    if (isLoggedIn()) void pushSync();
+    renderNotes();
+    toast("メモを削除しました");
     return;
   }
   const del = target.closest<HTMLElement>("[data-del]");
@@ -293,8 +345,7 @@ document.addEventListener("click", (e: Event) => {
   const sv = target.closest<HTMLElement>("[data-save-key]");
   if (sv) {
     const pid = sv.getAttribute("data-save-key") as string;
-    const inp = document.querySelector<HTMLInputElement>(`#key-${pid}`);
-    const v = (inp?.value || "").trim();
+    const v = readKeyInput(pid);
     if (v) state.keys[pid] = v;
     else delete state.keys[pid];
     delete state.tested[pid];
@@ -310,8 +361,7 @@ document.addEventListener("click", (e: Event) => {
   if (ts) {
     void (async () => {
       const pid = ts.getAttribute("data-test-key") as string;
-      const inp = document.querySelector<HTMLInputElement>(`#key-${pid}`);
-      const v = (inp?.value || "").trim();
+      const v = readKeyInput(pid);
       if (v) {
         state.keys[pid] = v;
         persistKeys();
@@ -449,6 +499,12 @@ $("#btnCustomModel").addEventListener("click", () => {
 });
 $("#keyStateLabel").addEventListener("click", () => {
   openSettings(state.conf.provider);
+});
+$("#btnAgent").addEventListener("click", () => {
+  state.conf.agent = !state.conf.agent;
+  persistConf();
+  renderAll();
+  toast(state.conf.agent ? "エージェントモードをオンにしました（ツールを使いながら回答します）" : "エージェントモードをオフにしました");
 });
 $("#btnSys").addEventListener("click", () => {
   $("#sysbar").classList.toggle("on");

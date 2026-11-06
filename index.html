@@ -3,25 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Eluntra — 8社のAIを、自分のキーで</title>
-<meta name="description" content="Eluntraは、OpenAI・Gemini・Anthropic・Mistral・Groq・OpenRouter・Cohere・DeepSeekの8社を自分のAPIキー（BYOK）で使うAIチャットサービスです。キーは端末内にのみ保存されます。">
+<title>Eluntra — 10社のAIを、自分のキーで</title>
+<meta name="description" content="Eluntraは、OpenAI・Gemini・Anthropic・Mistral・Groq・OpenRouter・Cohere・DeepSeek・Cloudflare・SambaNovaの10社を自分のAPIキー（BYOK）で使うAIチャットサービスです。キーは端末内にのみ保存されます。">
 <meta property="og:title" content="Eluntra">
-<meta property="og:description" content="8社のAIを、自分のキーで。BYOK専用AIチャット。">
+<meta property="og:description" content="10社のAIを、自分のキーで。BYOK専用AIチャット。">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#FFFFFF">
-<meta name="description" content="OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャット。キーは端末内にのみ保存。ログインで会話をクラウド同期。">
-<meta property="og:title" content="Eluntra — 8社のAIを、自分のキーで">
-<meta property="og:description" content="8社のAIを自分のAPIキーで使うBYOKチャット。キーは端末内にのみ保存し、選んだ会社のAPIへ直接送信。ログインで会話をクラウド同期。">
+<meta name="description" content="OpenAI・Gemini・Claudeなど10社のAIを、自分のAPIキーで使うチャット。キーは端末内にのみ保存。ログインで会話をクラウド同期。">
+<meta property="og:title" content="Eluntra — 10社のAIを、自分のキーで">
+<meta property="og:description" content="10社のAIを自分のAPIキーで使うBYOKチャット。キーは端末内にのみ保存し、選んだ会社のAPIへ直接送信。ログインで会話をクラウド同期。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://simple-url-server.lovable.app/s/eluntra/">
 <meta property="og:image" content="https://simple-url-server.lovable.app/s/eluntra/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Eluntra — 8社のAIを、自分のキーで。">
+<meta property="og:image:alt" content="Eluntra — 10社のAIを、自分のキーで。">
 <meta name="twitter:image" content="https://simple-url-server.lovable.app/s/eluntra/og-image.png">
-<meta name="twitter:title" content="Eluntra — 8社のAIを、自分のキーで使うチャット">
-<meta name="twitter:description" content="OpenAI / Gemini / Claude など8社のAIを、自分のAPIキーで使うBYOKチャット。キーは端末内のみに保存。">
+<meta name="twitter:title" content="Eluntra — 10社のAIを、自分のキーで使うチャット">
+<meta name="twitter:description" content="OpenAI / Gemini / Claude など10社のAIを、自分のAPIキーで使うBYOKチャット。キーは端末内のみに保存。">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
@@ -352,6 +352,17 @@ body.show-welcome #welcomeView{display:block}
 .w-prov .logo-tile{width:24px;height:24px;border-radius:7px}
 .w-keylink .logo-tile{width:24px;height:24px;border-radius:7px}
 @media (max-width:760px){.prov-cell .logo-tile{width:32px;height:32px;border-radius:8px}}
+
+/* ---------- Agent / steps / notes ---------- */
+.meta-btn.on{background:var(--tint);color:var(--accent);font-weight:700}
+.msg-steps{margin:6px 0 2px;display:flex;flex-direction:column;gap:4px}
+.msg-steps .step{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2)}
+.msg-steps .step .ic{color:var(--accent);flex:none}
+.note-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.note-row:last-child{border-bottom:0}
+.note-main{flex:1;min-width:0}
+.note-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note-meta{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
@@ -366,8 +377,8 @@ body.show-welcome #welcomeView{display:block}
       </nav>
     </header>
     <p class="w-kicker">BYOK AI CHAT</p>
-    <h1 class="w-title">8社のAIを、<br><span>自分のキー</span>で。</h1>
-    <p class="w-lead">OpenAI・Gemini・Claudeなど8社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
+    <h1 class="w-title">10社のAIを、<br><span>自分のキー</span>で。</h1>
+    <p class="w-lead">OpenAI・Gemini・Claudeなど10社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
     <div class="w-cta">
       <button class="btn primary w-main-btn w-login-btn" id="btnWelcomeLogin">ログインして始める</button>
       <button class="btn ghost w-guest-btn" id="btnWelcomeGuest">ログインせずに使う</button>
@@ -377,7 +388,7 @@ body.show-welcome #welcomeView{display:block}
     <section class="w-feats" id="w-features">
       <div class="w-feat">
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
-        <div><h3>8社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek。モデル一覧はキーで自動取得します。</p></div>
+        <div><h3>10社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek / Cloudflare / SambaNova。モデル一覧はキーで自動取得します。</p></div>
       </div>
       <div class="w-feat">
         <svg class="ic" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3"/><path d="M16.5 6.5 20 10"/><path d="M14 9l3 3"/></svg>
@@ -415,7 +426,7 @@ body.show-welcome #welcomeView{display:block}
       <h2 class="w-h2">セキュリティとプライバシー</h2>
       <div class="w-sec-body">
         <p><b>キーの保存場所。</b>APIキーはお使いの端末のブラウザ内にのみ保存され、Eluntra側のサーバーへ送信・保存されることはありません。通信は、あなたのブラウザから各AI会社の公式APIへ直接行われます。</p>
-        <p><b>同期の対象。</b>ログイン時のクラウド同期は、会話と設定だけが対象です。APIキーは同期対象に含まれません。同期データはSupabaseに保存され、自分のデータだけが読み書きできるよう制限されています。</p>
+        <p><b>同期の対象。</b>ログイン時のクラウド同期は、会話・設定・エージェントが保存したメモが対象です。APIキーは同期対象に含まれません。同期データはSupabaseに保存され、自分のデータだけが読み書きできるよう制限されています。</p>
         <p><b>データの削除。</b>設定の「すべて削除」から、端末内のキー・会話・設定をいつでも消せます。ログアウトすれば、この端末でのログイン状態も解けます。</p>
       </div>
     </section>
@@ -452,7 +463,7 @@ body.show-welcome #welcomeView{display:block}
   <aside class="sidebar" id="sidebar" aria-label="サイドバー">
     <div class="sb-head">
       <div class="logo">Eluntra</div>
-      <div class="logo-sub">8社のAIを、自分のキーで使うチャット</div>
+      <div class="logo-sub">10社のAIを、自分のキーで使うチャット</div>
     </div>
     <div class="sb-new">
       <button class="btn primary block" id="btnNewChat">
@@ -534,6 +545,9 @@ body.show-welcome #welcomeView{display:block}
             <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
             システム
           </button>
+          <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
+            エージェント
+          </button>
           <button class="meta-btn" id="btnExport">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
             書き出し
@@ -591,8 +605,11 @@ body.show-welcome #welcomeView{display:block}
     </div>
     <div class="sheet-body">
       <p class="set-desc">Eluntraは月額なしのBYOK専用です。使う会社のAPIキーを貼るだけで、その会社のモデルと直接通信します。キーはこの端末のブラウザ内（localStorage）にのみ保存され、Eluntraのサーバーには送られません（そもそもサーバーがありません）。料金は各社の従量課金がそのまま適用されます。</p>
-      <div class="set-sec">プロバイダー 8社</div>
+      <div class="set-sec">プロバイダー 10社</div>
       <div id="provSettings"></div>
+      <div class="set-sec">メモ（Supabase連携）</div>
+      <p class="set-desc">エージェントが保存したメモです。この端末に保存され、ログイン中はSupabaseにも自動で同期されます。</p>
+      <div id="notesList"></div>
       <div class="set-sec">表示</div>
       <button class="btn secondary" id="btnTheme2">ダークモード切替</button>
       <div class="set-sec">データ</div>
@@ -608,7 +625,7 @@ body.show-welcome #welcomeView{display:block}
 <div class="toast" id="toast"></div>
 <script>
 "use strict";
-/* ================= Providers (8) ================= */
+/* ================= Providers (10) ================= */
 const PROVIDERS=[
  {id:"openai",name:"OpenAI",mono:"OA",color:"#191919",type:"openai",base:"https://api.openai.com/v1",
   getKeyUrl:"https://platform.openai.com/api-keys",keyHint:"sk-… で始まるキー",
@@ -631,6 +648,12 @@ const PROVIDERS=[
  {id:"cohere",name:"Cohere",mono:"Co",color:"#0F4C3A",type:"cohere",base:"https://api.cohere.com",
   getKeyUrl:"https://dashboard.cohere.com/api-keys",keyHint:"Cohereダッシュボードのキー（試用キーあり）",
   models:["command-a-03-2025","command-r7b-12-2024","command-r-plus-08-2024","command-r-08-2024"],def:"command-a-03-2025"},
+ {id:"cloudflare",name:"Cloudflare Workers AI",mono:"CF",color:"#F38020",type:"openai",base:"https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1",
+  getKeyUrl:"https://dash.cloudflare.com/profile/api-tokens",keyHint:"APIトークン",dualKey:true,
+  models:["@cf/meta/llama-3.3-70b-instruct-fp8-fast","@cf/meta/llama-3.1-8b-instruct","@cf/qwen/qwen1.5-14b-chat","@cf/mistral/mistral-7b-instruct-v0.2"],def:"@cf/meta/llama-3.3-70b-instruct-fp8-fast"},
+ {id:"sambanova",name:"SambaNova Cloud",mono:"SN",color:"#EE7624",type:"openai",base:"https://api.sambanova.ai/v1",
+  getKeyUrl:"https://cloud.sambanova.ai/apis",keyHint:"SambaNova CloudのAPIキー",
+  models:["Meta-Llama-3.3-70B-Instruct","Meta-Llama-3.1-8B-Instruct","DeepSeek-R1","Qwen2.5-72B-Instruct"],def:"Meta-Llama-3.3-70B-Instruct"},
  {id:"deepseek",name:"DeepSeek",mono:"De",color:"#2B4BFF",type:"openai",base:"https://api.deepseek.com/v1",
   getKeyUrl:"https://platform.deepseek.com/api_keys",keyHint:"sk-… で始まるキー",
   models:["deepseek-chat","deepseek-reasoner"],def:"deepseek-chat"},
@@ -638,19 +661,25 @@ const PROVIDERS=[
 const P=id=>PROVIDERS.find(p=>p.id===id);
 
 /* ================= State ================= */
-const LS={keys:"eluntra_keys",tested:"eluntra_tested",models:"eluntra_models",conf:"eluntra_conf",sess:"eluntra_sessions",theme:"eluntra_theme"};
+const LS={keys:"eluntra_keys",tested:"eluntra_tested",models:"eluntra_models",conf:"eluntra_conf",sess:"eluntra_sessions",theme:"eluntra_theme",notes:"eluntra_notes"};
 const load=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
 const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let keys=load(LS.keys,{});
 let tested=load(LS.tested,{});
 let fetchedModels=load(LS.models,{});
-let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},load(LS.conf,{}));
+let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false},load(LS.conf,{}));
 PROVIDERS.forEach(p=>{if(!conf.models[p.id])conf.models[p.id]=p.def});
 let sessions=load(LS.sess,[]);
+let notes=load(LS.notes,[]);
 let currentId=null;
 let abortCtl=null;
 let generating=false;
 
+function splitSavedKey(pid,raw){if(pid!=="cloudflare")return{acct:"",token:raw||""};const i=(raw||"").indexOf("::");if(i<0)return{acct:"",token:raw||""};return{acct:raw.slice(0,i),token:raw.slice(i+2)}}
+function joinSavedKey(pid,acct,token){if(pid!=="cloudflare")return token;return acct&&token?acct+"::"+token:(token||acct)}
+function effBase(p,key){if(p.id!=="cloudflare")return p.base;return p.base.replace("{account}",splitSavedKey(p.id,key).acct)}
+function effToken(p,key){if(p.id!=="cloudflare")return key;return splitSavedKey(p.id,key).token}
+function readKeyInput(pid){const token=($("#key-"+pid).value||"").trim();if(!P(pid).dualKey)return token;const acct=($("#acct-"+pid).value||"").trim();return joinSavedKey(pid,acct,token)}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -696,7 +725,7 @@ function deleteSession(id){
 }
 
 /* ================= Rendering ================= */
-const LOGOS={"openai": "<path fill=\"#000000\" d=\"M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z\"/>", "gemini": "<path fill=\"#8E75B2\" d=\"M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81\"/>", "anthropic": "<path fill=\"#191919\" d=\"M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z\"/>", "mistral": "<path fill=\"#FA520F\" d=\"M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z\"/>", "groq": "<path fill=\"#F55036\" fill-rule=\"evenodd\" d=\"M12.036 2c-3.853-.035-7 3-7.036 6.781-.035 3.782 3.055 6.872 6.908 6.907h2.42v-2.566h-2.292c-2.407.028-4.38-1.866-4.408-4.23-.029-2.362 1.901-4.298 4.308-4.326h.1c2.407 0 4.358 1.915 4.365 4.278v6.305c0 2.342-1.944 4.25-4.323 4.279a4.375 4.375 0 01-3.033-1.252l-1.851 1.818A7 7 0 0012.029 22h.092c3.803-.056 6.858-3.083 6.879-6.816v-6.5C18.907 4.963 15.817 2 12.036 2z\"/>", "openrouter": "<path fill=\"#94A3B8\" d=\"M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z\"/>", "cohere": "<path clip-rule=\"evenodd\" d=\"M8.128 14.099c.592 0 1.77-.033 3.398-.703 1.897-.781 5.672-2.2 8.395-3.656 1.905-1.018 2.74-2.366 2.74-4.18A4.56 4.56 0 0018.1 1H7.549A6.55 6.55 0 001 7.55c0 3.617 2.745 6.549 7.128 6.549z\" fill=\"#39594D\" fill-rule=\"evenodd\"></path><path clip-rule=\"evenodd\" d=\"M9.912 18.61a4.387 4.387 0 012.705-4.052l3.323-1.38c3.361-1.394 7.06 1.076 7.06 4.715a5.104 5.104 0 01-5.105 5.104l-3.597-.001a4.386 4.386 0 01-4.386-4.387z\" fill=\"#D18EE2\" fill-rule=\"evenodd\"></path><path d=\"M4.776 14.962A3.775 3.775 0 001 18.738v.489a3.776 3.776 0 007.551 0v-.49a3.775 3.775 0 00-3.775-3.775z\" fill=\"#FF7759\"></path>", "deepseek": "<path fill=\"#5786FE\" d=\"M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45\"/>"};
+const LOGOS={"openai": "<path fill=\"#000000\" d=\"M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z\"/>", "gemini": "<path fill=\"#8E75B2\" d=\"M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81\"/>", "anthropic": "<path fill=\"#191919\" d=\"M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z\"/>", "mistral": "<path fill=\"#FA520F\" d=\"M17.143 3.429v3.428h-3.429v3.429h-3.428V6.857H6.857V3.43H3.43v13.714H0v3.428h10.286v-3.428H6.857v-3.429h3.429v3.429h3.429v-3.429h3.428v3.429h-3.428v3.428H24v-3.428h-3.43V3.429z\"/>", "groq": "<path fill=\"#F55036\" fill-rule=\"evenodd\" d=\"M12.036 2c-3.853-.035-7 3-7.036 6.781-.035 3.782 3.055 6.872 6.908 6.907h2.42v-2.566h-2.292c-2.407.028-4.38-1.866-4.408-4.23-.029-2.362 1.901-4.298 4.308-4.326h.1c2.407 0 4.358 1.915 4.365 4.278v6.305c0 2.342-1.944 4.25-4.323 4.279a4.375 4.375 0 01-3.033-1.252l-1.851 1.818A7 7 0 0012.029 22h.092c3.803-.056 6.858-3.083 6.879-6.816v-6.5C18.907 4.963 15.817 2 12.036 2z\"/>", "openrouter": "<path fill=\"#94A3B8\" d=\"M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z\"/>", "cohere": "<path clip-rule=\"evenodd\" d=\"M8.128 14.099c.592 0 1.77-.033 3.398-.703 1.897-.781 5.672-2.2 8.395-3.656 1.905-1.018 2.74-2.366 2.74-4.18A4.56 4.56 0 0018.1 1H7.549A6.55 6.55 0 001 7.55c0 3.617 2.745 6.549 7.128 6.549z\" fill=\"#39594D\" fill-rule=\"evenodd\"></path><path clip-rule=\"evenodd\" d=\"M9.912 18.61a4.387 4.387 0 012.705-4.052l3.323-1.38c3.361-1.394 7.06 1.076 7.06 4.715a5.104 5.104 0 01-5.105 5.104l-3.597-.001a4.386 4.386 0 01-4.386-4.387z\" fill=\"#D18EE2\" fill-rule=\"evenodd\"></path><path d=\"M4.776 14.962A3.775 3.775 0 001 18.738v.489a3.776 3.776 0 007.551 0v-.49a3.775 3.775 0 00-3.775-3.775z\" fill=\"#FF7759\"></path>", "deepseek": "<path fill=\"#5786FE\" d=\"M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45\"/>", "cloudflare": "<path fill=\"#F38020\" d=\"M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727\"/>", "sambanova": "<path d=\"M23 23h-1.223V8.028c0-3.118-2.568-5.806-5.744-5.806H8.027c-3.176 0-5.744 2.565-5.744 5.686 0 3.119 2.568 5.684 5.744 5.684h.794c1.346 0 2.445 1.1 2.445 2.444 0 1.346-1.1 2.446-2.445 2.446H1v-1.223h7.761c.671 0 1.223-.551 1.223-1.16 0-.67-.552-1.16-1.223-1.16h-.794C4.177 14.872 1 11.756 1 7.909 1 4.058 4.176 1 8.027 1h8.066C19.88 1 23 4.239 23 8.028V23z\" fill=\"#EE7624\"></path><path d=\"M8.884 12.672c1.71.06 3.361 1.588 3.361 3.422 0 1.833-1.528 3.421-3.421 3.421H1v1.223h7.761c2.568 0 4.705-2.077 4.705-4.644 0-.672-.123-1.283-.43-1.894-.245-.551-.67-1.1-1.099-1.528-.489-.429-1.039-.734-1.65-.977-.525-.175-1.048-.193-1.594-.212-.218-.008-.441-.016-.669-.034-.428 0-1.406-.245-1.956-.61a3.369 3.369 0 01-1.223-1.406c-.183-.489-.305-.977-.305-1.528A3.417 3.417 0 017.96 4.482h8.066c1.895 0 3.422 1.65 3.422 3.483v15.032h1.223V8.027c0-2.568-2.077-4.768-4.645-4.768h-8c-2.568 0-4.705 2.077-4.705 4.646 0 .67.123 1.282.43 1.894a4.45 4.45 0 001.099 1.528c.429.428 1.039.734 1.588.976.306.123.611.183.976.246.857.06 1.406.123 1.466.123h.003z\" fill=\"#EE7624\"></path><path d=\"M1 23h7.761v-.003c3.85 0 7.03-3.116 7.09-7.026 0-3.79-3.117-6.906-6.967-6.906H8.09c-.672 0-1.222-.552-1.222-1.16 0-.608.487-1.16 1.159-1.16h8.069c.608 0 1.159.611 1.159 1.283v14.97h1.223V8.024c0-1.345-1.1-2.505-2.445-2.505H7.967a2.451 2.451 0 00-2.445 2.445 2.45 2.45 0 002.445 2.445h.794c3.176 0 5.744 2.568 5.744 5.684s-2.568 5.684-5.744 5.684H1V23z\" fill=\"#EE7624\"></path>"};
 function logoTile(pid,sm){return '<span class="logo-tile'+(sm?" sm":"")+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+(LOGOS[pid]||"")+'</svg></span>'}
 function renderPills(){
   const p=curProv(),m=curModel();
@@ -726,9 +755,9 @@ function renderChat(){
       const st=keyState(p.id);
       return '<button class="prov-cell '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id)+'<span><span class="pc-name">'+esc(p.name)+'</span><br><span class="pc-state">'+stateLabel(p.id)+' ・ '+esc(conf.models[p.id])+'</span></span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
     }).join("");
-    col.innerHTML='<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、8社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>'
+    col.innerHTML='<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>'
       +'<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>'
-      +'<div class="sec-label">プロバイダーを選ぶ（8社）</div><div class="prov-grid">'+provCells+'</div>'
+      +'<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">'+provCells+'</div>'
       +'<div class="sec-label">たとえば</div><div class="sugg">'+SUGGESTIONS.map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
     return;
   }
@@ -741,7 +770,8 @@ function renderMsg(m,i,s){
     ?'<span class="mono-tile sm" style="background:var(--ink);color:var(--bg)">You</span><span class="msg-role">あなた</span>'
     :logoTile(P(s.providerAtSend||s.provider)?.id||"",true)+'<span class="msg-role">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+'</span><span class="msg-meta">'+esc(m.model||"")+'</span>';
   const tools=isUser?"":'<span class="msg-tools"><button data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>';
-  return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div><div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':md(m.content))+'</div></div>';
+  const stepsHtml=(m.steps&&m.steps.length)?'<div class="msg-steps">'+m.steps.map(st=>'<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(st)+'</span></div>').join("")+'</div>':"";
+  return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div>'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':md(m.content))+'</div></div>';
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
 
@@ -790,8 +820,8 @@ async function ensureFresh(){
     const j=await r.json();storeAuth({accessToken:j.access_token,refreshToken:j.refresh_token,expiresAt:Date.now()+j.expires_in*1000,user:toAuthUser(j.user)});return true}
   catch(e){storeAuth(null);return false}}
 async function doLogout(){if(authSess){try{await fetch(AUTH_URL+"/auth/v1/logout",{method:"POST",headers:{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken}})}catch(e){}}storeAuth(null)}
-function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp}}}
-function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;save(LS.conf,conf)}}
+function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp,agent:!!conf.agent},notes:notes}}
+function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;if(typeof d.conf.agent==="boolean")conf.agent=d.conf.agent;save(LS.conf,conf)}if(Array.isArray(d.notes)){notes=d.notes;save(LS.notes,notes)}}
 async function syncHeaders(){if(!(await ensureFresh())||!authSess)return null;return{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken,"Content-Type":"application/json"}}
 async function pushSync(){const h=await syncHeaders();if(!h)return false;try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync",{method:"POST",headers:Object.assign({},h,{Prefer:"resolution=merge-duplicates"}),body:JSON.stringify({user_id:authSess.user.id,data:collectSync(),updated_at:new Date().toISOString()})});if(!r.ok)return false;setLastSyncAt(Date.now());return true}catch(e){return false}}
 async function pullSync(){const h=await syncHeaders();if(!h)return"none";try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync?select=data,updated_at&user_id=eq."+authSess.user.id,{headers:h});if(!r.ok)return"none";const rows=await r.json();if(!rows.length)return"none";const ct=new Date(rows[0].updated_at).getTime();if(ct>lastSyncAt()+1000){applySync(rows[0].data);setLastSyncAt(ct);return"applied"}return"exists"}catch(e){return"none"}}
@@ -816,7 +846,7 @@ function renderAccount(){
     +'<button class="btn danger" id="btnLogout" style="width:100%;margin-top:10px">'+LOGOUT_SVG+'<span>ログアウト</span></button>'
     +'<p class="login-note">同期されるのは会話と設定だけです。APIキーはこの端末の中にだけ残ります。</p>'}
 
-function renderAll(){ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
+function renderAll(){const ag=$("#btnAgent");if(ag)ag.classList.toggle("on",!!conf.agent);ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
 
 /* ================= API ================= */
 function friendlyError(status,bodyText,p){
@@ -840,7 +870,7 @@ async function testConnection(pid){
     if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
     else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
     else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
-    else{res=await fetch(p.base+"/models",{headers:{Authorization:"Bearer "+key}})}
+    else{res=await fetch(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
     if(res.ok){tested[pid]=true;save(LS.tested,tested);return{ok:true,msg:"接続できました。このキーでチャットできます。"}}
     const t=await res.text();delete tested[pid];save(LS.tested,tested);
     return{ok:false,msg:friendlyError(res.status,t,p)};
@@ -864,7 +894,7 @@ async function fetchModels(pid){
   if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
   else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
   else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
-  else{res=await fetch(p.base+"/models",{headers:{Authorization:"Bearer "+key}})}
+  else{res=await fetch(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
   if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
   const j=await res.json();
   let ids=[];
@@ -882,7 +912,7 @@ async function fetchModels(pid){
 async function callOpenAI(p,key,model,history,onDelta){
   const msgs=[];if(conf.system)msgs.push({role:"system",content:conf.system});
   history.forEach(m=>msgs.push({role:m.role,content:m.content}));
-  const res=await fetchWithTimeout(p.base+"/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify({model,messages:msgs,temperature:+conf.temp,stream:true})});
+  const res=await fetchWithTimeout(effBase(p,key)+"/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+effToken(p,key)},body:JSON.stringify({model,messages:msgs,temperature:+conf.temp,stream:true})});
   if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
   const reader=res.body.getReader();const dec=new TextDecoder();let buf="",full="";
   while(true){const{done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});
@@ -925,6 +955,194 @@ async function callCohere(p,key,model,history,onDelta){
   if(!full)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
   onDelta(full);return full;
 }
+/* ================= Agent（ツール実行ループ） ================= */
+const AGENT_MAX_STEPS=8;
+const AGENT_SYS="あなたはEluntraのエージェントです。必要に応じてツールを使い、段階的にタスクを完了してください。計算やコードで確かめられることは推測で答えず、実際にツールで確認してください。ツールが不要な質問にはそのまま答えてください。最後に、結果をまとめた最終回答を書いてください。";
+const TOOL_DEFS=[
+{name:"run_javascript",label:"コードを実行",description:"JavaScriptコードを隔離されたサンドボックスで実行し、console.logの出力と戻り値を返す。計算・データ処理・検証に使う。",parameters:{type:"object",properties:{code:{type:"string",description:"実行するJavaScriptコード"}},required:["code"]}},
+{name:"get_current_datetime",label:"日時を確認",description:"現在の日時（日本時間）を返す。",parameters:{type:"object",properties:{}}},
+{name:"fetch_url",label:"ページを取得",description:"指定URLのページ本文テキストを取得する。CORSで取得できないサイトもある。",parameters:{type:"object",properties:{url:{type:"string",description:"取得するURL"}},required:["url"]}},
+{name:"save_note",label:"メモを保存",description:"調べた結果や要約をメモとして保存する。保存したメモはユーザーの端末とSupabase（ログイン時）に残る。",parameters:{type:"object",properties:{title:{type:"string",description:"メモのタイトル"},content:{type:"string",description:"メモの本文"}},required:["title","content"]}},
+{name:"search_notes",label:"メモを検索",description:"保存済みメモをキーワードで検索する。",parameters:{type:"object",properties:{query:{type:"string",description:"検索キーワード"}},required:["query"]}}
+];
+function toolLabel(name){const t=TOOL_DEFS.find(t=>t.name===name);return t?t.label:name}
+function runSandboxedJs(code){
+return new Promise(resolve=>{
+const id=Math.random().toString(36).slice(2);
+const iframe=document.createElement("iframe");
+iframe.setAttribute("sandbox","allow-scripts");iframe.style.display="none";
+let done=false;
+const finish=out=>{if(done)return;done=true;clearTimeout(timer);window.removeEventListener("message",onMsg);iframe.remove();resolve(String(out).slice(0,4000))};
+const onMsg=e=>{const d=e.data;if(d&&d.__eluntra===id)finish(d.out??"")};
+const timer=setTimeout(()=>finish("（6秒で時間切れになりました）"),6000);
+window.addEventListener("message",onMsg);
+iframe.srcdoc="<!DOCTYPE html><script>"
++"var logs=[];function fmt(v){try{return typeof v==='string'?v:JSON.stringify(v)}catch(e){return String(v)}}"
++"console.log=function(){logs.push([].map.call(arguments,fmt).join(' '))};console.error=console.warn=console.log;"
++"window.addEventListener('error',function(e){parent.postMessage({__eluntra:'"+id+"',out:'エラー: '+e.message},'*')});"
++"(async function(){try{var r=await (async function(){"+code+"\n})();"
++"var out=logs.join('\\n');if(r!==undefined)out+=(out?'\\n':'')+'戻り値: '+fmt(r);"
++"parent.postMessage({__eluntra:'"+id+"',out:out||'（出力なし）'},'*')"
++"}catch(err){parent.postMessage({__eluntra:'"+id+"',out:'エラー: '+((err&&err.message)||err)},'*')}})();"
++"<\/script>";
+document.body.appendChild(iframe);
+});
+}
+async function executeTool(name,args){
+args=args||{};
+try{
+if(name==="run_javascript")return await runSandboxedJs(String(args.code||""));
+if(name==="get_current_datetime"){
+return "現在の日時（日本時間）: "+new Intl.DateTimeFormat("ja-JP",{timeZone:"Asia/Tokyo",year:"numeric",month:"long",day:"numeric",weekday:"long",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date());
+}
+if(name==="fetch_url"){
+const url=String(args.url||"");
+if(!/^https?:\/\//.test(url))return "URLが正しくありません。http:// または https:// で始まるURLを指定してください。";
+const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),15000);
+try{
+const res=await fetch(url,{signal:ctl.signal});
+if(!res.ok)return "取得できませんでした（HTTP "+res.status+"）。";
+const ct=res.headers.get("content-type")||"";const raw=await res.text();
+if(ct.includes("html")){
+const doc=new DOMParser().parseFromString(raw,"text/html");
+doc.querySelectorAll("script,style,noscript").forEach(el=>el.remove());
+return ((doc.body&&doc.body.innerText)||"").replace(/\n{3,}/g,"\n\n").trim().slice(0,6000)||"（本文が空でした）";
+}
+return raw.slice(0,6000);
+}catch(e){return "取得できませんでした。対処：そのサイトはブラウザからの直接取得（CORS）を許可していない可能性があります。"}
+finally{clearTimeout(t)}
+}
+if(name==="save_note"){
+const title=String(args.title||"無題").slice(0,80);
+const content=String(args.content||"").slice(0,20000);
+if(!content)return "内容が空のため保存できませんでした。";
+notes.unshift({id:uid(),title,content,created:Date.now()});save(LS.notes,notes);
+if(authSess)pushSync();
+return "メモ「"+title+"」を保存しました。";
+}
+if(name==="search_notes"){
+const q=String(args.query||"").toLowerCase();
+const hits=notes.filter(n=>!q||n.title.toLowerCase().includes(q)||n.content.toLowerCase().includes(q)).slice(0,5);
+if(!hits.length)return "該当するメモはありませんでした。";
+return hits.map(n=>"\n"+n.content.slice(0,600)).join("\n\n");
+}
+return "未知のツールです: "+name;
+}catch(e){return "ツール実行でエラーが発生しました: "+(e&&e.message||e)}
+}
+function agentThrowIfAborted(){if(abortCtl&&abortCtl.signal.aborted){const e=new Error("aborted");e.name="AbortError";throw e}}
+function agentSystemText(){return conf.system?conf.system+"\n"+AGENT_SYS:AGENT_SYS}
+async function agentPostJson(url,headers,body,p){
+const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort("timeout"),90000);
+try{
+const res=await fetch(url,{method:"POST",headers:Object.assign({"Content-Type":"application/json"},headers),body:JSON.stringify(body),signal:(abortCtl&&abortCtl.signal)||ctl.signal});
+if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
+return await res.json();
+}finally{clearTimeout(timer)}
+}
+async function runAgentOpenAI(p,key,model,history,onStep){
+const steps=[];
+const tools=TOOL_DEFS.map(t=>({type:"function",function:{name:t.name,description:t.description,parameters:t.parameters}}));
+const messages=[{role:"system",content:agentSystemText()}].concat(history.map(m=>({role:m.role,content:m.content})));
+for(let i=0;i<AGENT_MAX_STEPS;i++){
+agentThrowIfAborted();
+const j=await agentPostJson(effBase(p,key)+"/chat/completions",{Authorization:"Bearer "+effToken(p,key)},{model,messages,tools,tool_choice:"auto",temperature:conf.temp},p);
+const msg=j.choices&&j.choices[0]&&j.choices[0].message;
+if(!msg)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+const calls=msg.tool_calls||[];
+if(!calls.length)return{text:String(msg.content||""),steps};
+messages.push(msg);
+for(const tc of calls){
+agentThrowIfAborted();
+let args={};try{args=JSON.parse(tc.function.arguments||"{}")}catch(e){}
+const result=await executeTool(tc.function.name,args);
+steps.push(toolLabel(tc.function.name)+"しました");onStep(steps.slice());
+messages.push({role:"tool",tool_call_id:tc.id,content:result});
+}
+}
+return{text:"（ツールの実行回数が上限に達しました。途中までの結果をもとに、質問を分けて再度お試しください）",steps};
+}
+async function runAgentGemini(p,key,model,history,onStep){
+const steps=[];
+const contents=history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+const tools=[{functionDeclarations:TOOL_DEFS.map(t=>({name:t.name,description:t.description,parameters:t.parameters}))}];
+for(let i=0;i<AGENT_MAX_STEPS;i++){
+agentThrowIfAborted();
+const j=await agentPostJson(p.base+"/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(key),{},{contents,tools,systemInstruction:{parts:[{text:agentSystemText()}]},generationConfig:{temperature:conf.temp}},p);
+const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
+const calls=parts.filter(x=>x.functionCall);
+if(!calls.length){
+const text=parts.map(x=>x.text||"").join("");
+if(!text)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+return{text,steps};
+}
+contents.push({role:"model",parts});
+const responses=[];
+for(const c of calls){
+agentThrowIfAborted();
+const result=await executeTool(c.functionCall.name,c.functionCall.args||{});
+steps.push(toolLabel(c.functionCall.name)+"しました");onStep(steps.slice());
+responses.push({functionResponse:{name:c.functionCall.name,response:{result}}});
+}
+contents.push({role:"user",parts:responses});
+}
+return{text:"（ツールの実行回数が上限に達しました。途中までの結果をもとに、質問を分けて再度お試しください）",steps};
+}
+async function runAgentAnthropic(p,key,model,history,onStep){
+const steps=[];
+const messages=history.map(m=>({role:m.role,content:m.content}));
+const tools=TOOL_DEFS.map(t=>({name:t.name,description:t.description,input_schema:t.parameters}));
+for(let i=0;i<AGENT_MAX_STEPS;i++){
+agentThrowIfAborted();
+const j=await agentPostJson(p.base+"/messages",{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},{model,max_tokens:4096,system:agentSystemText(),messages,tools,temperature:conf.temp},p);
+const blocks=j.content||[];
+const uses=blocks.filter(b=>b.type==="tool_use");
+if(!uses.length){
+const text=blocks.map(b=>b.text||"").join("");
+if(!text)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+return{text,steps};
+}
+messages.push({role:"assistant",content:blocks});
+const results=[];
+for(const u of uses){
+agentThrowIfAborted();
+const result=await executeTool(u.name,u.input||{});
+steps.push(toolLabel(u.name)+"しました");onStep(steps.slice());
+results.push({type:"tool_result",tool_use_id:u.id,content:result});
+}
+messages.push({role:"user",content:results});
+}
+return{text:"（ツールの実行回数が上限に達しました。途中までの結果をもとに、質問を分けて再度お試しください）",steps};
+}
+async function runAgentCohere(p,key,model,history,onStep){
+const steps=[];
+const guide=TOOL_DEFS.map(t=>"- "+t.name+": "+t.description).join("\n");
+const sys=agentSystemText()+"\nツールを使う場合は、次の形式のJSONコードブロックだけを出力してください（説明文は付けない）。\n```json\n{\"tool\":\"ツール名\",\"args\":{...}}\n```\n使えるツール:\n"+guide;
+const messages=[{role:"system",content:sys}].concat(history.map(m=>({role:m.role,content:m.content})));
+for(let i=0;i<AGENT_MAX_STEPS;i++){
+agentThrowIfAborted();
+const j=await agentPostJson(p.base+"/v2/chat",{Authorization:"Bearer "+key},{model,messages,temperature:conf.temp},p);
+const text=((j.message&&j.message.content)||[]).map(c=>c.text||"").join("");
+const m=text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+let call=null;
+if(m){try{call=JSON.parse(m[1])}catch(e){call=null}}
+if(!call||!call.tool){
+if(!text)throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
+return{text,steps};
+}
+const result=await executeTool(call.tool,call.args||{});
+steps.push(toolLabel(call.tool)+"しました");onStep(steps.slice());
+messages.push({role:"assistant",content:text});
+messages.push({role:"user",content:"ツール「"+call.tool+"」の実行結果:\n"+result+"\nこの結果を踏まえて続けてください。完了したら最終回答を書いてください。"});
+}
+return{text:"（ツールの実行回数が上限に達しました。途中までの結果をもとに、質問を分けて再度お試しください）",steps};
+}
+function runAgent(p,key,model,history,onStep){
+if(p.type==="gemini")return runAgentGemini(p,key,model,history,onStep);
+if(p.type==="anthropic")return runAgentAnthropic(p,key,model,history,onStep);
+if(p.type==="cohere")return runAgentCohere(p,key,model,history,onStep);
+return runAgentOpenAI(p,key,model,history,onStep);
+}
+
 async function sendMessage(){
   const ta=$("#input");const text=ta.value.trim();if(!text||generating)return;
   ensureSession();const s=curSession();const p=curProv();const model=curModel();
@@ -946,7 +1164,11 @@ async function sendMessage(){
   const onDelta=full=>{aiMsg.content=full;aiMsg.pending=false;updateStreamingMsg(s,aiMsg)};
   try{
     let full="";
-    if(p.type==="openai")full=await callOpenAI(p,key,model,histForCall,onDelta);
+    if(conf.agent){
+      const r=await runAgent(p,key,model,histForCall,steps=>{aiMsg.steps=steps;aiMsg.pending=false;aiMsg.content=aiMsg.content||"エージェントが作業中です…";updateStreamingMsg(s,aiMsg)});
+      aiMsg.steps=r.steps;full=r.text;
+    }
+    else if(p.type==="openai")full=await callOpenAI(p,key,model,histForCall,onDelta);
     else if(p.type==="gemini")full=await callGemini(p,key,model,histForCall,onDelta);
     else if(p.type==="anthropic")full=await callAnthropic(p,key,model,histForCall,onDelta);
     else if(p.type==="cohere")full=await callCohere(p,key,model,histForCall,onDelta);
@@ -966,6 +1188,7 @@ function updateStreamingMsg(s,aiMsg){
   const idx=s.messages.indexOf(aiMsg);const node=nodes[idx];
   if(!node){renderChat();return}
   const body=node.querySelector(".msg-body");if(body)body.innerHTML=md(aiMsg.content);
+  if(aiMsg.steps&&aiMsg.steps.length){const html=aiMsg.steps.map(st=>'<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(st)+'</span></div>').join("");let box=node.querySelector(".msg-steps");if(!box){box=document.createElement("div");box.className="msg-steps";node.insertBefore(box,body)}box.innerHTML=html}
   scrollBottom(true);
 }
 function renderChatWithNoKey(p){
@@ -998,7 +1221,8 @@ function renderSettings(){
       +'<span class="st '+stCls+'">'+stateLabel(p.id)+'</span>'
       +'<button class="icon-btn" data-toggle-key="'+p.id+'" aria-label="キー設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>'
       +'<div class="key-box" id="keybox-'+p.id+'">'
-      +'<div class="key-line"><input type="password" id="key-'+p.id+'" placeholder="'+esc(p.keyHint)+'" value="'+esc(keys[p.id]||"")+'" autocomplete="off" spellcheck="false">'
+      +(p.dualKey?'<div class="key-line" style="margin-bottom:8px"><input type="text" id="acct-'+p.id+'" placeholder="Account ID" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").acct)+'" autocomplete="off" spellcheck="false"></div>':"")
+      +'<div class="key-line"><input type="password" id="key-'+p.id+'" placeholder="'+esc(p.keyHint)+'" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").token)+'" autocomplete="off" spellcheck="false">'
       +'<button class="btn secondary" data-show-key="'+p.id+'">表示</button></div>'
       +'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
       +'<button class="btn secondary sm" data-test-key="'+p.id+'">接続テスト</button>'
@@ -1006,6 +1230,15 @@ function renderSettings(){
       +'<a class="get-key" href="'+p.getKeyUrl+'" target="_blank" rel="noopener">キーを取得する</a></div>'
       +'<div class="test-result" id="test-'+p.id+'"></div>'
       +'</div></div>';
+  }).join("");
+  renderNotes();
+}
+function renderNotes(){
+  const box=$("#notesList");if(!box)return;
+  if(!notes.length){box.innerHTML='<p class="set-desc">まだメモはありません。エージェントに「調べてメモに保存して」と頼むと、ここに残ります。</p>';return}
+  box.innerHTML=notes.map(n=>{
+    const d=new Date(n.created);const when=(d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    return '<div class="note-row"><div class="note-main"><div class="note-title">'+esc(n.title)+'</div><div class="note-meta">'+when+" ・ "+esc(n.content.slice(0,60))+'</div></div><button class="btn ghost sm" data-del-note="'+n.id+'">削除</button></div>';
   }).join("");
 }
 function openSheet(id){$("#"+id).classList.add("on")}
@@ -1046,8 +1279,8 @@ document.addEventListener("click",e=>{
   const cp=e.target.closest("[data-copy]");if(cp){const s=curSession();const m=s&&s.messages[+cp.getAttribute("data-copy")];if(m){navigator.clipboard.writeText(m.content).then(()=>toast("コピーしました"))}return}
   const tk=e.target.closest("[data-toggle-key]");if(tk){$("#keybox-"+tk.getAttribute("data-toggle-key")).classList.toggle("on");return}
   const sk=e.target.closest("[data-show-key]");if(sk){const inp=$("#key-"+sk.getAttribute("data-show-key"));inp.type=inp.type==="password"?"text":"password";sk.textContent=inp.type==="password"?"表示":"隠す";return}
-  const sv=e.target.closest("[data-save-key]");if(sv){const pid=sv.getAttribute("data-save-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v}else{delete keys[pid]}delete tested[pid];save(LS.keys,keys);save(LS.tested,tested);renderSettings();renderAll();toast(v?P(pid).name+"のキーを保存しました":"キーを削除しました");if(v)autoFetchModels(pid,true);return}
-  const ts=e.target.closest("[data-test-key]");if(ts){(async()=>{const pid=ts.getAttribute("data-test-key");const v=$("#key-"+pid).value.trim();if(v){keys[pid]=v;save(LS.keys,keys)}
+  const sv=e.target.closest("[data-save-key]");if(sv){const pid=sv.getAttribute("data-save-key");const v=readKeyInput(pid);if(v){keys[pid]=v}else{delete keys[pid]}delete tested[pid];save(LS.keys,keys);save(LS.tested,tested);renderSettings();renderAll();toast(v?P(pid).name+"のキーを保存しました":"キーを削除しました");if(v)autoFetchModels(pid,true);return}
+  const ts=e.target.closest("[data-test-key]");if(ts){(async()=>{const pid=ts.getAttribute("data-test-key");const v=readKeyInput(pid);if(v){keys[pid]=v;save(LS.keys,keys)}
     const box=$("#test-"+pid);box.className="test-result on";box.style.color="var(--text-2)";box.textContent="接続テスト中…";
     const r=await testConnection(pid);box.className="test-result on "+(r.ok?"ok":"ng");box.textContent=(r.ok?"成功：":"失敗：")+r.msg;renderAll()})();return}
   const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");autoFetchModels(conf.provider);return}
@@ -1080,6 +1313,8 @@ $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchMo
   catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="一覧を取得"}});
 $("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
 $("#keyStateLabel").addEventListener("click",()=>{openSettings(conf.provider)});
+$("#btnAgent").addEventListener("click",()=>{conf.agent=!conf.agent;save(LS.conf,conf);renderAll();toast(conf.agent?"エージェントモードをオンにしました（ツールを使いながら回答します）":"エージェントモードをオフにしました")});
+document.addEventListener("click",e=>{const dn=e.target.closest("[data-del-note]");if(!dn)return;const nid=dn.getAttribute("data-del-note");notes=notes.filter(n=>n.id!==nid);save(LS.notes,notes);if(authSess)pushSync();renderNotes();toast("メモを削除しました")});
 $("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});
 $("#sysPrompt").addEventListener("input",e=>{conf.system=e.target.value;save(LS.conf,conf)});
 $("#tempRange").addEventListener("input",e=>{conf.temp=+e.target.value;$("#tempVal").textContent=(+e.target.value).toFixed(1);save(LS.conf,conf)});
@@ -1098,7 +1333,7 @@ $("#btnExportAll").addEventListener("click",()=>{
   toast("書き出しました（キー本体は含みません）");
 });
 $("#btnWipe").addEventListener("click",()=>{if(!confirm("キー・会話・設定をすべて削除しますか？この操作は戻せません。"))return;
-  [LS.keys,LS.tested,LS.models,LS.conf,LS.sess].forEach(k=>localStorage.removeItem(k));
+  [LS.keys,LS.tested,LS.models,LS.conf,LS.sess,LS.notes].forEach(k=>localStorage.removeItem(k));notes=[];
   keys={};tested={};fetchedModels={};sessions=[];currentId=null;conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},{});PROVIDERS.forEach(p=>conf.models[p.id]=p.def);
   renderSettings();renderAll();toast("すべて削除しました")});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSheet");closeSheet("settingsSheet");closeSheet("loginSheet");closeSidebar()}});

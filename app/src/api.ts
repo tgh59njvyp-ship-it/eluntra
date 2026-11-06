@@ -1,4 +1,5 @@
 import { findProvider } from "./providers";
+import { splitSavedKey } from "./state";
 import {
   persistModels,
   persistTested,
@@ -42,6 +43,16 @@ async function fetchWithTimeout(
   }
 }
 
+/** Cloudflareは保存キーが "AccountID::トークン" 形式。実ベースURLと実トークンに直す */
+export function effBase(p: Provider, key: string): string {
+  if (p.id !== "cloudflare") return p.base;
+  return p.base.replace("{account}", splitSavedKey(p.id, key).acct);
+}
+export function effToken(p: Provider, key: string): string {
+  if (p.id !== "cloudflare") return key;
+  return splitSavedKey(p.id, key).token;
+}
+
 function modelsRequest(p: Provider, key: string): Promise<Response> {
   if (p.type === "gemini") {
     return fetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
@@ -60,7 +71,9 @@ function modelsRequest(p: Provider, key: string): Promise<Response> {
       headers: { Authorization: `Bearer ${key}` },
     });
   }
-  return fetch(`${p.base}/models`, { headers: { Authorization: `Bearer ${key}` } });
+  return fetch(`${effBase(p, key)}/models`, {
+    headers: { Authorization: `Bearer ${effToken(p, key)}` },
+  });
 }
 
 /** モデル一覧APIで疎通確認する */
@@ -162,9 +175,9 @@ export async function callOpenAI(
   const msgs: Array<{ role: string; content: string }> = [];
   if (state.conf.system) msgs.push({ role: "system", content: state.conf.system });
   history.forEach((m) => msgs.push({ role: m.role, content: m.content }));
-  const res = await fetchWithTimeout(`${p.base}/chat/completions`, {
+  const res = await fetchWithTimeout(`${effBase(p, key)}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${effToken(p, key)}` },
     body: JSON.stringify({ model, messages: msgs, temperature: state.conf.temp, stream: true }),
   });
   if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));

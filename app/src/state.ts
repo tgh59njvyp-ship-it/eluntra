@@ -1,5 +1,5 @@
 import { PROVIDERS, findProvider } from "./providers";
-import type { Config, KeyState, Provider, Session } from "./types";
+import type { Config, KeyState, Note, Provider, Session } from "./types";
 import { uid } from "./util";
 
 /** localStorageのキー。単一HTML版と接頭辞を共有し、保存データの形式も同一。 */
@@ -9,6 +9,7 @@ export const LS = {
   models: "eluntra_models",
   conf: "eluntra_conf",
   sess: "eluntra_sessions",
+  notes: "eluntra_notes",
   theme: "eluntra_theme",
 } as const;
 
@@ -35,10 +36,11 @@ export const state = {
   tested: load<Record<string, boolean>>(LS.tested, {}),
   fetchedModels: load<Record<string, string[]>>(LS.models, {}),
   conf: Object.assign(
-    { provider: "gemini", models: {}, system: "", temp: 0.7 } as Config,
+    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false } as Config,
     load<Partial<Config>>(LS.conf, {}),
   ),
   sessions: load<Session[]>(LS.sess, []),
+  notes: load<Note[]>(LS.notes, []),
   currentId: null as string | null,
 };
 
@@ -63,6 +65,9 @@ export function persistKeys(): void {
 }
 export function persistTested(): void {
   save(LS.tested, state.tested);
+}
+export function persistNotes(): void {
+  save(LS.notes, state.notes);
 }
 export function persistModels(): void {
   save(LS.models, state.fetchedModels);
@@ -125,16 +130,29 @@ export function deleteSession(id: string): void {
 }
 
 export function resetAllData(): void {
-  [LS.keys, LS.tested, LS.models, LS.conf, LS.sess].forEach((k) =>
+  [LS.keys, LS.tested, LS.models, LS.conf, LS.sess, LS.notes].forEach((k) =>
     localStorage.removeItem(k),
   );
   state.keys = {};
   state.tested = {};
   state.fetchedModels = {};
   state.sessions = [];
+  state.notes = [];
   state.currentId = null;
-  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7 };
+  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false };
   PROVIDERS.forEach((p) => {
     state.conf.models[p.id] = p.def;
   });
+}
+
+/** Cloudflareなど2要素キーの分割・結合（保存形式は "AccountID::トークン"） */
+export function splitSavedKey(pid: string, raw: string): { acct: string; token: string } {
+  if (pid !== "cloudflare") return { acct: "", token: raw || "" };
+  const i = (raw || "").indexOf("::");
+  if (i < 0) return { acct: "", token: raw || "" };
+  return { acct: raw.slice(0, i), token: raw.slice(i + 2) };
+}
+export function joinSavedKey(pid: string, acct: string, token: string): string {
+  if (pid !== "cloudflare") return token;
+  return acct && token ? `${acct}::${token}` : token || acct;
 }
