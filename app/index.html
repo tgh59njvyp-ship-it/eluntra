@@ -162,7 +162,7 @@
       <button class="model-pill" id="modelPillTop">
         <span class="logo-tile sm" id="pillMono"></span>
         <span style="flex:1;min-width:0">
-          <span class="mp-name" id="pillName">OpenAI</span><br>
+          <span class="mp-name" id="pillName">OpenAI</span>
           <span class="mp-model" id="pillModel">gpt-4o-mini</span>
         </span>
         <svg class="ic sm chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -212,6 +212,10 @@
           </button>
           <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
             エージェント
+          </button>
+          <button class="meta-btn" id="btnCode" title="コードモードを開く">
+            <svg class="ic" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg>
+            コード
           </button>
           <button class="meta-btn" id="btnExport">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -283,6 +287,32 @@
         <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
         <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sheet" id="codeSheet" role="dialog" aria-label="コード">
+  <div class="sheet-bg" data-close="codeSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>コード</h2>
+      <button class="btn secondary sm" id="btnCodeDownload">HTMLを書き出し</button>
+      <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="code-tabs">
+      <button class="code-tab on" id="tabCodeEdit">編集</button>
+      <button class="code-tab" id="tabCodePrev">プレビュー</button>
+    </div>
+    <div class="sheet-body code-body">
+      <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+      <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+      <div class="code-ai">
+        <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
+        <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
+      </div>
+      <p class="code-status" id="codeStatus"></p>
+      <p class="set-desc">単一HTMLファイルとして編集します。AIが返すコードは自動で反映され、プレビューで確認できます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>

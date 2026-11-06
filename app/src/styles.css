@@ -78,8 +78,9 @@ svg{display:block}
 .icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink)}
 .icon-btn:hover{background:var(--bg-sub)}
 .model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
-.model-pill .mp-name{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.model-pill .mp-model{font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .mp-name{display:block;font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .mp-model{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill>span:nth-of-type(2){overflow:hidden}
 .model-pill .chev{margin-left:auto;color:var(--text-3)}
 
 /* chat */
@@ -331,3 +332,20 @@ body.show-welcome #welcomeView{display:block}
 .note-main{flex:1;min-width:0}
 .note-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .note-meta{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* topbar: アカウントはサイドバーにもあるため、スマホ幅では上部から外して混雑を解消 */
+.topbar #btnAccountTop{display:none}
+
+/* ---------- Code mode ---------- */
+.code-tabs{display:flex;gap:6px;padding:10px 20px 0}
+.code-tab{flex:1;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text-2);font-size:13.5px;font-weight:600}
+.code-tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.code-body{flex:1;display:flex;flex-direction:column;overflow:hidden;gap:10px}
+#codeEditor{flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:12.5px;line-height:1.6;padding:12px;resize:none}
+#codeEditor:focus{border-color:var(--accent);outline:none}
+#codePreview{display:none;flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:#fff}
+.code-body.show-prev #codeEditor{display:none}
+.code-body.show-prev #codePreview{display:block}
+.code-ai{display:flex;gap:8px}
+.code-ai input{flex:1;min-width:0;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 12px;font-size:14px;font-family:inherit}
+.code-ai input:focus{border-color:var(--accent);outline:none}
+.code-status{font-size:13px;color:var(--text-2);min-height:1.2em}

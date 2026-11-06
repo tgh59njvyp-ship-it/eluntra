@@ -48,6 +48,9 @@ PROVIDERS.forEach((p) => {
   if (!state.conf.models[p.id]) state.conf.models[p.id] = p.def;
 });
 
+/** コードモードの保存キー（auth.tsの同期でも使う） */
+export const CODE_LS_KEY = "eluntra_code";
+
 /** 生成中フラグと中断用コントローラ */
 export const runtime = {
   generating: false,

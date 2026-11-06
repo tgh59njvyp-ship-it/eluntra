@@ -110,8 +110,9 @@ svg{display:block}
 .icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink)}
 .icon-btn:hover{background:var(--bg-sub)}
 .model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
-.model-pill .mp-name{font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.model-pill .mp-model{font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .mp-name{display:block;font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill .mp-model{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-pill>span:nth-of-type(2){overflow:hidden}
 .model-pill .chev{margin-left:auto;color:var(--text-3)}
 
 /* chat */
@@ -363,6 +364,23 @@ body.show-welcome #welcomeView{display:block}
 .note-main{flex:1;min-width:0}
 .note-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .note-meta{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* topbar: アカウントはサイドバーにもあるため、スマホ幅では上部から外して混雑を解消 */
+.topbar #btnAccountTop{display:none}
+
+/* ---------- Code mode ---------- */
+.code-tabs{display:flex;gap:6px;padding:10px 20px 0}
+.code-tab{flex:1;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text-2);font-size:13.5px;font-weight:600}
+.code-tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.code-body{flex:1;display:flex;flex-direction:column;overflow:hidden;gap:10px}
+#codeEditor{flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:12.5px;line-height:1.6;padding:12px;resize:none}
+#codeEditor:focus{border-color:var(--accent);outline:none}
+#codePreview{display:none;flex:1;width:100%;border:1px solid var(--line-strong);border-radius:12px;background:#fff}
+.code-body.show-prev #codeEditor{display:none}
+.code-body.show-prev #codePreview{display:block}
+.code-ai{display:flex;gap:8px}
+.code-ai input{flex:1;min-width:0;height:44px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);padding:0 12px;font-size:14px;font-family:inherit}
+.code-ai input:focus{border-color:var(--accent);outline:none}
+.code-status{font-size:13px;color:var(--text-2);min-height:1.2em}
 </style>
 </head>
 <body>
@@ -497,7 +515,7 @@ body.show-welcome #welcomeView{display:block}
       <button class="model-pill" id="modelPillTop">
         <span class="logo-tile sm" id="pillMono"></span>
         <span style="flex:1;min-width:0">
-          <span class="mp-name" id="pillName">OpenAI</span><br>
+          <span class="mp-name" id="pillName">OpenAI</span>
           <span class="mp-model" id="pillModel">gpt-4o-mini</span>
         </span>
         <svg class="ic sm chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
@@ -547,6 +565,10 @@ body.show-welcome #welcomeView{display:block}
           </button>
           <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
             エージェント
+          </button>
+          <button class="meta-btn" id="btnCode" title="コードモードを開く">
+            <svg class="ic" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg>
+            コード
           </button>
           <button class="meta-btn" id="btnExport">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -618,6 +640,32 @@ body.show-welcome #welcomeView{display:block}
         <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
         <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sheet" id="codeSheet" role="dialog" aria-label="コード">
+  <div class="sheet-bg" data-close="codeSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>コード</h2>
+      <button class="btn secondary sm" id="btnCodeDownload">HTMLを書き出し</button>
+      <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="code-tabs">
+      <button class="code-tab on" id="tabCodeEdit">編集</button>
+      <button class="code-tab" id="tabCodePrev">プレビュー</button>
+    </div>
+    <div class="sheet-body code-body">
+      <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+      <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
+      <div class="code-ai">
+        <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
+        <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
+      </div>
+      <p class="code-status" id="codeStatus"></p>
+      <p class="set-desc">単一HTMLファイルとして編集します。AIが返すコードは自動で反映され、プレビューで確認できます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>
@@ -775,6 +823,71 @@ function renderMsg(m,i,s){
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
 
+
+/* ================= コードモード ================= */
+const CODE_LS_KEY="eluntra_code";
+const DEFAULT_CODE="<!DOCTYPE html>\n<html lang=\"ja\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>マイ・ページ</title>\n<style>\n body { font-family: sans-serif; background: #FBFAF7; color: #1B1B18; padding: 32px 20px;}\n h1 { font-size: 28px;}\n button { background: #1E4D3B; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 16px;}\n</style>\n</head>\n<body>\n <h1>こんにちは</h1>\n <p>これは最初のページです。下の欄からAIに作り直してもらえます。</p>\n <p>押した回数: <b id=\"n\">0</b></p>\n <button id=\"b\">押してみる</button>\n <script>\n let n = 0;\n document.getElementById(\"b\").onclick = () => {\n n++;\n document.getElementById(\"n\").textContent = n;\n};\n <\/script>\n</body>\n</html>";
+function getCode(){return load(CODE_LS_KEY,DEFAULT_CODE)}
+function setCode(v,sync){save(CODE_LS_KEY,v);if(sync!==false&&authSess)pushSync()}
+function extractCode(text){
+const fenced=text.match(/```(?:html|HTML)?\s*\n([\s\S]*?)```/);
+if(fenced&&fenced[1].trim())return fenced[1].trim();
+const i=text.search(/<!DOCTYPE html|<html[\s>]/i);
+if(i>=0)return text.slice(i).trim();
+return null;
+}
+function refreshCodePreview(){$("#codePreview").srcdoc=$("#codeEditor").value}
+function setCodeTab(preview){
+$("#tabCodeEdit").classList.toggle("on",!preview);
+$("#tabCodePrev").classList.toggle("on",preview);
+document.querySelector(".code-body").classList.toggle("show-prev",preview);
+if(preview)refreshCodePreview();
+}
+function openCode(){$("#codeEditor").value=getCode();setCodeTab(false);openSheet("codeSheet")}
+let codeAiBusy=false;
+async function codeAiGenerate(){
+if(codeAiBusy)return;
+const input=$("#codePrompt"),status=$("#codeStatus");
+const inst=input.value.trim();
+if(!inst){status.textContent="AIへの依頼を入力してください（例：ダークな時計のページにして）。";return}
+const p=curProv();const key=(keys[p.id]||"").trim();
+if(!key){status.textContent=p.name+"のキーが未設定です。対処：設定でキーを貼ってから、もう一度押してください。";return}
+codeAiBusy=true;const btn=$("#btnCodeAI");btn.disabled=true;
+status.textContent="AIが作成中です…";
+const prompt="あなたは腕の良いフロントエンド開発者です。次の依頼に沿って、単一HTMLファイルとして完結するコードを作成（または修正）してください。説明は最小限にし、完成したコード全体を必ず ```html のコードブロックで返してください。\n\n\n"+inst+"\n\n\n```html\n"+$("#codeEditor").value+"\n```";
+const onDelta=partial=>{status.textContent="AIが作成中です…（"+partial.length+"文字）"};
+try{
+let full="";
+const hist=[{role:"user",content:prompt}];
+if(p.type==="openai")full=await callOpenAI(p,key,curModel(),hist,onDelta);
+else if(p.type==="gemini")full=await callGemini(p,key,curModel(),hist,onDelta);
+else if(p.type==="anthropic")full=await callAnthropic(p,key,curModel(),hist,onDelta);
+else if(p.type==="cohere")full=await callCohere(p,key,curModel(),hist,onDelta);
+const code=extractCode(full);
+if(!code){status.textContent="AIの回答にコードが含まれていなかったため、反映しませんでした。依頼を具体的にして、もう一度お試しください。";return}
+$("#codeEditor").value=code;setCode(code);setCodeTab(true);
+status.textContent="反映しました。プレビューで確認できます。";
+input.value="";toast("コードを反映しました");
+}catch(e){status.textContent=e.message||String(e)}
+finally{codeAiBusy=false;btn.disabled=false}
+}
+function downloadCode(){
+const blob=new Blob([$("#codeEditor").value],{type:"text/html"});
+const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="eluntra-code.html";a.click();
+setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function initCode(){
+$("#codeEditor").addEventListener("input",()=>setCode($("#codeEditor").value,false));
+$("#codeEditor").addEventListener("blur",()=>{if(authSess)pushSync()});
+$("#tabCodeEdit").addEventListener("click",()=>setCodeTab(false));
+$("#tabCodePrev").addEventListener("click",()=>setCodeTab(true));
+$("#btnCodeAI").addEventListener("click",codeAiGenerate);
+$("#codePrompt").addEventListener("keydown",e=>{if(e.key==="Enter")codeAiGenerate()});
+$("#btnCodeDownload").addEventListener("click",downloadCode);
+$("#btnCodeClose").addEventListener("click",()=>closeSheet("codeSheet"));
+$("#btnCode").addEventListener("click",openCode);
+}
+
 /* ================= Auth（Supabase） ================= */
 const AUTH_URL="https://rzgldbedsjocmvqrfdhf.supabase.co";
 const AUTH_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6Z2xkYmVkc2pvY212cXJmZGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NzMzMzAsImV4cCI6MjEwOTA0OTMzMH0.3y77je51HEUxAV4E1yYN7UU3Cxgnrr7Elt2ingRwVsw";
@@ -820,8 +933,8 @@ async function ensureFresh(){
     const j=await r.json();storeAuth({accessToken:j.access_token,refreshToken:j.refresh_token,expiresAt:Date.now()+j.expires_in*1000,user:toAuthUser(j.user)});return true}
   catch(e){storeAuth(null);return false}}
 async function doLogout(){if(authSess){try{await fetch(AUTH_URL+"/auth/v1/logout",{method:"POST",headers:{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken}})}catch(e){}}storeAuth(null)}
-function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp,agent:!!conf.agent},notes:notes}}
-function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;if(typeof d.conf.agent==="boolean")conf.agent=d.conf.agent;save(LS.conf,conf)}if(Array.isArray(d.notes)){notes=d.notes;save(LS.notes,notes)}}
+function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp,agent:!!conf.agent},notes:notes,code:load(CODE_LS_KEY,"")}}
+function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;if(typeof d.conf.agent==="boolean")conf.agent=d.conf.agent;save(LS.conf,conf)}if(Array.isArray(d.notes)){notes=d.notes;save(LS.notes,notes)}if(typeof d.code==="string"&&d.code){save(CODE_LS_KEY,d.code)}}
 async function syncHeaders(){if(!(await ensureFresh())||!authSess)return null;return{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken,"Content-Type":"application/json"}}
 async function pushSync(){const h=await syncHeaders();if(!h)return false;try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync",{method:"POST",headers:Object.assign({},h,{Prefer:"resolution=merge-duplicates"}),body:JSON.stringify({user_id:authSess.user.id,data:collectSync(),updated_at:new Date().toISOString()})});if(!r.ok)return false;setLastSyncAt(Date.now());return true}catch(e){return false}}
 async function pullSync(){const h=await syncHeaders();if(!h)return"none";try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync?select=data,updated_at&user_id=eq."+authSess.user.id,{headers:h});if(!r.ok)return"none";const rows=await r.json();if(!rows.length)return"none";const ct=new Date(rows[0].updated_at).getTime();if(ct>lastSyncAt()+1000){applySync(rows[0].data);setLastSyncAt(ct);return"applied"}return"exists"}catch(e){return"none"}}
@@ -1313,6 +1426,7 @@ $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchMo
   catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="一覧を取得"}});
 $("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
 $("#keyStateLabel").addEventListener("click",()=>{openSettings(conf.provider)});
+initCode();
 $("#btnAgent").addEventListener("click",()=>{conf.agent=!conf.agent;save(LS.conf,conf);renderAll();toast(conf.agent?"エージェントモードをオンにしました（ツールを使いながら回答します）":"エージェントモードをオフにしました")});
 document.addEventListener("click",e=>{const dn=e.target.closest("[data-del-note]");if(!dn)return;const nid=dn.getAttribute("data-del-note");notes=notes.filter(n=>n.id!==nid);save(LS.notes,notes);if(authSess)pushSync();renderNotes();toast("メモを削除しました")});
 $("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});
@@ -1333,7 +1447,7 @@ $("#btnExportAll").addEventListener("click",()=>{
   toast("書き出しました（キー本体は含みません）");
 });
 $("#btnWipe").addEventListener("click",()=>{if(!confirm("キー・会話・設定をすべて削除しますか？この操作は戻せません。"))return;
-  [LS.keys,LS.tested,LS.models,LS.conf,LS.sess,LS.notes].forEach(k=>localStorage.removeItem(k));notes=[];
+  [LS.keys,LS.tested,LS.models,LS.conf,LS.sess,LS.notes,CODE_LS_KEY].forEach(k=>localStorage.removeItem(k));notes=[];
   keys={};tested={};fetchedModels={};sessions=[];currentId=null;conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7},{});PROVIDERS.forEach(p=>conf.models[p.id]=p.def);
   renderSettings();renderAll();toast("すべて削除しました")});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSheet");closeSheet("settingsSheet");closeSheet("loginSheet");closeSidebar()}});

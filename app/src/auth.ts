@@ -1,4 +1,4 @@
-import { persistConf, persistNotes, persistSessions, state } from "./state";
+import { CODE_LS_KEY, load, persistConf, persistNotes, persistSessions, save, state } from "./state";
 import type { Note, Session } from "./types";
 
 /**
@@ -269,6 +269,7 @@ interface SyncData {
   sessions: Session[];
   conf: { provider: string; models: Record<string, string>; system: string; temp: number; agent?: boolean };
   notes?: Note[];
+  code?: string;
 }
 
 function collectSyncData(): SyncData {
@@ -283,6 +284,7 @@ function collectSyncData(): SyncData {
       agent: state.conf.agent,
     },
     notes: state.notes,
+    code: load<string>(CODE_LS_KEY, ""),
   };
 }
 
@@ -303,6 +305,9 @@ function applySyncData(data: SyncData): void {
   if (Array.isArray(data.notes)) {
     state.notes = data.notes;
     persistNotes();
+  }
+  if (typeof data.code === "string" && data.code) {
+    save(CODE_LS_KEY, data.code);
   }
 }
 

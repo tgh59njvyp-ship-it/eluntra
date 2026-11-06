@@ -10,6 +10,7 @@ import {
   type OAuthProvider,
 } from "./auth";
 import { runAgent } from "./agent";
+import { initCode, openCode } from "./code";
 import { callChat, fetchModels, testConnection } from "./api";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
@@ -500,6 +501,10 @@ $("#btnCustomModel").addEventListener("click", () => {
 $("#keyStateLabel").addEventListener("click", () => {
   openSettings(state.conf.provider);
 });
+$("#btnCode").addEventListener("click", () => {
+  openCode();
+});
+initCode();
 $("#btnAgent").addEventListener("click", () => {
   state.conf.agent = !state.conf.agent;
   persistConf();
