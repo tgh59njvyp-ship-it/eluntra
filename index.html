@@ -106,10 +106,10 @@ svg{display:block}
 .mono-tile.sm{width:28px;height:28px;border-radius:7px;font-size:10.5px}
 
 /* topbar (mobile) */
-.topbar{display:none;align-items:center;gap:8px;padding:10px 12px calc(10px);border-bottom:1px solid var(--line);background:var(--bg);padding-top:calc(10px + env(safe-area-inset-top))}
+.topbar{display:none;align-items:center;gap:5px;padding:10px 8px calc(10px);border-bottom:1px solid var(--line);background:var(--bg);padding-top:calc(10px + env(safe-area-inset-top))}
 .icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink)}
 .icon-btn:hover{background:var(--bg-sub)}
-.model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
+.model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:7px;height:44px;padding:0 10px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
 .model-pill .mp-name{display:block;font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-pill .mp-model{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-pill>span:nth-of-type(2){overflow:hidden}
@@ -403,6 +403,44 @@ body.show-welcome #welcomeView{display:block}
 .preset-chip{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text-2);font-size:12.5px}
 .preset-chip:active{background:var(--accent-soft);color:var(--accent)}
 .code-body.show-pub .code-editor-wrap{display:none}
+
+/* モード切替ロゴ（左上） */
+.mode-logo{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none;cursor:pointer;padding:0}
+.mode-logo .ml-e{font-family:var(--serif);font-size:19px;font-weight:700;line-height:1}
+.mode-logo .ml-code{display:none}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.mode-logo.on .ml-e{display:none}
+.mode-logo.on .ml-code{display:grid;place-items:center}
+.mode-logo.on .ml-code .ic{stroke:currentColor}
+body.mode-code #btnAgent{display:none}
+body.mode-code .send-btn{background:var(--ink)}
+
+/* コード成果物の操作バー */
+.msg-body pre{margin:10px 0}
+.code-actions{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 12px}
+.cact{height:32px;padding:0 13px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--ink);font-size:13px;font-family:inherit;cursor:pointer}
+.cact:active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+
+/* プレビューシート */
+.pv-size{font-size:12.5px;color:var(--text-3);font-family:var(--mono)}
+.pv-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 0}
+.pv-chips .preset-chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pv-stage{flex:1;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;padding:12px;background:var(--bg-sub)}
+.pv-holder{flex:none;box-shadow:0 0 0 1px var(--line-strong);border-radius:6px;overflow:hidden;background:#fff}
+#pvFrame{border:0;transform-origin:top left;display:block}
+
+/* コード表示シート */
+.cv-body{display:flex;flex-direction:column;gap:10px}
+.cv-actions{display:flex;gap:6px;flex-wrap:wrap}
+.cv-scroll{flex:1;overflow:auto;display:flex;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface)}
+.cv-gutter{padding:12px 8px 12px 10px;text-align:right;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--text-3);background:var(--bg-sub);border-right:1px solid var(--line);white-space:pre;user-select:none}
+.cv-pre{margin:0;padding:12px;font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre;color:var(--ink)}
+.cv-out{display:none;margin:0;padding:14px;border-radius:12px;background:#171512;color:#EDE8DD;font-family:var(--mono);font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-height:40%;overflow-y:auto}
+
+/* 公開シート */
+.pub-body{overflow-y:auto}
+#publishEmbedBox iframe{margin:0 auto}
+.topbar .icon-btn{width:38px;height:38px}
 </style>
 </head>
 <body>
@@ -531,6 +569,10 @@ body.show-welcome #welcomeView{display:block}
   <!-- Main -->
   <div class="main">
     <div class="topbar">
+      <button class="mode-logo" id="btnModeLogo" aria-label="チャットとコードの切り替え" title="タップでチャット／コードを切り替え">
+        <span class="ml-e">E</span>
+        <span class="ml-code"><svg class="ic sm" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg></span>
+      </button>
       <button class="icon-btn" id="btnMenu" aria-label="メニュー">
         <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
@@ -587,10 +629,6 @@ body.show-welcome #welcomeView{display:block}
           </button>
           <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
             エージェント
-          </button>
-          <button class="meta-btn" id="btnCode" title="コードモードを開く">
-            <svg class="ic" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg>
-            コード
           </button>
           <button class="meta-btn" id="btnExport">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -667,60 +705,68 @@ body.show-welcome #welcomeView{display:block}
 </div>
 
 
-<div class="sheet" id="codeSheet" role="dialog" aria-label="コード">
-  <div class="sheet-bg" data-close="codeSheet"></div>
+<div class="sheet" id="previewSheet" role="dialog" aria-label="プレビュー">
+  <div class="sheet-bg" data-close="previewSheet"></div>
   <div class="sheet-panel full">
     <div class="sheet-head">
-      <h2>コード</h2>
-      <button class="btn secondary sm" id="btnCodeDownload">書き出し</button>
-      <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <h2>プレビュー</h2>
+      <span class="pv-size" id="pvSize"></span>
+      <button class="icon-btn" id="btnPvClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <div class="code-tabs">
-      <button class="code-tab on" id="tabCodeEdit">編集</button>
-      <button class="code-tab" id="tabCodePrev"><span id="tabCodePrevLabel">プレビュー</span></button>
-      <button class="code-tab" id="tabCodePub">公開</button>
+    <div class="pv-chips">
+      <button class="preset-chip" data-dev="0">スマホ</button>
+      <button class="preset-chip" data-dev="1">スマホ大</button>
+      <button class="preset-chip" data-dev="2">タブレット</button>
+      <button class="preset-chip" data-dev="3">PC</button>
+      <button class="preset-chip" data-dev="4">全幅</button>
     </div>
-    <div class="sheet-body code-body">
-      <div class="code-toolbar">
-        <select id="codeLang" aria-label="言語を選ぶ">
-          <option value="html">HTML</option>
-          <option value="javascript">JavaScript</option>
-          <option value="typescript">TypeScript</option>
-          <option value="python">Python</option>
-          <option value="css">CSS</option>
-          <option value="json">JSON</option>
-          <option value="markdown">Markdown</option>
-        </select>
-        <button class="btn primary sm" id="btnCodeRun">プレビュー</button>
+    <div class="pv-stage" id="pvStage">
+      <div class="pv-holder" id="pvHolder">
+        <iframe id="pvFrame" sandbox="allow-scripts" title="プレビュー"></iframe>
       </div>
-      <div class="code-editor-wrap">
-        <div class="code-gutter" id="codeGutter">1</div>
-        <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="codeViewSheet" role="dialog" aria-label="コード表示">
+  <div class="sheet-bg" data-close="codeViewSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2 id="codeViewTitle">index.html</h2>
+      <button class="icon-btn" id="btnCvClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body cv-body">
+      <div class="cv-actions">
+        <button class="btn secondary sm" id="btnCvCopy">コピー</button>
+        <button class="btn secondary sm" id="btnCvZip">Zipで保存</button>
+        <button class="btn secondary sm" id="btnCvRun">実行する</button>
+        <button class="btn secondary sm" id="btnCvPreview">プレビュー</button>
+        <button class="btn primary sm" id="btnCvPublish">公開する</button>
       </div>
-      <div class="code-outpane" id="codeOutPane">
-        <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
-        <pre id="codeOutput"></pre>
-        <div id="codeMd" class="msg-body"></div>
+      <div class="cv-scroll">
+        <div class="cv-gutter" id="codeViewGutter">1</div>
+        <pre class="cv-pre" id="codeViewPre"></pre>
       </div>
-      <div class="code-publish" id="codePublish">
-        <div class="code-pub-bar">
-          <p>Simple URL Serverの公開フォームです。「コードをコピー」してフォームに貼るか、書き出したHTMLファイルを選ぶと、そのままサイトとして公開できます。</p>
-          <button class="btn secondary sm" id="btnCopyCode">コードをコピー</button>
-        </div>
+      <pre class="cv-out" id="codeViewOut"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="publishSheet" role="dialog" aria-label="公開">
+  <div class="sheet-bg" data-close="publishSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>サイトとして公開</h2>
+      <button class="icon-btn" id="btnPubClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body pub-body">
+      <div class="code-pub-bar">
+        <p>Simple URL Serverの公開フォームです。「コードをコピー」して下のフォームに貼ると、そのままサイトとして公開できます。</p>
+        <button class="btn secondary sm" id="btnPubCopy">コードをコピー</button>
+      </div>
+      <div id="publishEmbedBox">
         <script src="https://tgh59njvyp-ship-it.github.io/simple-url-server-redesigned/embed.js" data-key="sus_mj4ty7z6hyb8tw2iw33xcwvd"></script>
       </div>
-      <div class="code-chips">
-        <button class="preset-chip" data-preset="fix">バグを直す</button>
-        <button class="preset-chip" data-preset="improve">改善する</button>
-        <button class="preset-chip" data-preset="comment">コメントを付ける</button>
-        <button class="preset-chip" data-preset="example">実行例を出す</button>
-      </div>
-      <div class="code-ai">
-        <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
-        <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
-      </div>
-      <p class="code-status" id="codeStatus"></p>
-      <p class="set-desc">言語ごとに別々に保存されます。JavaScriptとPythonはその場で実行でき、HTML・CSS・Markdownはプレビュー、JSONは整形・検証ができます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>
@@ -770,7 +816,7 @@ const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let keys=load(LS.keys,{});
 let tested=load(LS.tested,{});
 let fetchedModels=load(LS.models,{});
-let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false},load(LS.conf,{}));
+let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false,mode:"chat"},load(LS.conf,{}));
 PROVIDERS.forEach(p=>{if(!conf.models[p.id])conf.models[p.id]=p.def});
 let sessions=load(LS.sess,[]);
 let notes=load(LS.notes,[]);
@@ -796,7 +842,7 @@ function stateLabel(pid){return keyState(pid)==="ok"?"接続OK":keyState(pid)===
 /* ================= Markdown (minimal, safe) ================= */
 function md(src){
   const blocks=[];let s=String(src||"");
-  s=s.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{blocks.push("<pre><code>"+esc(c.replace(/\n$/,""))+"</code></pre>");return "\u0001"+(blocks.length-1)+"\u0001"});
+  s=s.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{blocks.push("<pre><code data-lang=\""+l+"\">"+esc(c.replace(/\n$/,""))+"</code></pre>");return "\u0001"+(blocks.length-1)+"\u0001"});
   const lines=s.split("\n");let html="",inUl=false,inOl=false,inQ=false;
   const closeLists=()=>{if(inUl){html+="</ul>";inUl=false}if(inOl){html+="</ol>";inOl=false}if(inQ){html+="</blockquote>";inQ=false}};
   const inline=t=>esc(t).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -815,15 +861,16 @@ function md(src){
 }
 
 /* ================= Sessions ================= */
+function sessionKind(x){return x.kind==="code"?"code":"chat"}
 function curSession(){return sessions.find(s=>s.id===currentId)||null}
 function newSession(){
-  const s={id:uid(),title:"新しいチャット",provider:conf.provider,model:curModel(),messages:[],created:Date.now()};
+  const s={id:uid(),title:"新しいチャット",provider:conf.provider,model:curModel(),messages:[],created:Date.now(),kind:conf.mode||"chat"};
   sessions.unshift(s);currentId=s.id;save(LS.sess,sessions);renderAll();$("#input").focus();
 }
-function ensureSession(){if(!curSession()){if(sessions.length){currentId=sessions[0].id}else{newSession();return}}}
+function ensureSession(){const cur=curSession();if(cur&&sessionKind(cur)===conf.mode)return;const same=sessions.find(x=>sessionKind(x)===conf.mode);if(same){currentId=same.id}else if(!cur){newSession()}else{currentId=null}}
 function deleteSession(id){
   sessions=sessions.filter(s=>s.id!==id);
-  if(currentId===id)currentId=sessions.length?sessions[0].id:null;
+  if(currentId===id){const same=sessions.find(x=>sessionKind(x)===conf.mode);currentId=same?same.id:null}
   save(LS.sess,sessions);renderAll();
 }
 
@@ -847,10 +894,12 @@ function renderProvStatus(){
 }
 function renderSessions(){
   const el=$("#sessionList");
-  if(!sessions.length){el.innerHTML='<p style="padding:8px 12px;font-size:13px;color:var(--text-3)">まだ会話がありません</p>';return}
-  el.innerHTML=sessions.map(s=>'<button class="sess '+(s.id===currentId?"on":"")+'" data-sess="'+s.id+'"><span class="t">'+esc(s.title)+'</span><span class="del" data-del="'+s.id+'" role="button" aria-label="削除"><svg class="ic sm" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13h10l1-13"/></svg></span></button>').join("");
+  const list=sessions.filter(x=>sessionKind(x)===conf.mode);
+  if(!list.length){el.innerHTML='<p style="padding:8px 12px;font-size:13px;color:var(--text-3)">まだ会話がありません</p>';return}
+  el.innerHTML=list.map(s=>'<button class="sess '+(s.id===currentId?"on":"")+'" data-sess="'+s.id+'"><span class="t">'+esc(s.title)+'</span><span class="del" data-del="'+s.id+'" role="button" aria-label="削除"><svg class="ic sm" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13h10l1-13"/></svg></span></button>').join("");
 }
 const SUGGESTIONS=["今日の献立を、冷蔵庫の残り物で考えて","この英文を自然な日本語にして： The early bird catches the worm.","PythonでCSVを読み込むコードを書いて","小学生にも分かるように、相対性理論を説明して"];
+const CODE_SUGGESTIONS=["ストップウォッチのWebページを作って","ToDoリストのアプリをHTMLで作って","Pythonでフィボナッチ数を計算するコードを書いて","おしゃれな名刺カードのHTMLを作って"];
 function renderChat(){
   const col=$("#chatCol");const s=curSession();
   if(!s||!s.messages.length){
@@ -858,10 +907,10 @@ function renderChat(){
       const st=keyState(p.id);
       return '<button class="prov-cell '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id)+'<span><span class="pc-name">'+esc(p.name)+'</span><br><span class="pc-state">'+stateLabel(p.id)+' ・ '+esc(conf.models[p.id])+'</span></span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
     }).join("");
-    col.innerHTML='<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>'
+    col.innerHTML=(conf.mode==="code"?'<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>':'<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>')
       +'<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>'
       +'<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">'+provCells+'</div>'
-      +'<div class="sec-label">たとえば</div><div class="sugg">'+SUGGESTIONS.map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
+      +'<div class="sec-label">たとえば</div><div class="sugg">'+(conf.mode==="code"?CODE_SUGGESTIONS:SUGGESTIONS).map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
     return;
   }
   col.innerHTML=s.messages.map((m,i)=>renderMsg(m,i,s)).join("");
@@ -874,7 +923,7 @@ function renderMsg(m,i,s){
     :logoTile(P(s.providerAtSend||s.provider)?.id||"",true)+'<span class="msg-role">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+'</span><span class="msg-meta">'+esc(m.model||"")+'</span>';
   const tools=isUser?"":'<span class="msg-tools"><button data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>';
   const stepsHtml=(m.steps&&m.steps.length)?'<div class="msg-steps">'+m.steps.map(st=>'<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(st)+'</span></div>').join("")+'</div>':"";
-  return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div>'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':md(m.content))+'</div></div>';
+  return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div>'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':isUser?md(m.content):addCodeActions(md(m.content)))+'</div></div>';
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
 
@@ -883,301 +932,185 @@ function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFra
 
 
 
-/* ================= コードモード（多言語・コード特化） ================= */
+
+/* ================= コード特化チャット（成果物まわり） ================= */
 const CODES_LS_KEY = "eluntra_codes";
-const LANG_LS_KEY = "eluntra_code_lang";
-const OLD_CODE_LS_KEY = "eluntra_code";
-const STARTER_HTML = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>マイ・ページ</title>
-<style>
-body { font-family: sans-serif; background: #FBFAF7; color: #1B1B18; padding: 32px 20px;}
-h1 { font-size: 28px;}
-button { background: #1E4D3B; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 16px;}
-</style>
-</head>
-<body>
-<h1>こんにちは</h1>
-<p>これは最初のページです。下の欄からAIに作り直してもらえます。</p>
-<p>押した回数: <b id="n">0</b></p>
-<button id="b">押してみる</button>
-<script>
-let n = 0;
-document.getElementById("b").onclick = () => {
-n++;
-document.getElementById("n").textContent = n;
-};
-<\/script>
-</body>
-</html>`;
-const LANGS = [
-{ id: "html", name: "HTML", fence: "html", ext: "html", run: "preview", runLabel: "プレビュー", starter: STARTER_HTML},
-{ id: "javascript", name: "JavaScript", fence: "javascript", ext: "js", run: "js", runLabel: "実行する",
-starter: "// JavaScriptのサンプル\nconst scores = [72, 85, 90, 68, 95];\nconst total = scores.reduce((a, b) => a + b, 0);\nconsole.log(\"合計:\", total);\nconsole.log(\"平均:\", total / scores.length);\nconsole.log(\"最高:\", Math.max(...scores));"},
-{ id: "typescript", name: "TypeScript", fence: "typescript", ext: "ts", run: "none", runLabel: "",
-starter: "// TypeScriptのサンプル（編集とAI生成に対応。実行はJavaScript欄で）\ninterface User {\n name: string;\n score: number;\n}\n\nfunction rank(users) {\n return users\n.slice()\n.sort((a, b) => b.score - a.score)\n.map((u, i) => (i + 1) + \"位: \" + u.name + \" (\" + u.score + \")\");\n}"},
-{ id: "python", name: "Python", fence: "python", ext: "py", run: "python", runLabel: "実行する",
-starter: "# Pythonのサンプル（ブラウザ内蔵のPythonで実行されます）\nscores = [72, 85, 90, 68, 95]\nprint(\"合計:\", sum(scores))\nprint(\"平均:\", sum(scores) / len(scores))\nprint(\"最高:\", max(scores))"},
-{ id: "css", name: "CSS", fence: "css", ext: "css", run: "css", runLabel: "プレビュー",
-starter: "/* CSSのサンプル（右のプレビュー用ページに適用されます） */\n.card {\n border: 2px solid #1E4D3B;\n background: #EAF3EE;\n}\nbutton {\n background: #1E4D3B;\n border-radius: 999px;\n}"},
-{ id: "json", name: "JSON", fence: "json", ext: "json", run: "json", runLabel: "整形・検証",
-starter: "{\n \"app\": \"Eluntra\",\n \"version\": 4,\n \"features\": [\"chat\", \"agent\", \"code\"],\n \"dark\": false\n}"},
-{ id: "markdown", name: "Markdown", fence: "markdown", ext: "md", run: "md", runLabel: "プレビュー",
-starter: "# メモ\n\n## 今日やること\n\n- **買い物**：牛乳と卵\n- 散歩 30分\n- 本を10ページ読む\n\n> 無理のない範囲で。"}
-];
-function langById(id){ return LANGS.find(l => l.id === id) || LANGS[0];}
-let curLang = load(LANG_LS_KEY, "html");
-if (!LANGS.some(l => l.id === curLang)) curLang = "html";
+const CODE_LS_KEY = "eluntra_code";
 function codeIsLoggedIn(){ return !!authSess; }
-function getCodes(){
-const codes = load(CODES_LS_KEY, {});
-if (!codes.html){ const old = load(OLD_CODE_LS_KEY, ""); if (old) codes.html = old;}
-return codes;
+function normLang(raw, code){
+  const l = (raw || "").toLowerCase();
+  if (l === "js" || l === "javascript" || l === "node") return "javascript";
+  if (l === "ts" || l === "typescript") return "typescript";
+  if (l === "py" || l === "python") return "python";
+  if (l === "html" || l === "xml") return "html";
+  if (l === "css") return "css";
+  if (l === "json") return "json";
+  if (l === "md" || l === "markdown") return "markdown";
+  if (l) return l;
+  const head = (code || "").trimStart().slice(0, 200).toLowerCase();
+  if (head.startsWith("<!doctype") || head.startsWith("<html") || head.includes("<body")) return "html";
+  return "";
 }
-function setCodes(codes){ save(CODES_LS_KEY, codes);}
-function currentCode(){ const codes = getCodes(); return codes[curLang]?? langById(curLang).starter;}
-function persistEditor(sync = true){
-const codes = getCodes(); codes[curLang] = $("#codeEditor").value; setCodes(codes);
-if (sync && codeIsLoggedIn()) pushSync();
+function addCodeActions(html){
+  return html.replace(/<pre><code data-lang="(\w*)">([\s\S]*?)<\/code><\/pre>/g, (whole, rawLang, escCode) => {
+    const codeText = escCode.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const lang = normLang(rawLang, codeText);
+    const btn = (act, label) => '<button class="cact" data-cact="' + act + '">' + label + "</button>";
+    let bar = '<div class="code-actions">';
+    if (lang === "html") bar += btn("preview", "プレビュー");
+    if (lang === "javascript") bar += btn("run", "実行する");
+    bar += btn("code", "コード") + btn("zip", "Zipで保存") + btn("copy", "コピー");
+    if (lang === "html") bar += btn("publish", "公開する");
+    bar += "</div>";
+    return whole + bar;
+  });
 }
-function getCode(){ return getCodes().html?? STARTER_HTML;}
-function extractCode(text){
-const fenced = text.match(/```(?:\w+)?\s*\n([\s\S]*?)```/);
-if (fenced && fenced[1].trim()) return fenced[1].trim();
-const docStart = text.search(/<!DOCTYPE html|<html[\s>]/i);
-if (docStart >= 0) return text.slice(docStart).trim();
-return null;
+const FILE_NAMES = { html: "index.html", javascript: "script.js", typescript: "main.ts", python: "main.py", css: "style.css", json: "data.json", markdown: "README.md" };
+function fileNameFor(lang){ return FILE_NAMES[lang] || "code.txt"; }
+const CRC_TABLE = (() => { const t = []; for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(data){ let c = 0xffffffff; for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+function makeZipBlob(files){
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xffff;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xffff;
+  for (const f of files){
+    const nameBytes = enc.encode(f.name);
+    const data = enc.encode(f.content);
+    const crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, nameBytes.length, true); lh.setUint16(28, 0, true);
+    chunks.push(new Uint8Array(lh.buffer), nameBytes, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true); ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, nameBytes.length, true); ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  let centralSize = 0;
+  central.forEach(c => (centralSize += c.length));
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true); end.setUint32(16, offset, true);
+  return new Blob([...chunks, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
 }
-function setCodeStatus(msg){ $("#codeStatus").textContent = msg;}
-function setCodeTab(tab){
-$("#tabCodeEdit").classList.toggle("on", tab === "edit");
-$("#tabCodePrev").classList.toggle("on", tab === "out");
-$("#tabCodePub").classList.toggle("on", tab === "pub");
-const body = document.querySelector(".code-body");
-body.classList.toggle("show-out", tab === "out");
-body.classList.toggle("show-pub", tab === "pub");
-if (tab === "out") runOrPreview(false);
+let currentArtifact = { code: "", lang: "" };
+function downloadZip(a){
+  const blob = makeZipBlob([{ name: fileNameFor(a.lang), content: a.code }]);
+  const el = document.createElement("a");
+  el.href = URL.createObjectURL(blob);
+  el.download = "eluntra-code.zip";
+  el.click();
+  setTimeout(() => URL.revokeObjectURL(el.href), 4000);
+  toast("Zipを保存しました（" + fileNameFor(a.lang) + "）");
 }
-function updateGutter(){
-const ed = $("#codeEditor");
-const lines = ed.value.split("\n").length;
-let html = "";
-for (let i = 1; i <= lines; i++) html += i + "\n";
-const g = $("#codeGutter");
-g.textContent = html;
-g.scrollTop = ed.scrollTop;
+const PV_DEVICES = [
+  { name: "スマホ", w: 390, h: 844 },
+  { name: "スマホ大", w: 430, h: 932 },
+  { name: "タブレット", w: 768, h: 1024 },
+  { name: "PC", w: 1280, h: 800 },
+  { name: "全幅", w: 0, h: 0 }
+];
+let pvDeviceIdx = 0;
+function applyDevice(){
+  const dev = PV_DEVICES[pvDeviceIdx];
+  document.querySelectorAll("[data-dev]").forEach(chip => chip.classList.toggle("on", Number(chip.getAttribute("data-dev")) === pvDeviceIdx));
+  const stage = $("#pvStage"), holder = $("#pvHolder"), frame = $("#pvFrame");
+  $("#pvSize").textContent = dev.w === 0 ? "画面幅いっぱい" : dev.w + " × " + dev.h + "px";
+  if (dev.w === 0){
+    holder.style.width = "100%"; holder.style.height = "100%";
+    frame.style.width = "100%"; frame.style.height = "100%"; frame.style.transform = "none";
+    return;
+  }
+  const availW = Math.max(stage.clientWidth - 24, 200);
+  const availH = Math.max(stage.clientHeight - 24, 200);
+  const scale = Math.min(availW / dev.w, availH / dev.h, 1);
+  holder.style.width = dev.w * scale + "px";
+  holder.style.height = dev.h * scale + "px";
+  frame.style.width = dev.w + "px";
+  frame.style.height = dev.h + "px";
+  frame.style.transform = "scale(" + scale + ")";
 }
-function applyLangUI(){
-const lang = langById(curLang);
-$("#codeLang").value = curLang;
-const runBtn = $("#btnCodeRun");
-if (lang.run === "none"){ runBtn.style.display = "none";}
-else { runBtn.style.display = ""; runBtn.textContent = lang.runLabel;}
-$("#tabCodePrevLabel").textContent = (lang.run === "js" || lang.run === "python")? "実行結果": "プレビュー";
-updateGutter();
+function openPreview(a){
+  currentArtifact = a;
+  $("#pvFrame").srcdoc = a.code;
+  openSheet("previewSheet");
+  setTimeout(applyDevice, 60);
 }
-function switchLang(id){
-if (id === curLang) return;
-persistEditor(false);
-curLang = id;
-save(LANG_LS_KEY, curLang);
-$("#codeEditor").value = currentCode();
-applyLangUI();
-setCodeStatus(id === "typescript"? "TypeScriptは編集とAI生成に対応しています（実行はJavaScript欄でできます）。": "");
-if (codeIsLoggedIn()) pushSync();
+function openCodeView(a){
+  currentArtifact = a;
+  $("#codeViewTitle").textContent = fileNameFor(a.lang);
+  const lines = a.code.split("\n");
+  $("#codeViewGutter").textContent = lines.map((_, i) => String(i + 1)).join("\n");
+  $("#codeViewPre").textContent = a.code;
+  $("#codeViewOut").style.display = "none";
+  $("#btnCvRun").style.display = a.lang === "javascript" ? "" : "none";
+  $("#btnCvPreview").style.display = a.lang === "html" ? "" : "none";
+  $("#btnCvPublish").style.display = a.lang === "html" ? "" : "none";
+  openSheet("codeViewSheet");
 }
-function openCode(){
-$("#codeEditor").value = currentCode();
-applyLangUI();
-setCodeTab("edit");
-openSheet("codeSheet");
+function openPublish(a){ currentArtifact = a; openSheet("publishSheet"); }
+async function copyCurrent(){
+  try { await navigator.clipboard.writeText(currentArtifact.code); toast("コードをコピーしました"); }
+  catch (e) { toast("コピーできませんでした"); }
 }
-function showOutput(text){
-const pre = $("#codeOutput");
-pre.style.display = "block";
-$("#codePreview").style.display = "none";
-$("#codeMd").style.display = "none";
-pre.textContent = text;
+async function runCurrent(){
+  const out = $("#codeViewOut");
+  out.style.display = "block";
+  out.textContent = "実行中…";
+  out.textContent = await runSandboxedJs(currentArtifact.code);
 }
-function showFrame(html){
-const frame = $("#codePreview");
-frame.style.display = "block";
-$("#codeOutput").style.display = "none";
-$("#codeMd").style.display = "none";
-frame.srcdoc = html;
+function applyMode(){
+  const isCode = conf.mode === "code";
+  document.body.classList.toggle("mode-code", isCode);
+  $("#btnModeLogo").classList.toggle("on", isCode);
+  $("#input").placeholder = isCode ? "作りたいものを説明してください（例：タイマーのページ）" : "AIに質問してみよう";
 }
-function showMd(html){
-const box = $("#codeMd");
-box.style.display = "block";
-$("#codePreview").style.display = "none";
-$("#codeOutput").style.display = "none";
-box.innerHTML = html;
+function toggleMode(){
+  conf.mode = conf.mode === "code" ? "chat" : "code";
+  save(LS.conf, conf);
+  currentId = null;
+  ensureSession();
+  applyMode();
+  renderAll();
+  toast(conf.mode === "code" ? "コードモードに切り替えました（コード出力に特化したチャットです）" : "チャットモードに切り替えました");
+  if (authSess) pushSync();
 }
-const CSS_DEMO = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>
-body{font-family:sans-serif;padding:24px;color:#1B1B18;background:#fff}
-.card{border:1px solid #D8D6CC;border-radius:14px;padding:18px;margin:14px 0}
-button{background:#5C5C55;color:#fff;border:0;border-radius:10px;padding:10px 18px}
-</style><style id="userCss"></style></head><body>
-<h1>見出しの例</h1><p>本文の例です。リンクは <a href="#">こちら</a>。</p>
-<div class="card"><h2>カードの例</h2><p>このカードとボタンに、左のCSSが適用されます。</p><button>ボタンの例</button></div>
-<ul><li>リスト1</li><li>リスト2</li></ul></body></html>`;
-let pyodidePromise = null;
-function loadPyodideOnce(){
-if (pyodidePromise) return pyodidePromise;
-pyodidePromise = new Promise((resolve, reject) => {
-const start = () => {
-if (!window.loadPyodide){ reject(new Error("Pythonの読み込みに失敗しました")); return;}
-window.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"}).then(resolve, reject);
-};
-if (window.loadPyodide){ start(); return;}
-const script = document.createElement("script");
-script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
-script.onload = start;
-script.onerror = () => reject(new Error("Pythonの読み込みに失敗しました。通信状態を確認してください。"));
-document.head.appendChild(script);
-});
-return pyodidePromise;
-}
-async function runOrPreview(switchTab = true){
-const lang = langById(curLang);
-const code = $("#codeEditor").value;
-if (switchTab) setCodeTab("out");
-switch (lang.run) {
-case "preview":
-showFrame(code); setCodeStatus("プレビューを更新しました。"); return;
-case "css": {
-const doc = new DOMParser().parseFromString(CSS_DEMO, "text/html");
-const styleEl = doc.querySelector("#userCss");
-if (styleEl) styleEl.textContent = code;
-showFrame("<!DOCTYPE html>\n" + doc.documentElement.outerHTML);
-setCodeStatus("サンプルページにCSSを適用しました。"); return;
-}
-case "md":
-showMd(md(code)); setCodeStatus("プレビューを更新しました。"); return;
-case "json":
-try {
-const parsed = JSON.parse(code);
-showOutput(JSON.stringify(parsed, null, 2));
-setCodeStatus("正しいJSONです。整形して表示しています。");
-} catch (e) {
-showOutput("");
-setCodeStatus("JSONの形式が正しくありません：" + (e instanceof Error? e.message: String(e)));
-}
-return;
-case "js": {
-setCodeStatus("実行中…");
-const out = await runSandboxedJs(code);
-showOutput(out); setCodeStatus("実行しました。"); return;
-}
-case "python": {
-setCodeStatus("Pythonを準備中…（初回は読み込みに時間がかかります）");
-try {
-const py = await loadPyodideOnce();
-const lines = [];
-py.setStdout({ batched: t => lines.push(t)});
-py.setStderr({ batched: t => lines.push(t)});
-setCodeStatus("実行中…");
-await py.runPythonAsync(code);
-showOutput(lines.join("\n") || "（出力なし）");
-setCodeStatus("実行しました。");
-} catch (e) {
-showOutput("");
-const msg = e instanceof Error? e.message: String(e);
-setCodeStatus("実行できませんでした：" + msg.split("\n").slice(-3).join(" "));
-}
-return;
-}
-default: return;
-}
-}
-let codeAiBusy = false;
-const CODE_PRESETS = {
-fix: "このコードのバグを探して直してください。直した箇所と原因を、コードの後に短く教えてください。",
-improve: "このコードを、動作を変えずに読みやすく・効率よく書き直してください。",
-comment: "このコードに、処理の流れが分かる日本語のコメントを付けてください（動作は変えないでください）。",
-example: "このコードの使い方と、実行例（サンプルデータと期待する出力）を教えてください。"
-};
-async function codeAiGenerate(){
-if (codeAiBusy) return;
-const input = $("#codePrompt");
-const inst = input.value.trim();
-if (!inst){ setCodeStatus("AIへの依頼を入力してください（例：ダークな時計のページにして）。"); return;}
-const p = curProv();
-const key = (keys[p.id] || "").trim();
-if (!key){ setCodeStatus(p.name + "のキーが未設定です。対処：設定でキーを貼ってから、もう一度押してください。"); return;}
-const lang = langById(curLang);
-codeAiBusy = true;
-const btn = $("#btnCodeAI");
-btn.disabled = true;
-setCodeStatus("AIが作成中です…");
-const prompt = "あなたは" + lang.name + "のシニアエンジニアです。次の依頼に沿って、" + lang.name + "のコードを作成（または修正）してください。" +
-"完成したコード全体を必ず ```" + lang.fence + " のコードブロックで返し、説明は最小限にしてください。\n\n" +
-"\n" + inst + "\n\n\n```" + lang.fence + "\n" + $("#codeEditor").value + "\n```";
-try {
-const full = await callChat(p, key, curModel(), [{ role: "user", content: prompt}], partial => {
-setCodeStatus("AIが作成中です…（" + partial.length + "文字）");
-});
-const code = extractCode(full);
-if (!code){ setCodeStatus("AIの回答にコードが含まれていなかったため、反映しませんでした。依頼を具体的にして、もう一度お試しください。"); return;}
-$("#codeEditor").value = code;
-persistEditor();
-updateGutter();
-setCodeStatus("反映しました。");
-input.value = "";
-toast("コードを反映しました");
-if (lang.run!== "none") setCodeTab("out");
-} catch (e) {
-setCodeStatus(e instanceof Error? e.message: String(e));
-} finally {
-codeAiBusy = false;
-btn.disabled = false;
-}
-}
-async function copyCode(){
-try { await navigator.clipboard.writeText($("#codeEditor").value); toast("コードをコピーしました");}
-catch (e) { $("#codeEditor").select(); toast("コピーできませんでした。編集欄で長押ししてコピーしてください");}
-}
-function downloadCode(){
-const lang = langById(curLang);
-const blob = new Blob([$("#codeEditor").value], { type: "text/plain"});
-const a = document.createElement("a");
-a.href = URL.createObjectURL(blob);
-a.download = "eluntra-code." + lang.ext;
-a.click();
-setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-}
-function initCode(){
-const ed = $("#codeEditor");
-ed.addEventListener("input", () => { persistEditor(false); updateGutter();});
-ed.addEventListener("scroll", () => { $("#codeGutter").scrollTop = ed.scrollTop;});
-ed.addEventListener("blur", () => { if (codeIsLoggedIn()) pushSync();});
-ed.addEventListener("keydown", e => {
-if (e.key === "Tab"){
-e.preventDefault();
-ed.setRangeText(" ", ed.selectionStart, ed.selectionEnd, "end");
-persistEditor(false); updateGutter();
-}
-});
-$("#codeLang").addEventListener("change", e => switchLang(e.target.value));
-$("#btnCodeRun").addEventListener("click", () => runOrPreview(true));
-$("#tabCodeEdit").addEventListener("click", () => setCodeTab("edit"));
-$("#tabCodePrev").addEventListener("click", () => setCodeTab("out"));
-$("#tabCodePub").addEventListener("click", () => setCodeTab("pub"));
-$("#btnCopyCode").addEventListener("click", copyCode);
-document.querySelectorAll("[data-preset]").forEach(chip => {
-chip.addEventListener("click", () => {
-const input = $("#codePrompt");
-input.value = CODE_PRESETS[chip.getAttribute("data-preset")] || "";
-input.focus();
-});
-});
-$("#btnCodeAI").addEventListener("click", codeAiGenerate);
-$("#codePrompt").addEventListener("keydown", e => { if (e.key === "Enter") codeAiGenerate();});
-$("#btnCodeDownload").addEventListener("click", downloadCode);
-$("#btnCodeClose").addEventListener("click", () => closeSheet("codeSheet"));
+function initCodeUI(){
+  document.addEventListener("click", e => {
+    const btn = e.target.closest("[data-cact]");
+    if (!btn) return;
+    const bar = btn.closest(".code-actions");
+    const pre = bar ? bar.previousElementSibling : null;
+    const codeEl = pre ? pre.querySelector("code") : null;
+    if (!codeEl) return;
+    const artifact = { code: codeEl.textContent || "", lang: normLang(codeEl.getAttribute("data-lang") || "", codeEl.textContent || "") };
+    const act = btn.getAttribute("data-cact");
+    if (act === "preview") openPreview(artifact);
+    else if (act === "code") openCodeView(artifact);
+    else if (act === "zip") downloadZip(artifact);
+    else if (act === "publish") openPublish(artifact);
+    else if (act === "copy"){ currentArtifact = artifact; copyCurrent(); }
+    else if (act === "run"){ openCodeView(artifact); runCurrent(); }
+  });
+  document.querySelectorAll("[data-dev]").forEach(chip => {
+    chip.addEventListener("click", () => { pvDeviceIdx = Number(chip.getAttribute("data-dev")); applyDevice(); });
+  });
+  $("#btnPvClose").addEventListener("click", () => closeSheet("previewSheet"));
+  $("#btnCvClose").addEventListener("click", () => closeSheet("codeViewSheet"));
+  $("#btnCvCopy").addEventListener("click", copyCurrent);
+  $("#btnCvZip").addEventListener("click", () => downloadZip(currentArtifact));
+  $("#btnCvPreview").addEventListener("click", () => { closeSheet("codeViewSheet"); openPreview(currentArtifact); });
+  $("#btnCvPublish").addEventListener("click", () => { closeSheet("codeViewSheet"); openPublish(currentArtifact); });
+  $("#btnCvRun").addEventListener("click", runCurrent);
+  $("#btnPubClose").addEventListener("click", () => closeSheet("publishSheet"));
+  $("#btnPubCopy").addEventListener("click", copyCurrent);
+  $("#btnModeLogo").addEventListener("click", toggleMode);
 }
 
 /* ================= Auth（Supabase） ================= */
@@ -1566,10 +1499,11 @@ async function sendMessage(){
   }
   generating=true;abortCtl=new AbortController();setSendBtn(true);
   const histForCall=s.messages.slice(0,-1).filter(m=>m.content&&m.content!=="__NOKEY__");
+  if(conf.mode==="code"){const rev=[...histForCall].reverse().find(m=>m.role==="user");if(rev){const ix=histForCall.indexOf(rev);histForCall[ix]={...rev,content:"【コード作成の指示】あなたはコード作成に特化したAIです。依頼に対して、動作する完成コードを ```言語名 のコードブロックで返してください。Webページやアプリは単一HTMLファイル（CSSとJavaScriptを内蔵）で完結させてください。説明は最小限にし、コードを主役にしてください。修正の依頼では、変更後のコード全体を返してください。\n\n【依頼】\n"+rev.content}}}
   const onDelta=full=>{aiMsg.content=full;aiMsg.pending=false;updateStreamingMsg(s,aiMsg)};
   try{
     let full="";
-    if(conf.agent){
+    if(conf.agent&&conf.mode!=="code"){
       const r=await runAgent(p,key,model,histForCall,steps=>{aiMsg.steps=steps;aiMsg.pending=false;aiMsg.content=aiMsg.content||"エージェントが作業中です…";updateStreamingMsg(s,aiMsg)});
       aiMsg.steps=r.steps;full=r.text;
     }
@@ -1718,7 +1652,7 @@ $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchMo
   catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="一覧を取得"}});
 $("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
 $("#keyStateLabel").addEventListener("click",()=>{openSettings(conf.provider)});
-initCode();
+initCodeUI();
 $("#btnAgent").addEventListener("click",()=>{conf.agent=!conf.agent;save(LS.conf,conf);renderAll();toast(conf.agent?"エージェントモードをオンにしました（ツールを使いながら回答します）":"エージェントモードをオフにしました")});
 document.addEventListener("click",e=>{const dn=e.target.closest("[data-del-note]");if(!dn)return;const nid=dn.getAttribute("data-del-note");notes=notes.filter(n=>n.id!==nid);save(LS.notes,notes);if(authSess)pushSync();renderNotes();toast("メモを削除しました")});
 $("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});
@@ -1746,9 +1680,11 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
 
 /* ================= Init ================= */
 (function init(){
+  currentId=null;ensureSession();
   const savedTheme=load(LS.theme,null);
   const prefersDark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;
   applyTheme(savedTheme||(prefersDark?"dark":"light"));
+  applyMode();
   $("#sysPrompt").value=conf.system||"";
   $("#tempRange").value=conf.temp;$("#tempVal").textContent=(+conf.temp).toFixed(1);
   renderAll();

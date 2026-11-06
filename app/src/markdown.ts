@@ -8,7 +8,7 @@ export function md(src: string): string {
   const blocks: string[] = [];
   let s = String(src || "");
   s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, _lang: string, code: string) => {
-    blocks.push("<pre><code>" + esc(code.replace(/\n$/, "")) + "</code></pre>");
+    blocks.push("<pre><code data-lang=\"" + _lang + "\">" + esc(code.replace(/\n$/, "")) + "</code></pre>");
     return "\u0001" + (blocks.length - 1) + "\u0001";
   });
 

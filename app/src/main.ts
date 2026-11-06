@@ -10,7 +10,7 @@ import {
   type OAuthProvider,
 } from "./auth";
 import { runAgent } from "./agent";
-import { initCode, openCode } from "./code";
+import { initCodeUI } from "./code";
 import { callChat, fetchModels, testConnection } from "./api";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
@@ -201,13 +201,26 @@ async function sendMessage(): Promise<void> {
   const histForCall = s.messages
     .slice(0, -1)
     .filter((m) => m.content && m.content !== "__NOKEY__");
+  if (state.conf.mode === "code") {
+    const lastUser = [...histForCall].reverse().find((m) => m.role === "user");
+    if (lastUser) {
+      const idx = histForCall.indexOf(lastUser);
+      histForCall[idx] = {
+        ...lastUser,
+        content:
+          "【コード作成の指示】あなたはコード作成に特化したAIです。依頼に対して、動作する完成コードを ```言語名 のコードブロックで返してください。" +
+          "Webページやアプリは単一HTMLファイル（CSSとJavaScriptを内蔵）で完結させてください。説明は最小限にし、コードを主役にしてください。" +
+          "修正の依頼では、変更後のコード全体を返してください。\n\n【依頼】\n" + lastUser.content,
+      };
+    }
+  }
   const onDelta = (full: string): void => {
     aiMsg.content = full;
     aiMsg.pending = false;
     updateStreamingMsg(s, aiMsg);
   };
   try {
-    if (state.conf.agent) {
+    if (state.conf.agent && state.conf.mode !== "code") {
       const r = await runAgent(p, key, model, histForCall, (steps) => {
         aiMsg.steps = steps;
         aiMsg.pending = false;
@@ -244,6 +257,28 @@ async function sendMessage(): Promise<void> {
   renderAll();
   if (!aiMsg.error && isLoggedIn()) void pushSync();
   if (aiMsg.error) showErrorBanner(aiMsg.error, p);
+}
+
+/* ---------- モード切替（左上ロゴ） ---------- */
+
+export function applyMode(): void {
+  const isCode = state.conf.mode === "code";
+  document.body.classList.toggle("mode-code", isCode);
+  $("#btnModeLogo").classList.toggle("on", isCode);
+  ($("#input") as HTMLTextAreaElement).placeholder = isCode
+    ? "作りたいものを説明してください（例：タイマーのページ）"
+    : "AIに質問してみよう";
+}
+
+function toggleMode(): void {
+  state.conf.mode = state.conf.mode === "code" ? "chat" : "code";
+  persistConf();
+  state.currentId = null;
+  ensureSession();
+  applyMode();
+  renderAll();
+  toast(state.conf.mode === "code" ? "コードモードに切り替えました（コード出力に特化したチャットです）" : "チャットモードに切り替えました");
+  if (isLoggedIn()) void pushSync();
 }
 
 /* ---------- 入力欄 ---------- */
@@ -501,10 +536,10 @@ $("#btnCustomModel").addEventListener("click", () => {
 $("#keyStateLabel").addEventListener("click", () => {
   openSettings(state.conf.provider);
 });
-$("#btnCode").addEventListener("click", () => {
-  openCode();
+initCodeUI();
+$("#btnModeLogo").addEventListener("click", () => {
+  toggleMode();
 });
-initCode();
 $("#btnAgent").addEventListener("click", () => {
   state.conf.agent = !state.conf.agent;
   persistConf();
@@ -629,6 +664,9 @@ document
   const prefersDark =
     window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   applyTheme(savedTheme || (prefersDark ? "dark" : "light"));
+  state.currentId = null;
+  ensureSession();
+  applyMode();
   ($("#sysPrompt") as HTMLTextAreaElement).value = state.conf.system || "";
   ($("#tempRange") as HTMLInputElement).value = String(state.conf.temp);
   $("#tempVal").textContent = Number(state.conf.temp).toFixed(1);

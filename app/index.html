@@ -156,6 +156,10 @@
   <!-- Main -->
   <div class="main">
     <div class="topbar">
+      <button class="mode-logo" id="btnModeLogo" aria-label="チャットとコードの切り替え" title="タップでチャット／コードを切り替え">
+        <span class="ml-e">E</span>
+        <span class="ml-code"><svg class="ic sm" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg></span>
+      </button>
       <button class="icon-btn" id="btnMenu" aria-label="メニュー">
         <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
@@ -212,10 +216,6 @@
           </button>
           <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
             エージェント
-          </button>
-          <button class="meta-btn" id="btnCode" title="コードモードを開く">
-            <svg class="ic" viewBox="0 0 24 24"><path d="m8 8-5 4 5 4M16 8l5 4-5 4"/></svg>
-            コード
           </button>
           <button class="meta-btn" id="btnExport">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -292,60 +292,68 @@
 </div>
 
 
-<div class="sheet" id="codeSheet" role="dialog" aria-label="コード">
-  <div class="sheet-bg" data-close="codeSheet"></div>
+<div class="sheet" id="previewSheet" role="dialog" aria-label="プレビュー">
+  <div class="sheet-bg" data-close="previewSheet"></div>
   <div class="sheet-panel full">
     <div class="sheet-head">
-      <h2>コード</h2>
-      <button class="btn secondary sm" id="btnCodeDownload">書き出し</button>
-      <button class="icon-btn" id="btnCodeClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <h2>プレビュー</h2>
+      <span class="pv-size" id="pvSize"></span>
+      <button class="icon-btn" id="btnPvClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
-    <div class="code-tabs">
-      <button class="code-tab on" id="tabCodeEdit">編集</button>
-      <button class="code-tab" id="tabCodePrev"><span id="tabCodePrevLabel">プレビュー</span></button>
-      <button class="code-tab" id="tabCodePub">公開</button>
+    <div class="pv-chips">
+      <button class="preset-chip" data-dev="0">スマホ</button>
+      <button class="preset-chip" data-dev="1">スマホ大</button>
+      <button class="preset-chip" data-dev="2">タブレット</button>
+      <button class="preset-chip" data-dev="3">PC</button>
+      <button class="preset-chip" data-dev="4">全幅</button>
     </div>
-    <div class="sheet-body code-body">
-      <div class="code-toolbar">
-        <select id="codeLang" aria-label="言語を選ぶ">
-          <option value="html">HTML</option>
-          <option value="javascript">JavaScript</option>
-          <option value="typescript">TypeScript</option>
-          <option value="python">Python</option>
-          <option value="css">CSS</option>
-          <option value="json">JSON</option>
-          <option value="markdown">Markdown</option>
-        </select>
-        <button class="btn primary sm" id="btnCodeRun">プレビュー</button>
+    <div class="pv-stage" id="pvStage">
+      <div class="pv-holder" id="pvHolder">
+        <iframe id="pvFrame" sandbox="allow-scripts" title="プレビュー"></iframe>
       </div>
-      <div class="code-editor-wrap">
-        <div class="code-gutter" id="codeGutter">1</div>
-        <textarea id="codeEditor" spellcheck="false" aria-label="コード編集"></textarea>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="codeViewSheet" role="dialog" aria-label="コード表示">
+  <div class="sheet-bg" data-close="codeViewSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2 id="codeViewTitle">index.html</h2>
+      <button class="icon-btn" id="btnCvClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body cv-body">
+      <div class="cv-actions">
+        <button class="btn secondary sm" id="btnCvCopy">コピー</button>
+        <button class="btn secondary sm" id="btnCvZip">Zipで保存</button>
+        <button class="btn secondary sm" id="btnCvRun">実行する</button>
+        <button class="btn secondary sm" id="btnCvPreview">プレビュー</button>
+        <button class="btn primary sm" id="btnCvPublish">公開する</button>
       </div>
-      <div class="code-outpane" id="codeOutPane">
-        <iframe id="codePreview" sandbox="allow-scripts" title="プレビュー"></iframe>
-        <pre id="codeOutput"></pre>
-        <div id="codeMd" class="msg-body"></div>
+      <div class="cv-scroll">
+        <div class="cv-gutter" id="codeViewGutter">1</div>
+        <pre class="cv-pre" id="codeViewPre"></pre>
       </div>
-      <div class="code-publish" id="codePublish">
-        <div class="code-pub-bar">
-          <p>Simple URL Serverの公開フォームです。「コードをコピー」してフォームに貼るか、書き出したHTMLファイルを選ぶと、そのままサイトとして公開できます。</p>
-          <button class="btn secondary sm" id="btnCopyCode">コードをコピー</button>
-        </div>
+      <pre class="cv-out" id="codeViewOut"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="publishSheet" role="dialog" aria-label="公開">
+  <div class="sheet-bg" data-close="publishSheet"></div>
+  <div class="sheet-panel full">
+    <div class="sheet-head">
+      <h2>サイトとして公開</h2>
+      <button class="icon-btn" id="btnPubClose" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="sheet-body pub-body">
+      <div class="code-pub-bar">
+        <p>Simple URL Serverの公開フォームです。「コードをコピー」して下のフォームに貼ると、そのままサイトとして公開できます。</p>
+        <button class="btn secondary sm" id="btnPubCopy">コードをコピー</button>
+      </div>
+      <div id="publishEmbedBox">
         <script src="https://tgh59njvyp-ship-it.github.io/simple-url-server-redesigned/embed.js" data-key="sus_mj4ty7z6hyb8tw2iw33xcwvd"></script>
       </div>
-      <div class="code-chips">
-        <button class="preset-chip" data-preset="fix">バグを直す</button>
-        <button class="preset-chip" data-preset="improve">改善する</button>
-        <button class="preset-chip" data-preset="comment">コメントを付ける</button>
-        <button class="preset-chip" data-preset="example">実行例を出す</button>
-      </div>
-      <div class="code-ai">
-        <input id="codePrompt" type="text" placeholder="AIへの依頼（例：ダークな時計のページにして）" autocomplete="off">
-        <button class="btn primary" id="btnCodeAI">AIで作る・直す</button>
-      </div>
-      <p class="code-status" id="codeStatus"></p>
-      <p class="set-desc">言語ごとに別々に保存されます。JavaScriptとPythonはその場で実行でき、HTML・CSS・Markdownはプレビュー、JSONは整形・検証ができます。コードはこの端末に保存され、ログイン時はSupabaseにも同期されます。</p>
     </div>
   </div>
 </div>

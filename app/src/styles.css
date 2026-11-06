@@ -74,10 +74,10 @@ svg{display:block}
 .mono-tile.sm{width:28px;height:28px;border-radius:7px;font-size:10.5px}
 
 /* topbar (mobile) */
-.topbar{display:none;align-items:center;gap:8px;padding:10px 12px calc(10px);border-bottom:1px solid var(--line);background:var(--bg);padding-top:calc(10px + env(safe-area-inset-top))}
+.topbar{display:none;align-items:center;gap:5px;padding:10px 8px calc(10px);border-bottom:1px solid var(--line);background:var(--bg);padding-top:calc(10px + env(safe-area-inset-top))}
 .icon-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink)}
 .icon-btn:hover{background:var(--bg-sub)}
-.model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
+.model-pill{flex:1;min-width:0;display:flex;align-items:center;gap:7px;height:44px;padding:0 10px;background:var(--bg-sub);border:1px solid var(--line);border-radius:999px;text-align:left}
 .model-pill .mp-name{display:block;font-size:13.5px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-pill .mp-model{display:block;font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-pill>span:nth-of-type(2){overflow:hidden}
@@ -371,3 +371,41 @@ body.show-welcome #welcomeView{display:block}
 .preset-chip{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--text-2);font-size:12.5px}
 .preset-chip:active{background:var(--accent-soft);color:var(--accent)}
 .code-body.show-pub .code-editor-wrap{display:none}
+
+/* モード切替ロゴ（左上） */
+.mode-logo{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none;cursor:pointer;padding:0}
+.mode-logo .ml-e{font-family:var(--serif);font-size:19px;font-weight:700;line-height:1}
+.mode-logo .ml-code{display:none}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.mode-logo.on .ml-e{display:none}
+.mode-logo.on .ml-code{display:grid;place-items:center}
+.mode-logo.on .ml-code .ic{stroke:currentColor}
+body.mode-code #btnAgent{display:none}
+body.mode-code .send-btn{background:var(--ink)}
+
+/* コード成果物の操作バー */
+.msg-body pre{margin:10px 0}
+.code-actions{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 12px}
+.cact{height:32px;padding:0 13px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--ink);font-size:13px;font-family:inherit;cursor:pointer}
+.cact:active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+
+/* プレビューシート */
+.pv-size{font-size:12.5px;color:var(--text-3);font-family:var(--mono)}
+.pv-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 0}
+.pv-chips .preset-chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pv-stage{flex:1;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;padding:12px;background:var(--bg-sub)}
+.pv-holder{flex:none;box-shadow:0 0 0 1px var(--line-strong);border-radius:6px;overflow:hidden;background:#fff}
+#pvFrame{border:0;transform-origin:top left;display:block}
+
+/* コード表示シート */
+.cv-body{display:flex;flex-direction:column;gap:10px}
+.cv-actions{display:flex;gap:6px;flex-wrap:wrap}
+.cv-scroll{flex:1;overflow:auto;display:flex;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface)}
+.cv-gutter{padding:12px 8px 12px 10px;text-align:right;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--text-3);background:var(--bg-sub);border-right:1px solid var(--line);white-space:pre;user-select:none}
+.cv-pre{margin:0;padding:12px;font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre;color:var(--ink)}
+.cv-out{display:none;margin:0;padding:14px;border-radius:12px;background:#171512;color:#EDE8DD;font-family:var(--mono);font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-height:40%;overflow-y:auto}
+
+/* 公開シート */
+.pub-body{overflow-y:auto}
+#publishEmbedBox iframe{margin:0 auto}
+.topbar .icon-btn{width:38px;height:38px}

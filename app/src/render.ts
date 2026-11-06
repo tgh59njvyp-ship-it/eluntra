@@ -10,6 +10,7 @@ import {
   keyState,
   modelList,
   persistConf,
+  sessionKind,
   splitSavedKey,
   state,
   stateLabel,
@@ -22,6 +23,13 @@ export const SUGGESTIONS: string[] = [
   "この英文を自然な日本語にして： The early bird catches the worm.",
   "PythonでCSVを読み込むコードを書いて",
   "小学生にも分かるように、相対性理論を説明して",
+];
+
+export const CODE_SUGGESTIONS: string[] = [
+  "ストップウォッチのWebページを作って",
+  "ToDoリストのアプリをHTMLで作って",
+  "Pythonでフィボナッチ数を計算するコードを書いて",
+  "おしゃれな名刺カードのHTMLを作って",
 ];
 
 /* ---------- 描画 ---------- */
@@ -52,11 +60,12 @@ export function renderProvStatus(): void {
 
 export function renderSessions(): void {
   const el = $("#sessionList");
-  if (!state.sessions.length) {
+  const list = state.sessions.filter((x) => sessionKind(x) === state.conf.mode);
+  if (!list.length) {
     el.innerHTML = '<p style="padding:8px 12px;font-size:13px;color:var(--text-3)">まだ会話がありません</p>';
     return;
   }
-  el.innerHTML = state.sessions
+  el.innerHTML = list
     .map(
       (s) =>
         `<button class="sess ${s.id === state.currentId ? "on" : ""}" data-sess="${s.id}"><span class="t">${esc(s.title)}</span><span class="del" data-del="${s.id}" role="button" aria-label="削除"><svg class="ic sm" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13h10l1-13"/></svg></span></button>`,
@@ -72,14 +81,18 @@ export function renderChat(): void {
       const st = keyState(p.id);
       return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}">${logoTile(p.id)}<span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
     }).join("");
+    const isCode = state.conf.mode === "code";
+    const sugg = isCode ? CODE_SUGGESTIONS : SUGGESTIONS;
     col.innerHTML =
-      '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>' +
+      (isCode
+        ? '<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>'
+        : '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>') +
       '<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>' +
       '<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">' +
       provCells +
       '</div>' +
       '<div class="sec-label">たとえば</div><div class="sugg">' +
-      SUGGESTIONS.map(
+      sugg.map(
         (t, i) => `<button data-sugg="${i}"><span class="n">0${i + 1}</span><span>${esc(t)}</span></button>`,
       ).join("") +
       "</div></div>";
@@ -102,7 +115,40 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const stepsHtml = m.steps && m.steps.length
     ? `<div class="msg-steps">${m.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("")}</div>`
     : "";
-  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div>${stepsHtml}<div class="msg-body">${m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div></div>`;
+  const bodyHtml = m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : isUser ? md(m.content) : addCodeActions(md(m.content));
+  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div>${stepsHtml}<div class="msg-body">${bodyHtml}</div></div>`;
+}
+
+/** 言語名の正規化（フェンス表記ゆれ吸収） */
+export function normLang(raw: string, code: string): string {
+  const l = (raw || "").toLowerCase();
+  if (l === "js" || l === "javascript" || l === "node") return "javascript";
+  if (l === "ts" || l === "typescript") return "typescript";
+  if (l === "py" || l === "python") return "python";
+  if (l === "html" || l === "xml") return "html";
+  if (l === "css") return "css";
+  if (l === "json") return "json";
+  if (l === "md" || l === "markdown") return "markdown";
+  if (l) return l;
+  const head = code.trimStart().slice(0, 200).toLowerCase();
+  if (head.startsWith("<!doctype") || head.startsWith("<html") || head.includes("<body")) return "html";
+  return "";
+}
+
+/** AI回答のコードブロック直下に、プレビュー／コード／Zipなどの操作バーを付ける */
+export function addCodeActions(html: string): string {
+  return html.replace(/<pre><code data-lang="(\w*)">([\s\S]*?)<\/code><\/pre>/g, (whole, rawLang: string, escCode: string) => {
+    const codeText = escCode.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const lang = normLang(rawLang, codeText);
+    const btn = (act: string, label: string) => `<button class="cact" data-cact="${act}">${label}</button>`;
+    let bar = '<div class="code-actions">';
+    if (lang === "html") bar += btn("preview", "プレビュー");
+    if (lang === "javascript") bar += btn("run", "実行する");
+    bar += btn("code", "コード") + btn("zip", "Zipで保存") + btn("copy", "コピー");
+    if (lang === "html") bar += btn("publish", "公開する");
+    bar += "</div>";
+    return whole + bar;
+  });
 }
 
 export function scrollBottom(smooth = true): void {

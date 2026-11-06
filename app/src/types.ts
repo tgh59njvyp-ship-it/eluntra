@@ -53,6 +53,8 @@ export interface Session {
   created: number;
   /** 直近の送信に使ったプロバイダー（表示用） */
   providerAtSend?: string;
+  /** 会話の種類（未指定はチャット） */
+  kind?: "chat" | "code";
 }
 
 export interface Config {
@@ -63,6 +65,8 @@ export interface Config {
   temp: number;
   /** エージェントモード（ツール実行ループ） */
   agent: boolean;
+  /** 画面モード：通常チャット／コード特化チャット */
+  mode: "chat" | "code";
 }
 
 export type KeyState = "ok" | "set" | "none";

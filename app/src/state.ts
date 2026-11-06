@@ -36,7 +36,7 @@ export const state = {
   tested: load<Record<string, boolean>>(LS.tested, {}),
   fetchedModels: load<Record<string, string[]>>(LS.models, {}),
   conf: Object.assign(
-    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false } as Config,
+    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat" } as Config,
     load<Partial<Config>>(LS.conf, {}),
   ),
   sessions: load<Session[]>(LS.sess, []),
@@ -102,10 +102,16 @@ export function curSession(): Session | null {
   return state.sessions.find((s) => s.id === state.currentId) ?? null;
 }
 
+/** 会話の種類（未指定はチャット扱い） */
+export function sessionKind(s: Session): "chat" | "code" {
+  return s.kind === "code" ? "code" : "chat";
+}
+
 export function createSession(): Session {
   const s: Session = {
     id: uid(),
     title: "新しいチャット",
+    kind: state.conf.mode,
     provider: state.conf.provider,
     model: curModel(),
     messages: [],
@@ -118,16 +124,19 @@ export function createSession(): Session {
 }
 
 export function ensureSession(): void {
-  if (!curSession()) {
-    if (state.sessions.length) state.currentId = state.sessions[0].id;
-    else createSession();
-  }
+  const cur = curSession();
+  if (cur && sessionKind(cur) === state.conf.mode) return;
+  const same = state.sessions.find((x) => sessionKind(x) === state.conf.mode);
+  if (same) state.currentId = same.id;
+  else if (!cur) createSession();
+  else state.currentId = null;
 }
 
 export function deleteSession(id: string): void {
   state.sessions = state.sessions.filter((s) => s.id !== id);
   if (state.currentId === id) {
-    state.currentId = state.sessions.length ? state.sessions[0].id : null;
+    const same = state.sessions.find((x) => sessionKind(x) === state.conf.mode);
+    state.currentId = same ? same.id : null;
   }
   persistSessions();
 }
@@ -142,7 +151,7 @@ export function resetAllData(): void {
   state.sessions = [];
   state.notes = [];
   state.currentId = null;
-  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false };
+  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat" };
   PROVIDERS.forEach((p) => {
     state.conf.models[p.id] = p.def;
   });

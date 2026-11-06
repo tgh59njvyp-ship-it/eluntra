@@ -1,446 +1,250 @@
-import { runSandboxedJs} from "./agent";
-import { callChat} from "./api";
-import { isLoggedIn, pushSync} from "./auth";
-import { md} from "./markdown";
-import { closeSheet, openSheet} from "./render";
-import { curModel, curProv, load, save, state} from "./state";
-import { $, toast} from "./util";
+import { runSandboxedJs } from "./agent";
+import { closeSheet, normLang, openSheet } from "./render";
+import { $, toast } from "./util";
 
 /**
-* コードモード（多言語対応・コード特化）。
-* 言語ごとに編集・保存し、HTML/CSS/Markdownはプレビュー、JavaScriptはサンドボックス実行、
-* PythonはPyodide（ブラウザ内Python）で実行、JSONは整形・検証ができる。
-* AIは言語専門の指示でコードを生成・修正する。コードは端末保存＋Supabase同期。
-*/
+ * コード特化チャットの成果物まわり。
+ * AI回答のコードブロック直下のバー（プレビュー／実行／コード／Zip／コピー／公開）を受け持ち、
+ * 端末幅プレビュー・コード表示・Zip保存・公開（Simple URL Server埋め込み）のシートを制御する。
+ */
 
-export const CODES_LS_KEY = "eluntra_codes";
-const LANG_LS_KEY = "eluntra_code_lang";
-const OLD_CODE_LS_KEY = "eluntra_code";
-
-type RunKind = "preview" | "js" | "python" | "css" | "json" | "md" | "none";
-
-interface Lang {
-id: string;
-name: string;
-fence: string;
-ext: string;
-run: RunKind;
-runLabel: string;
-starter: string;
+interface Artifact {
+  code: string;
+  lang: string;
 }
 
-const STARTER_HTML = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>マイ・ページ</title>
-<style>
-body { font-family: sans-serif; background: #FBFAF7; color: #1B1B18; padding: 32px 20px;}
-h1 { font-size: 28px;}
-button { background: #1E4D3B; color: #fff; border: 0; border-radius: 10px; padding: 12px 20px; font-size: 16px;}
-</style>
-</head>
-<body>
-<h1>こんにちは</h1>
-<p>これは最初のページです。下の欄からAIに作り直してもらえます。</p>
-<p>押した回数: <b id="n">0</b></p>
-<button id="b">押してみる</button>
-<script>
-let n = 0;
-document.getElementById("b").onclick = () => {
-n++;
-document.getElementById("n").textContent = n;
-};
-<\/script>
-</body>
-</html>`;
+let current: Artifact = { code: "", lang: "" };
 
-export const LANGS: Lang[] = [
-{ id: "html", name: "HTML", fence: "html", ext: "html", run: "preview", runLabel: "プレビュー", starter: STARTER_HTML},
-{
-id: "javascript", name: "JavaScript", fence: "javascript", ext: "js", run: "js", runLabel: "実行する",
-starter: `// JavaScriptのサンプル\nconst scores = [72, 85, 90, 68, 95];\nconst total = scores.reduce((a, b) => a + b, 0);\nconsole.log("合計:", total);\nconsole.log("平均:", total / scores.length);\nconsole.log("最高:", Math.max(...scores));`,
-},
-{
-id: "typescript", name: "TypeScript", fence: "typescript", ext: "ts", run: "none", runLabel: "",
-starter: `// TypeScriptのサンプル（編集とAI生成に対応。実行はJavaScript欄で）\ninterface User {\n name: string;\n score: number;\n}\n\nfunction rank(users: User[]): string[] {\n return users\n.slice()\n.sort((a, b) => b.score - a.score)\n.map((u, i) => (i + 1) + "位: " + u.name + " (" + u.score + ")");\n}`,
-},
-{
-id: "python", name: "Python", fence: "python", ext: "py", run: "python", runLabel: "実行する",
-starter: `# Pythonのサンプル（ブラウザ内蔵のPythonで実行されます）\nscores = [72, 85, 90, 68, 95]\nprint("合計:", sum(scores))\nprint("平均:", sum(scores) / len(scores))\nprint("最高:", max(scores))`,
-},
-{
-id: "css", name: "CSS", fence: "css", ext: "css", run: "css", runLabel: "プレビュー",
-starter: `/* CSSのサンプル（右のプレビュー用ページに適用されます） */\n.card {\n border: 2px solid #1E4D3B;\n background: #EAF3EE;\n}\nbutton {\n background: #1E4D3B;\n border-radius: 999px;\n}`,
-},
-{
-id: "json", name: "JSON", fence: "json", ext: "json", run: "json", runLabel: "整形・検証",
-starter: `{\n "app": "Eluntra",\n "version": 4,\n "features": ["chat", "agent", "code"],\n "dark": false\n}`,
-},
-{
-id: "markdown", name: "Markdown", fence: "markdown", ext: "md", run: "md", runLabel: "プレビュー",
-starter: `# メモ\n\n## 今日やること\n\n- **買い物**：牛乳と卵\n- 散歩 30分\n- 本を10ページ読む\n\n> 無理のない範囲で。`,
-},
+export const FILE_NAMES: Record<string, string> = {
+  html: "index.html",
+  javascript: "script.js",
+  typescript: "main.ts",
+  python: "main.py",
+  css: "style.css",
+  json: "data.json",
+  markdown: "README.md",
+};
+
+export function fileNameFor(lang: string): string {
+  return FILE_NAMES[lang] || "code.txt";
+}
+
+/* ---------- Zip作成（無圧縮STORE形式） ---------- */
+
+const CRC_TABLE = ((): number[] => {
+  const t: number[] = [];
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(data: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+export function makeZipBlob(files: { name: string; content: string }[]): Blob {
+  const enc = new TextEncoder();
+  const chunks: BlobPart[] = [];
+  const central: BlobPart[] = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xffff;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xffff;
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const data = enc.encode(f.content);
+    const crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true);
+    lh.setUint16(4, 20, true);
+    lh.setUint16(6, 0x0800, true);
+    lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true);
+    lh.setUint16(12, dosDate, true);
+    lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true);
+    lh.setUint32(22, data.length, true);
+    lh.setUint16(26, nameBytes.length, true);
+    lh.setUint16(28, 0, true);
+    chunks.push(new Uint8Array(lh.buffer) as BlobPart, nameBytes as BlobPart, data as BlobPart);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true);
+    ch.setUint16(4, 20, true);
+    ch.setUint16(6, 20, true);
+    ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true);
+    ch.setUint16(12, dosTime, true);
+    ch.setUint16(14, dosDate, true);
+    ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true);
+    ch.setUint32(24, data.length, true);
+    ch.setUint16(28, nameBytes.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer) as BlobPart, nameBytes as BlobPart);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  let centralSize = 0;
+  central.forEach((c) => (centralSize += (c as Uint8Array).length));
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true);
+  end.setUint32(16, offset, true);
+  const parts: BlobPart[] = [...chunks, ...central, new Uint8Array(end.buffer) as BlobPart];
+  return new Blob(parts, { type: "application/zip" });
+}
+
+function download(blob: Blob, name: string): void {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+export function downloadZip(a: Artifact): void {
+  const blob = makeZipBlob([{ name: fileNameFor(a.lang), content: a.code }]);
+  download(blob, "eluntra-code.zip");
+  toast("Zipを保存しました（" + fileNameFor(a.lang) + "）");
+}
+
+/* ---------- プレビュー（端末幅切替） ---------- */
+
+const DEVICES = [
+  { name: "スマホ", w: 390, h: 844 },
+  { name: "スマホ大", w: 430, h: 932 },
+  { name: "タブレット", w: 768, h: 1024 },
+  { name: "PC", w: 1280, h: 800 },
+  { name: "全幅", w: 0, h: 0 },
 ];
+let deviceIdx = 0;
 
-export function langById(id: string): Lang {
-return LANGS.find((l) => l.id === id)?? LANGS[0];
-}
-
-let curLang: string = load<string>(LANG_LS_KEY, "html");
-if (!LANGS.some((l) => l.id === curLang)) curLang = "html";
-
-export function getCodes(): Record<string, string> {
-const codes = load<Record<string, string>>(CODES_LS_KEY, {});
-if (!codes.html) {
-const old = load<string>(OLD_CODE_LS_KEY, "");
-if (old) codes.html = old;
-}
-return codes;
-}
-
-export function setCodes(codes: Record<string, string>): void {
-save(CODES_LS_KEY, codes);
-}
-
-function currentCode(): string {
-const codes = getCodes();
-return codes[curLang]?? langById(curLang).starter;
-}
-
-function persistEditor(sync = true): void {
-const codes = getCodes();
-codes[curLang] = editor().value;
-setCodes(codes);
-if (sync && isLoggedIn()) void pushSync();
+function applyDevice(): void {
+  const dev = DEVICES[deviceIdx];
+  document.querySelectorAll<HTMLElement>("[data-dev]").forEach((chip) => {
+    chip.classList.toggle("on", Number(chip.getAttribute("data-dev")) === deviceIdx);
+  });
+  const stage = $("#pvStage");
+  const holder = $("#pvHolder");
+  const frame = $("#pvFrame") as HTMLIFrameElement;
+  $("#pvSize").textContent = dev.w === 0 ? "画面幅いっぱい" : `${dev.w} × ${dev.h}px`;
+  if (dev.w === 0) {
+    holder.style.width = "100%";
+    holder.style.height = "100%";
+    frame.style.width = "100%";
+    frame.style.height = "100%";
+    frame.style.transform = "none";
+    return;
+  }
+  const availW = Math.max(stage.clientWidth - 24, 200);
+  const availH = Math.max(stage.clientHeight - 24, 200);
+  const scale = Math.min(availW / dev.w, availH / dev.h, 1);
+  holder.style.width = dev.w * scale + "px";
+  holder.style.height = dev.h * scale + "px";
+  frame.style.width = dev.w + "px";
+  frame.style.height = dev.h + "px";
+  frame.style.transform = `scale(${scale})`;
 }
 
-/** 互換用：HTMLのコード（公開タブのコピーなど） */
-export function getCode(): string {
-return getCodes().html?? STARTER_HTML;
+export function openPreview(a: Artifact): void {
+  current = a;
+  ($("#pvFrame") as HTMLIFrameElement).srcdoc = a.code;
+  openSheet("previewSheet");
+  window.setTimeout(applyDevice, 60);
 }
 
-function editor(): HTMLTextAreaElement {
-return $("#codeEditor") as HTMLTextAreaElement;
+/* ---------- コード表示 ---------- */
+
+export function openCodeView(a: Artifact): void {
+  current = a;
+  $("#codeViewTitle").textContent = fileNameFor(a.lang);
+  const lines = a.code.split("\n");
+  $("#codeViewGutter").textContent = lines.map((_, i) => String(i + 1)).join("\n");
+  $("#codeViewPre").textContent = a.code;
+  $("#codeViewOut").style.display = "none";
+  ($("#btnCvRun") as HTMLElement).style.display = a.lang === "javascript" ? "" : "none";
+  ($("#btnCvPreview") as HTMLElement).style.display = a.lang === "html" ? "" : "none";
+  ($("#btnCvPublish") as HTMLElement).style.display = a.lang === "html" ? "" : "none";
+  openSheet("codeViewSheet");
 }
 
-/** AIの応答からコードを取り出す */
-export function extractCode(text: string): string | null {
-const fenced = text.match(/```(?:\w+)?\s*\n([\s\S]*?)```/);
-if (fenced && fenced[1].trim()) return fenced[1].trim();
-const docStart = text.search(/<!DOCTYPE html|<html[\s>]/i);
-if (docStart >= 0) return text.slice(docStart).trim();
-return null;
+/* ---------- 公開 ---------- */
+
+export function openPublish(a: Artifact): void {
+  current = a;
+  openSheet("publishSheet");
 }
 
-/* ---------- 表示・タブ ---------- */
-
-type CodeTab = "edit" | "out" | "pub";
-
-function setCodeTab(tab: CodeTab): void {
-$("#tabCodeEdit").classList.toggle("on", tab === "edit");
-$("#tabCodePrev").classList.toggle("on", tab === "out");
-$("#tabCodePub").classList.toggle("on", tab === "pub");
-const body = $(".code-body");
-body.classList.toggle("show-out", tab === "out");
-body.classList.toggle("show-pub", tab === "pub");
-if (tab === "out") void runOrPreview(false);
+async function copyCurrent(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(current.code);
+    toast("コードをコピーしました");
+  } catch {
+    toast("コピーできませんでした");
+  }
 }
 
-function updateGutter(): void {
-const lines = editor().value.split("\n").length;
-const g = $("#codeGutter");
-let html = "";
-for (let i = 1; i <= lines; i++) html += i + "\n";
-g.textContent = html;
-g.scrollTop = editor().scrollTop;
+/* ---------- 初期化 ---------- */
+
+export function initCodeUI(): void {
+  document.addEventListener("click", (e: Event) => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-cact]");
+    if (!btn) return;
+    const bar = btn.closest(".code-actions");
+    const pre = bar?.previousElementSibling;
+    const codeEl = pre?.querySelector("code");
+    if (!codeEl) return;
+    const artifact: Artifact = {
+      code: codeEl.textContent || "",
+      lang: normLang(codeEl.getAttribute("data-lang") || "", codeEl.textContent || ""),
+    };
+    const act = btn.getAttribute("data-cact");
+    if (act === "preview") openPreview(artifact);
+    else if (act === "code") openCodeView(artifact);
+    else if (act === "zip") downloadZip(artifact);
+    else if (act === "publish") openPublish(artifact);
+    else if (act === "copy") {
+      current = artifact;
+      void copyCurrent();
+    } else if (act === "run") {
+      openCodeView(artifact);
+      void runCurrent();
+    }
+  });
+  document.querySelectorAll<HTMLElement>("[data-dev]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      deviceIdx = Number(chip.getAttribute("data-dev"));
+      applyDevice();
+    });
+  });
+  $("#btnPvClose").addEventListener("click", () => closeSheet("previewSheet"));
+  $("#btnCvClose").addEventListener("click", () => closeSheet("codeViewSheet"));
+  $("#btnCvCopy").addEventListener("click", () => void copyCurrent());
+  $("#btnCvZip").addEventListener("click", () => downloadZip(current));
+  $("#btnCvPreview").addEventListener("click", () => {
+    closeSheet("codeViewSheet");
+    openPreview(current);
+  });
+  $("#btnCvPublish").addEventListener("click", () => {
+    closeSheet("codeViewSheet");
+    openPublish(current);
+  });
+  $("#btnCvRun").addEventListener("click", () => void runCurrent());
+  $("#btnPubClose").addEventListener("click", () => closeSheet("publishSheet"));
+  $("#btnPubCopy").addEventListener("click", () => void copyCurrent());
 }
 
-function applyLangUI(): void {
-const lang = langById(curLang);
-($("#codeLang") as HTMLSelectElement).value = curLang;
-const runBtn = $("#btnCodeRun") as HTMLButtonElement;
-if (lang.run === "none") {
-runBtn.style.display = "none";
-} else {
-runBtn.style.display = "";
-runBtn.textContent = lang.runLabel;
-}
-$("#tabCodePrevLabel").textContent = lang.run === "js" || lang.run === "python"? "実行結果": "プレビュー";
-updateGutter();
+async function runCurrent(): Promise<void> {
+  const out = $("#codeViewOut");
+  out.style.display = "block";
+  out.textContent = "実行中…";
+  const result = await runSandboxedJs(current.code);
+  out.textContent = result;
 }
 
-function switchLang(id: string): void {
-if (id === curLang) return;
-persistEditor(false);
-curLang = id;
-save(LANG_LS_KEY, curLang);
-editor().value = currentCode();
-applyLangUI();
-setStatus(id === "typescript"? "TypeScriptは編集とAI生成に対応しています（実行はJavaScript欄でできます）。": "");
-if (isLoggedIn()) void pushSync();
-}
-
-export function openCode(): void {
-editor().value = currentCode();
-applyLangUI();
-setCodeTab("edit");
-openSheet("codeSheet");
-}
-
-/* ---------- 実行・プレビュー ---------- */
-
-function setStatus(msg: string): void {
-$("#codeStatus").textContent = msg;
-}
-
-function showOutput(text: string): void {
-const pre = $("#codeOutput");
-pre.style.display = "block";
-($("#codePreview") as HTMLIFrameElement).style.display = "none";
-$("#codeMd").style.display = "none";
-pre.textContent = text;
-}
-
-function showFrame(html: string): void {
-const frame = $("#codePreview") as HTMLIFrameElement;
-frame.style.display = "block";
-$("#codeOutput").style.display = "none";
-$("#codeMd").style.display = "none";
-frame.srcdoc = html;
-}
-
-function showMd(html: string): void {
-const box = $("#codeMd");
-box.style.display = "block";
-($("#codePreview") as HTMLIFrameElement).style.display = "none";
-$("#codeOutput").style.display = "none";
-box.innerHTML = html;
-}
-
-const CSS_DEMO = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><style>
-body{font-family:sans-serif;padding:24px;color:#1B1B18;background:#fff}
-.card{border:1px solid #D8D6CC;border-radius:14px;padding:18px;margin:14px 0}
-button{background:#5C5C55;color:#fff;border:0;border-radius:10px;padding:10px 18px}
-</style><style id="userCss"></style></head><body>
-<h1>見出しの例</h1><p>本文の例です。リンクは <a href="#">こちら</a>。</p>
-<div class="card"><h2>カードの例</h2><p>このカードとボタンに、左のCSSが適用されます。</p><button>ボタンの例</button></div>
-<ul><li>リスト1</li><li>リスト2</li></ul></body></html>`;
-
-interface PyodideLike {
-setStdout: (o: { batched: (s: string) => void}) => void;
-setStderr: (o: { batched: (s: string) => void}) => void;
-runPythonAsync: (code: string) => Promise<unknown>;
-}
-let pyodidePromise: Promise<PyodideLike> | null = null;
-
-function loadPyodideOnce(): Promise<PyodideLike> {
-if (pyodidePromise) return pyodidePromise;
-pyodidePromise = new Promise<PyodideLike>((resolve, reject) => {
-const w = window as unknown as { loadPyodide?: (o: { indexURL: string}) => Promise<PyodideLike>};
-const start = (): void => {
-if (!w.loadPyodide) {
-reject(new Error("Pythonの読み込みに失敗しました"));
-return;
-}
-w.loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"}).then(resolve, reject);
-};
-if (w.loadPyodide) {
-start();
-return;
-}
-const script = document.createElement("script");
-script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
-script.onload = start;
-script.onerror = () => reject(new Error("Pythonの読み込みに失敗しました。通信状態を確認してください。"));
-document.head.appendChild(script);
-});
-return pyodidePromise;
-}
-
-async function runOrPreview(switchTab = true): Promise<void> {
-const lang = langById(curLang);
-const code = editor().value;
-if (switchTab) setCodeTab("out");
-switch (lang.run) {
-case "preview":
-showFrame(code);
-setStatus("プレビューを更新しました。");
-return;
-case "css": {
-const doc = new DOMParser().parseFromString(CSS_DEMO, "text/html");
-const styleEl = doc.querySelector("#userCss");
-if (styleEl) styleEl.textContent = code;
-showFrame("<!DOCTYPE html>\n" + doc.documentElement.outerHTML);
-setStatus("サンプルページにCSSを適用しました。");
-return;
-}
-case "md":
-showMd(md(code));
-setStatus("プレビューを更新しました。");
-return;
-case "json":
-try {
-const parsed: unknown = JSON.parse(code);
-showOutput(JSON.stringify(parsed, null, 2));
-setStatus("正しいJSONです。整形して表示しています。");
-} catch (e) {
-showOutput("");
-setStatus(`JSONの形式が正しくありません：${e instanceof Error? e.message: String(e)}`);
-}
-return;
-case "js": {
-setStatus("実行中…");
-const out = await runSandboxedJs(code);
-showOutput(out);
-setStatus("実行しました。");
-return;
-}
-case "python": {
-setStatus("Pythonを準備中…（初回は読み込みに時間がかかります）");
-try {
-const py = await loadPyodideOnce();
-const lines: string[] = [];
-py.setStdout({ batched: (t: string) => lines.push(t)});
-py.setStderr({ batched: (t: string) => lines.push(t)});
-setStatus("実行中…");
-await py.runPythonAsync(code);
-showOutput(lines.join("\n") || "（出力なし）");
-setStatus("実行しました。");
-} catch (e) {
-showOutput("");
-const msg = e instanceof Error? e.message: String(e);
-setStatus(`実行できませんでした：${msg.split("\n").slice(-3).join(" ")}`);
-}
-return;
-}
-default:
-return;
-}
-}
-
-/* ---------- AI生成（コード特化） ---------- */
-
-let aiBusy = false;
-
-const PRESETS: Record<string, string> = {
-fix: "このコードのバグを探して直してください。直した箇所と原因を、コードの後に短く教えてください。",
-improve: "このコードを、動作を変えずに読みやすく・効率よく書き直してください。",
-comment: "このコードに、処理の流れが分かる日本語のコメントを付けてください（動作は変えないでください）。",
-example: "このコードの使い方と、実行例（サンプルデータと期待する出力）を教えてください。",
-};
-
-async function aiGenerate(): Promise<void> {
-if (aiBusy) return;
-const input = $("#codePrompt") as HTMLInputElement;
-const inst = input.value.trim();
-if (!inst) {
-setStatus("AIへの依頼を入力してください（例：ダークな時計のページにして）。");
-return;
-}
-const p = curProv();
-const key = (state.keys[p.id] || "").trim();
-if (!key) {
-setStatus(`${p.name}のキーが未設定です。対処：設定でキーを貼ってから、もう一度押してください。`);
-return;
-}
-const lang = langById(curLang);
-aiBusy = true;
-const btn = $("#btnCodeAI") as HTMLButtonElement;
-btn.disabled = true;
-setStatus("AIが作成中です…");
-const prompt =
-`あなたは${lang.name}のシニアエンジニアです。次の依頼に沿って、${lang.name}のコードを作成（または修正）してください。` +
-`完成したコード全体を必ず \`\`\`${lang.fence} のコードブロックで返し、説明は最小限にしてください。\n\n` +
-`\n${inst}\n\n\n\`\`\`${lang.fence}\n${editor().value}\n\`\`\``;
-try {
-const full = await callChat(p, key, curModel(), [{ role: "user", content: prompt}], (partial) => {
-setStatus(`AIが作成中です…（${partial.length}文字）`);
-});
-const code = extractCode(full);
-if (!code) {
-setStatus("AIの回答にコードが含まれていなかったため、反映しませんでした。依頼を具体的にして、もう一度お試しください。");
-return;
-}
-editor().value = code;
-persistEditor();
-updateGutter();
-setStatus("反映しました。");
-input.value = "";
-toast("コードを反映しました");
-if (lang.run!== "none") setCodeTab("out");
-} catch (e) {
-setStatus(e instanceof Error? e.message: String(e));
-} finally {
-aiBusy = false;
-btn.disabled = false;
-}
-}
-
-async function copyCode(): Promise<void> {
-try {
-await navigator.clipboard.writeText(editor().value);
-toast("コードをコピーしました");
-} catch {
-editor().select();
-toast("コピーできませんでした。編集欄で長押ししてコピーしてください");
-}
-}
-
-function downloadCode(): void {
-const lang = langById(curLang);
-const blob = new Blob([editor().value], { type: "text/plain"});
-const a = document.createElement("a");
-a.href = URL.createObjectURL(blob);
-a.download = `eluntra-code.${lang.ext}`;
-a.click();
-window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-}
-
-/** コードモードのイベント配線（main.tsの初期化から呼ぶ） */
-export function initCode(): void {
-const ed = editor();
-ed.addEventListener("input", () => {
-persistEditor(false);
-updateGutter();
-});
-ed.addEventListener("scroll", () => {
-$("#codeGutter").scrollTop = ed.scrollTop;
-});
-ed.addEventListener("blur", () => {
-if (isLoggedIn()) void pushSync();
-});
-ed.addEventListener("keydown", (e: KeyboardEvent) => {
-if (e.key === "Tab") {
-e.preventDefault();
-const start = ed.selectionStart;
-const end = ed.selectionEnd;
-ed.setRangeText(" ", start, end, "end");
-persistEditor(false);
-updateGutter();
-}
-});
-($("#codeLang") as HTMLSelectElement).addEventListener("change", (e: Event) => {
-switchLang((e.target as HTMLSelectElement).value);
-});
-$("#btnCodeRun").addEventListener("click", () => void runOrPreview(true));
-$("#tabCodeEdit").addEventListener("click", () => setCodeTab("edit"));
-$("#tabCodePrev").addEventListener("click", () => setCodeTab("out"));
-$("#tabCodePub").addEventListener("click", () => setCodeTab("pub"));
-$("#btnCopyCode").addEventListener("click", () => void copyCode());
-document.querySelectorAll<HTMLElement>("[data-preset]").forEach((chip) => {
-chip.addEventListener("click", () => {
-const key = chip.getAttribute("data-preset") || "";
-const input = $("#codePrompt") as HTMLInputElement;
-input.value = PRESETS[key] || "";
-input.focus();
-});
-});
-$("#btnCodeAI").addEventListener("click", () => void aiGenerate());
-$("#codePrompt").addEventListener("keydown", (e: KeyboardEvent) => {
-if (e.key === "Enter") void aiGenerate();
-});
-$("#btnCodeDownload").addEventListener("click", downloadCode);
-$("#btnCodeClose").addEventListener("click", () => closeSheet("codeSheet"));
-}
