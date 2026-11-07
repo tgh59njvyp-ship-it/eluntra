@@ -275,6 +275,15 @@
         <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
         <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
       </div>
+      <div class="set-sec">自己修復</div>
+      <p class="set-desc">このサイト自体で起きたエラーを記録し、前に保存したGeminiのAPIキーでAIが診断して、壊れた状態を自動で直します。APIキーは修復でも消しません。</p>
+      <p class="set-desc" id="repairStatus">エラー記録はありません。</p>
+      <label class="repair-toggle"><input type="checkbox" id="chkAutoRepair"> エラーが続いたら自動でAI修復する</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn primary" id="btnSelfRepair">AIで診断・修復する</button>
+        <button class="btn secondary" id="btnRepairLog">記録をコピー</button>
+      </div>
+      <div class="repair-log" id="repairLog"></div>
     </div>
   </div>
 </div>

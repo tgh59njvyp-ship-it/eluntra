@@ -11,6 +11,7 @@ import {
 } from "./auth";
 import { runAgent } from "./agent";
 import { initCodeUI } from "./code";
+import { copyRepairLog, installWatchdog, renderRepairPanel, runSelfRepair, setAutoRepair } from "./selfrepair";
 import { callChat, fetchModels, testConnection } from "./api";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
@@ -667,21 +668,14 @@ document
 /* ---------- 初期化 ---------- */
 
 (function init(): void {
-  let lastErrToast = 0;
-  window.addEventListener("error", () => {
-    const now = Date.now();
-    if (now - lastErrToast > 8000) {
-      lastErrToast = now;
-      toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。");
-    }
+  installWatchdog();
+  $("#btnSelfRepair").addEventListener("click", () => void runSelfRepair(false));
+  $("#btnRepairLog").addEventListener("click", () => copyRepairLog());
+  $("#chkAutoRepair").addEventListener("change", (e: Event) => {
+    setAutoRepair((e.target as HTMLInputElement).checked);
+    toast((e.target as HTMLInputElement).checked ? "自動修復をオンにしました" : "自動修復をオフにしました");
   });
-  window.addEventListener("unhandledrejection", () => {
-    const now = Date.now();
-    if (now - lastErrToast > 8000) {
-      lastErrToast = now;
-      toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。");
-    }
-  });
+  renderRepairPanel();
   const savedTheme = load<string | null>("eluntra_theme", null);
   const prefersDark =
     window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;

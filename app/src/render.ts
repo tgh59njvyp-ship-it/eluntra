@@ -94,7 +94,15 @@ export function renderChat(): void {
       "</div></div>";
     return;
   }
-  col.innerHTML = s.messages.map((m, i) => renderMsg(m, i, s)).join("");
+  col.innerHTML = s.messages
+    .map((m, i) => {
+      try {
+        return renderMsg(m, i, s);
+      } catch {
+        return '<div class="msg"><div class="msg-body"><p>このメッセージを表示できませんでした（データが壊れている可能性があります）。設定の「自己修復」で直せます。</p></div></div>';
+      }
+    })
+    .join("");
   scrollBottom(false);
 }
 
