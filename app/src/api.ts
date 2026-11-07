@@ -40,8 +40,15 @@ async function fetchWithTimeout(
     return await apiFetch(url, { ...opts, signal: runtime.abortCtl?.signal ?? ctl.signal });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
+    let host = "";
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      host = "";
+    }
+    const orig = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     throw new Error(
-      "通信できませんでした。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、設定で接続テストを押して結果を確認してください（会社側がブラウザからの直接接続を許可していない場合、その会社はブラウザ版では使えません）。",
+      `通信できませんでした（接続先：${host || "不明"}／方式：${proxyEnabled() ? "サーバー経由" : "直接接続"}／詳細：${orig}／版：v4.10）。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、この文面をそのまま教えてください。`,
     );
   } finally {
     window.clearTimeout(timer);

@@ -759,6 +759,7 @@ body.mode-code #codeChip{display:inline-flex}
       <div class="set-sec">接続</div>
       <p class="set-desc">各社のAPIへ、Eluntraの中継サーバー（Vercel）を通してつなぎます。SambaNovaなど、ブラウザから直接つなげない会社を使うにはオンが必要です。キーは中継サーバーに保存されず、そのまま各社へ渡されます。</p>
       <label class="repair-toggle"><input type="checkbox" id="chkProxy"> サーバー経由で接続する</label>
+      <p class="set-desc">現在の版：v4.10</p>
       <div class="set-sec">自己修復</div>
       <p class="set-desc">このサイト自体で起きたエラーを記録し、前に保存したGeminiのAPIキーでAIが診断して、壊れた状態を自動で直します。APIキーは修復でも消しません。</p>
       <p class="set-desc" id="repairStatus">エラー記録はありません。</p>
@@ -1953,7 +1954,7 @@ async function sendMessage(){
   }catch(e){
     aiMsg.pending=false;
     if(e&&e.name==="AbortError"){aiMsg.content=aiMsg.content||"（生成を止めました）"}
-    else{aiMsg.content="";aiMsg.error=(e&&(e.name==="TypeError"||/Failed to fetch|NetworkError|Load failed/i.test(e.message||"")))?"通信できませんでした。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、設定で接続テストを押して結果を確認してください（会社側がブラウザからの直接接続を許可していない場合、その会社はブラウザ版では使えません）。":(e.message||String(e))}
+    else{aiMsg.content="";aiMsg.error=(e&&(e.name==="TypeError"||/Failed to fetch|NetworkError|Load failed/i.test(e.message||"")))?"通信できませんでした（方式："+(proxyOn()?"サーバー経由":"直接接続")+"／詳細："+(e.message||String(e))+"／版：v4.10）。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、この文面をそのまま教えてください。":(e.message||String(e))}
   }
   if(!aiMsg.error&&conf.mode==="code"&&(conf.effort==="high"||conf.effort==="super")){await verifyAndRepair(s.id,s.messages.indexOf(aiMsg),conf.effort==="super"?2:1)}
   generating=false;abortCtl=null;setSendBtn(false);
