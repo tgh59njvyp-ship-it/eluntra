@@ -667,6 +667,21 @@ document
 /* ---------- 初期化 ---------- */
 
 (function init(): void {
+  let lastErrToast = 0;
+  window.addEventListener("error", () => {
+    const now = Date.now();
+    if (now - lastErrToast > 8000) {
+      lastErrToast = now;
+      toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。");
+    }
+  });
+  window.addEventListener("unhandledrejection", () => {
+    const now = Date.now();
+    if (now - lastErrToast > 8000) {
+      lastErrToast = now;
+      toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。");
+    }
+  });
   const savedTheme = load<string | null>("eluntra_theme", null);
   const prefersDark =
     window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;

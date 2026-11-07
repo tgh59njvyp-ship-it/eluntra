@@ -1,5 +1,8 @@
 import { runSandboxedJs } from "./agent";
-import { closeSheet, normLang, openSheet } from "./render";
+import { callChat } from "./api";
+import { PROVIDERS } from "./providers";
+import { closeSheet, normLang, openSheet, renderChat } from "./render";
+import { curModel, curSession, persistSessions, state } from "./state";
 import { $, toast } from "./util";
 
 /**
@@ -152,9 +155,29 @@ function applyDevice(): void {
   frame.style.transform = `scale(${scale})`;
 }
 
+let pvToken = "";
+let pvAutoTried = false;
+
+function withErrorHook(code: string, token: string): string {
+  const hook =
+    "<script>window.addEventListener('error',function(e){parent.postMessage({__eluntraPv:'" + token + "',msg:String(e.message||'エラー')},'*')},true);" +
+    "window.addEventListener('unhandledrejection',function(e){parent.postMessage({__eluntraPv:'" + token + "',msg:String((e.reason&&e.reason.message)||e.reason||'非同期エラー')},'*')});</" + "script>";
+  const doctype = code.match(/^\s*<!DOCTYPE[^>]*>/i);
+  if (doctype) return doctype[0] + hook + code.slice(doctype[0].length);
+  const head = code.match(/<head[^>]*>/i);
+  if (head && head.index !== undefined) {
+    const at = head.index + head[0].length;
+    return code.slice(0, at) + hook + code.slice(at);
+  }
+  return hook + code;
+}
+
 export function openPreview(a: Artifact): void {
   current = a;
-  ($("#pvFrame") as HTMLIFrameElement).srcdoc = a.code;
+  pvToken = Math.random().toString(36).slice(2);
+  pvAutoTried = false;
+  $("#pvFix").classList.remove("on");
+  ($("#pvFrame") as HTMLIFrameElement).srcdoc = withErrorHook(a.code, pvToken);
   openSheet("previewSheet");
   window.setTimeout(applyDevice, 60);
 }
@@ -204,6 +227,13 @@ export function initCodeUI(): void {
       code: codeEl.textContent || "",
       lang: normLang(codeEl.getAttribute("data-lang") || "", codeEl.textContent || ""),
     };
+    const msgNode = btn.closest(".msg");
+    const sess = curSession();
+    if (msgNode && sess) {
+      const msgIdx = [...document.querySelectorAll("#chatCol .msg")].indexOf(msgNode);
+      const blockIdx = [...msgNode.querySelectorAll("pre")].indexOf(pre as HTMLPreElement);
+      if (msgIdx >= 0 && blockIdx >= 0) currentRef = { sessId: sess.id, msgIdx, blockIdx };
+    }
     const act = btn.getAttribute("data-cact");
     if (act === "preview") openPreview(artifact);
     else if (act === "code") openCodeView(artifact);
@@ -238,13 +268,152 @@ export function initCodeUI(): void {
   $("#btnCvRun").addEventListener("click", () => void runCurrent());
   $("#btnPubClose").addEventListener("click", () => closeSheet("publishSheet"));
   $("#btnPubCopy").addEventListener("click", () => void copyCurrent());
+  $("#btnCvFix").addEventListener("click", () => {
+    const out = $("#codeViewOut").textContent || "";
+    const errMsg = out.startsWith("エラー:") ? out.slice(4).trim() : "実行エラー";
+    void autoRepair(errMsg, "js", true);
+  });
+  $("#btnPvFix").addEventListener("click", () => {
+    const msg = $("#pvFixMsg").textContent || "エラー";
+    void autoRepair(msg, "preview", true);
+  });
+  window.addEventListener("message", (e: MessageEvent) => {
+    const d = e.data as { __eluntraPv?: string; msg?: string } | null;
+    if (!d || d.__eluntraPv !== pvToken || !pvToken) return;
+    showPvFix(`プレビューでエラー：${d.msg || "不明なエラー"}`);
+    if (!pvAutoTried) {
+      pvAutoTried = true;
+      void autoRepair(d.msg || "不明なエラー", "preview");
+    }
+  });
 }
 
 async function runCurrent(): Promise<void> {
   const out = $("#codeViewOut");
   out.style.display = "block";
   out.textContent = "実行中…";
+  $("#codeViewFix").classList.remove("on");
   const result = await runSandboxedJs(current.code);
   out.textContent = result;
+  if (result.startsWith("エラー:")) {
+    const errMsg = result.slice(4).trim();
+    showCvFix(`実行エラー：${errMsg}`);
+    void autoRepair(errMsg, "js");
+  }
 }
 
+function showCvFix(msg: string): void {
+  $("#codeViewFixMsg").textContent = msg;
+  $("#codeViewFix").classList.add("on");
+}
+
+function showPvFix(msg: string): void {
+  $("#pvFixMsg").textContent = msg;
+  $("#pvFix").classList.add("on");
+}
+
+
+/* ---------- エラー自動修復（Gemini優先でAIに直させる） ---------- */
+
+interface ArtifactRef {
+  sessId: string;
+  msgIdx: number;
+  blockIdx: number;
+}
+let currentRef: ArtifactRef | null = null;
+
+function extractFixedCode(text: string): string | null {
+  const fenced = text.match(/```(?:\w+)?\s*\n([\s\S]*?)```/);
+  if (fenced && fenced[1].trim()) return fenced[1].trim();
+  const docStart = text.search(/<!DOCTYPE html|<html[\s>]/i);
+  if (docStart >= 0) return text.slice(docStart).trim();
+  return null;
+}
+
+/** 会話内の該当コードブロックを直したコードで置き換える */
+function writeBackFixed(newCode: string): boolean {
+  if (!currentRef) return false;
+  const sess = state.sessions.find((x) => x.id === currentRef?.sessId);
+  const msg = sess?.messages[currentRef.msgIdx];
+  if (!sess || !msg || msg.role !== "assistant") return false;
+  let n = -1;
+  const replaced = msg.content.replace(/```(\w*)\s*\n([\s\S]*?)```/g, (whole, lang: string) => {
+    n++;
+    if (n !== currentRef?.blockIdx) return whole;
+    return "```" + (lang || current.lang) + "\n" + newCode + "\n```";
+  });
+  if (n < currentRef.blockIdx) return false;
+  msg.content = replaced;
+  persistSessions();
+  renderChat();
+  return true;
+}
+
+let repairing = false;
+
+/**
+ * エラーが出たコードをAIに直させる。
+ * Geminiのキーが入っていればGeminiを、無ければ現在のプロバイダーを使う。
+ */
+export async function autoRepair(errMsg: string, source: "js" | "preview", manual = false): Promise<void> {
+  if (repairing) return;
+  const gemini = PROVIDERS.find((p) => p.id === "gemini");
+  const useGemini = gemini && (state.keys.gemini || "").trim();
+  const prov = useGemini ? gemini : PROVIDERS.find((p) => p.id === state.conf.provider) ?? gemini;
+  if (!prov) return;
+  const key = (state.keys[prov.id] || "").trim();
+  const status = (t: string): void => {
+    if (source === "js") showCvFix(t);
+    else showPvFix(t);
+  };
+  if (!key) {
+    status(`修復には${prov.name}のキー設定が必要です。対処：設定でキーを貼ってから「AIで直す」を押してください。`);
+    return;
+  }
+  repairing = true;
+  status(`エラーを検知しました。${prov.name}で自動修復中…`);
+  const model = state.conf.models[prov.id] || prov.def || curModel();
+  const prompt =
+    `次の${current.lang || "コード"}にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n` +
+    `【エラー】\n${errMsg}\n\n【コード】\n\`\`\`${current.lang}\n${current.code}\n\`\`\``;
+  try {
+    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => undefined);
+    const fixed = extractFixedCode(full);
+    if (!fixed) {
+      status("AIの回答からコードを取り出せませんでした。「AIで直す」でもう一度お試しください。");
+      return;
+    }
+    current = { code: fixed, lang: current.lang };
+    writeBackFixed(fixed);
+    if (source === "js") {
+      $("#codeViewPre").textContent = fixed;
+      $("#codeViewGutter").textContent = fixed.split("\n").map((_, i) => String(i + 1)).join("\n");
+      status("直しました。再実行します。");
+      repairing = false;
+      await runCurrentAfterRepair();
+    } else {
+      pvToken = Math.random().toString(36).slice(2);
+      pvAutoTried = true;
+      ($("#pvFrame") as HTMLIFrameElement).srcdoc = withErrorHook(fixed, pvToken);
+      status("直しました。プレビューを更新しました。");
+      window.setTimeout(() => $("#pvFix").classList.remove("on"), 2600);
+    }
+    toast("エラーを自動修復しました");
+  } catch (e) {
+    status(`修復できませんでした：${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    repairing = false;
+  }
+}
+
+async function runCurrentAfterRepair(): Promise<void> {
+  const out = $("#codeViewOut");
+  out.style.display = "block";
+  const result = await runSandboxedJs(current.code);
+  out.textContent = result;
+  if (result.startsWith("エラー:")) {
+    showCvFix(`まだエラーが出ています：${result.slice(4).trim()}（「AIでエラーを直す」でもう一度試せます）`);
+  } else {
+    $("#codeViewFix").classList.remove("on");
+  }
+}

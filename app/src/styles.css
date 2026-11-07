@@ -445,3 +445,12 @@ body.mode-code #codeChip{display:inline-flex}
 .prov-chip.on{border-color:var(--accent);background:var(--accent-soft)}
 .menu-row{display:flex;width:100%;align-items:center;gap:12px;padding:15px 4px;font-size:15px;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer;font-family:inherit}
 .menu-row:last-child{border-bottom:0}
+
+.pv-fix{display:none;align-items:center;gap:10px;margin:10px 16px 0;padding:10px 12px;border:1px solid #E5C4B8;border-radius:12px;background:#FBEEE9}
+.pv-fix.on{display:flex}
+.pv-fix p{flex:1;font-size:13px;color:#8A3B22;line-height:1.5}
+.cv-fix{display:none;align-items:center;gap:10px;padding:10px 12px;border:1px solid #E5C4B8;border-radius:12px;background:#FBEEE9}
+.cv-fix.on{display:flex}
+.cv-fix p{flex:1;font-size:13px;color:#8A3B22;line-height:1.5}
+[data-theme="dark"] .pv-fix,[data-theme="dark"] .cv-fix{background:#3A2620;border-color:#5C3A2E}
+[data-theme="dark"] .pv-fix p,[data-theme="dark"] .cv-fix p{color:#F0BBA6}

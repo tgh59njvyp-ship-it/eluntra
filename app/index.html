@@ -295,6 +295,10 @@
       <button class="preset-chip" data-dev="3">PC</button>
       <button class="preset-chip" data-dev="4">全幅</button>
     </div>
+    <div class="pv-fix" id="pvFix">
+      <p id="pvFixMsg"></p>
+      <button class="btn primary sm" id="btnPvFix">AIで直す</button>
+    </div>
     <div class="pv-stage" id="pvStage">
       <div class="pv-holder" id="pvHolder">
         <iframe id="pvFrame" sandbox="allow-scripts" title="プレビュー"></iframe>
@@ -321,6 +325,10 @@
       <div class="cv-scroll">
         <div class="cv-gutter" id="codeViewGutter">1</div>
         <pre class="cv-pre" id="codeViewPre"></pre>
+      </div>
+      <div class="cv-fix" id="codeViewFix">
+        <p id="codeViewFixMsg"></p>
+        <button class="btn primary sm" id="btnCvFix">AIでエラーを直す</button>
       </div>
       <pre class="cv-out" id="codeViewOut"></pre>
     </div>

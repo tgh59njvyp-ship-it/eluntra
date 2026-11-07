@@ -477,6 +477,15 @@ body.mode-code #codeChip{display:inline-flex}
 .prov-chip.on{border-color:var(--accent);background:var(--accent-soft)}
 .menu-row{display:flex;width:100%;align-items:center;gap:12px;padding:15px 4px;font-size:15px;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer;font-family:inherit}
 .menu-row:last-child{border-bottom:0}
+
+.pv-fix{display:none;align-items:center;gap:10px;margin:10px 16px 0;padding:10px 12px;border:1px solid #E5C4B8;border-radius:12px;background:#FBEEE9}
+.pv-fix.on{display:flex}
+.pv-fix p{flex:1;font-size:13px;color:#8A3B22;line-height:1.5}
+.cv-fix{display:none;align-items:center;gap:10px;padding:10px 12px;border:1px solid #E5C4B8;border-radius:12px;background:#FBEEE9}
+.cv-fix.on{display:flex}
+.cv-fix p{flex:1;font-size:13px;color:#8A3B22;line-height:1.5}
+[data-theme="dark"] .pv-fix,[data-theme="dark"] .cv-fix{background:#3A2620;border-color:#5C3A2E}
+[data-theme="dark"] .pv-fix p,[data-theme="dark"] .cv-fix p{color:#F0BBA6}
 </style>
 </head>
 <body>
@@ -744,6 +753,10 @@ body.mode-code #codeChip{display:inline-flex}
       <button class="preset-chip" data-dev="3">PC</button>
       <button class="preset-chip" data-dev="4">全幅</button>
     </div>
+    <div class="pv-fix" id="pvFix">
+      <p id="pvFixMsg"></p>
+      <button class="btn primary sm" id="btnPvFix">AIで直す</button>
+    </div>
     <div class="pv-stage" id="pvStage">
       <div class="pv-holder" id="pvHolder">
         <iframe id="pvFrame" sandbox="allow-scripts" title="プレビュー"></iframe>
@@ -770,6 +783,10 @@ body.mode-code #codeChip{display:inline-flex}
       <div class="cv-scroll">
         <div class="cv-gutter" id="codeViewGutter">1</div>
         <pre class="cv-pre" id="codeViewPre"></pre>
+      </div>
+      <div class="cv-fix" id="codeViewFix">
+        <p id="codeViewFixMsg"></p>
+        <button class="btn primary sm" id="btnCvFix">AIでエラーを直す</button>
       </div>
       <pre class="cv-out" id="codeViewOut"></pre>
     </div>
@@ -965,8 +982,16 @@ function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFra
 
 
 
+
+
 /* ================= コード特化チャット（成果物まわり） ================= */
 const CODES_LS_KEY = "eluntra_codes";
+async function callChat(p, key, model, messages, onDelta){
+  if (p.type === "openai") return callOpenAI(p, key, model, messages, onDelta);
+  if (p.type === "gemini") return callGemini(p, key, model, messages, onDelta);
+  if (p.type === "anthropic") return callAnthropic(p, key, model, messages, onDelta);
+  return callCohere(p, key, model, messages, onDelta);
+}
 const CODE_LS_KEY = "eluntra_code";
 function codeIsLoggedIn(){ return !!authSess; }
 function normLang(raw, code){
@@ -1068,9 +1093,23 @@ function applyDevice(){
   frame.style.height = dev.h + "px";
   frame.style.transform = "scale(" + scale + ")";
 }
+let pvToken = "";
+let pvAutoTried = false;
+function withErrorHook(code, token){
+  const hook = "<script>window.addEventListener('error',function(e){parent.postMessage({__eluntraPv:'" + token + "',msg:String(e.message||'エラー')},'*')},true);" +
+    "window.addEventListener('unhandledrejection',function(e){parent.postMessage({__eluntraPv:'" + token + "',msg:String((e.reason&&e.reason.message)||e.reason||'非同期エラー')},'*')});</" + "script>";
+  const doctype = code.match(/^\s*<!DOCTYPE[^>]*>/i);
+  if (doctype) return doctype[0] + hook + code.slice(doctype[0].length);
+  const head = code.match(/<head[^>]*>/i);
+  if (head && head.index !== undefined){ const at = head.index + head[0].length; return code.slice(0, at) + hook + code.slice(at); }
+  return hook + code;
+}
 function openPreview(a){
   currentArtifact = a;
-  $("#pvFrame").srcdoc = a.code;
+  pvToken = Math.random().toString(36).slice(2);
+  pvAutoTried = false;
+  $("#pvFix").classList.remove("on");
+  $("#pvFrame").srcdoc = withErrorHook(a.code, pvToken);
   openSheet("previewSheet");
   setTimeout(applyDevice, 60);
 }
@@ -1091,18 +1130,94 @@ async function copyCurrent(){
   try { await navigator.clipboard.writeText(currentArtifact.code); toast("コードをコピーしました"); }
   catch (e) { toast("コピーできませんでした"); }
 }
+function showCvFix(msg){ $("#codeViewFixMsg").textContent = msg; $("#codeViewFix").classList.add("on"); }
+function showPvFix(msg){ $("#pvFixMsg").textContent = msg; $("#pvFix").classList.add("on"); }
 async function runCurrent(){
   const out = $("#codeViewOut");
   out.style.display = "block";
   out.textContent = "実行中…";
-  out.textContent = await runSandboxedJs(currentArtifact.code);
+  $("#codeViewFix").classList.remove("on");
+  const result = await runSandboxedJs(currentArtifact.code);
+  out.textContent = result;
+  if (result.startsWith("エラー:")){
+    const errMsg = result.slice(4).trim();
+    showCvFix("実行エラー：" + errMsg);
+    autoRepair(errMsg, "js");
+  }
+}
+let currentRef = null;
+let repairing = false;
+function extractFixedCode(text){
+  const fenced = text.match(/```(?:\w+)?\s*\n([\s\S]*?)```/);
+  if (fenced && fenced[1].trim()) return fenced[1].trim();
+  const docStart = text.search(/<!DOCTYPE html|<html[\s>]/i);
+  if (docStart >= 0) return text.slice(docStart).trim();
+  return null;
+}
+function writeBackFixed(newCode){
+  if (!currentRef) return false;
+  const sess = sessions.find(x => x.id === currentRef.sessId);
+  const msg = sess ? sess.messages[currentRef.msgIdx] : null;
+  if (!sess || !msg || msg.role !== "assistant") return false;
+  let n = -1;
+  const replaced = msg.content.replace(/```(\w*)\s*\n([\s\S]*?)```/g, whole => {
+    n++;
+    if (n !== currentRef.blockIdx) return whole;
+    return "```" + (currentArtifact.lang || "") + "\n" + newCode + "\n```";
+  });
+  if (n < currentRef.blockIdx) return false;
+  msg.content = replaced;
+  save(LS.sess, sessions);
+  renderAll();
+  return true;
+}
+async function autoRepair(errMsg, source, manual = false){
+  if (repairing) return;
+  const gemini = PROVIDERS.find(p => p.id === "gemini");
+  const useGemini = gemini && (keys.gemini || "").trim();
+  const prov = useGemini ? gemini : curProv();
+  const key = (keys[prov.id] || "").trim();
+  const status = t => { if (source === "js") showCvFix(t); else showPvFix(t); };
+  if (!key){ status("修復には" + prov.name + "のキー設定が必要です。対処：設定でキーを貼ってから「AIで直す」を押してください。"); return; }
+  repairing = true;
+  status("エラーを検知しました。" + prov.name + "で自動修復中…");
+  const model = conf.models[prov.id] || prov.def;
+  const prompt = "次の" + (currentArtifact.lang || "コード") + "にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n【エラー】\n" + errMsg + "\n\n【コード】\n```" + currentArtifact.lang + "\n" + currentArtifact.code + "\n```";
+  try {
+    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => {});
+    const fixed = extractFixedCode(full);
+    if (!fixed){ status("AIの回答からコードを取り出せませんでした。「AIで直す」でもう一度お試しください。"); return; }
+    currentArtifact = { code: fixed, lang: currentArtifact.lang };
+    writeBackFixed(fixed);
+    if (source === "js"){
+      $("#codeViewPre").textContent = fixed;
+      $("#codeViewGutter").textContent = fixed.split("\n").map((_, i) => String(i + 1)).join("\n");
+      status("直しました。再実行します。");
+      repairing = false;
+      const out = $("#codeViewOut");
+      const result = await runSandboxedJs(currentArtifact.code);
+      out.textContent = result;
+      if (result.startsWith("エラー:")) showCvFix("まだエラーが出ています：" + result.slice(4).trim() + "（「AIでエラーを直す」でもう一度試せます）");
+      else $("#codeViewFix").classList.remove("on");
+    } else {
+      pvToken = Math.random().toString(36).slice(2);
+      pvAutoTried = true;
+      $("#pvFrame").srcdoc = withErrorHook(fixed, pvToken);
+      status("直しました。プレビューを更新しました。");
+      setTimeout(() => $("#pvFix").classList.remove("on"), 2600);
+    }
+    toast("エラーを自動修復しました");
+  } catch (e) {
+    status("修復できませんでした：" + (e instanceof Error ? e.message : String(e)));
+  } finally {
+    repairing = false;
+  }
 }
 function applyMode(){
   const isCode = conf.mode === "code";
   document.body.classList.toggle("mode-code", isCode);
   $("#btnModeLogo").classList.toggle("on", isCode);
-  $("#input").placeholder = isCode ? "作りたいものを説明してください" : "AIに質問してみよう";
-  $("#btnPlusMode").textContent = isCode ? "チャットモードに切り替え" : "コードモードに切り替え";
+  $("#input").placeholder = isCode ? "作りたいものを説明してください（例：タイマーのページ）" : "AIに質問してみよう";
 }
 function toggleMode(){
   conf.mode = conf.mode === "code" ? "chat" : "code";
@@ -1123,6 +1238,13 @@ function initCodeUI(){
     const codeEl = pre ? pre.querySelector("code") : null;
     if (!codeEl) return;
     const artifact = { code: codeEl.textContent || "", lang: normLang(codeEl.getAttribute("data-lang") || "", codeEl.textContent || "") };
+    const msgNode = btn.closest(".msg");
+    const sess = curSession();
+    if (msgNode && sess){
+      const msgIdx = [...document.querySelectorAll("#chatCol .msg")].indexOf(msgNode);
+      const blockIdx = [...msgNode.querySelectorAll("pre")].indexOf(pre);
+      if (msgIdx >= 0 && blockIdx >= 0) currentRef = { sessId: sess.id, msgIdx, blockIdx };
+    }
     const act = btn.getAttribute("data-cact");
     if (act === "preview") openPreview(artifact);
     else if (act === "code") openCodeView(artifact);
@@ -1143,6 +1265,17 @@ function initCodeUI(){
   $("#btnCvRun").addEventListener("click", runCurrent);
   $("#btnPubClose").addEventListener("click", () => closeSheet("publishSheet"));
   $("#btnPubCopy").addEventListener("click", copyCurrent);
+  $("#btnCvFix").addEventListener("click", () => {
+    const out = $("#codeViewOut").textContent || "";
+    autoRepair(out.startsWith("エラー:") ? out.slice(4).trim() : "実行エラー", "js", true);
+  });
+  $("#btnPvFix").addEventListener("click", () => autoRepair($("#pvFixMsg").textContent || "エラー", "preview", true));
+  window.addEventListener("message", e => {
+    const d = e.data;
+    if (!d || d.__eluntraPv !== pvToken || !pvToken) return;
+    showPvFix("プレビューでエラー：" + (d.msg || "不明なエラー"));
+    if (!pvAutoTried){ pvAutoTried = true; autoRepair(d.msg || "不明なエラー", "preview"); }
+  });
   $("#btnModeLogo").addEventListener("click", toggleMode);
 }
 
@@ -1716,6 +1849,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
 
 /* ================= Init ================= */
 (function init(){
+  let lastErrToast = 0;
+  window.addEventListener("error", () => { const now = Date.now(); if (now - lastErrToast > 8000) { lastErrToast = now; toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。"); } });
+  window.addEventListener("unhandledrejection", () => { const now = Date.now(); if (now - lastErrToast > 8000) { lastErrToast = now; toast("問題が発生しました。直らない場合は、画面を再読み込みしてください。"); } });
   currentId=null;ensureSession();
   const savedTheme=load(LS.theme,null);
   const prefersDark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;
