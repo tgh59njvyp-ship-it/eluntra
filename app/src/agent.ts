@@ -1,4 +1,4 @@
-import { apiFetch, effBase, effToken, friendlyError } from "./api";
+import { apiFetch, effBase, effToken, friendlyError, UserError } from "./api";
 import { isLoggedIn, pushSync} from "./auth";
 import { persistNotes, runtime, state} from "./state";
 import type { Message, Provider} from "./types";
@@ -198,7 +198,7 @@ headers: { "Content-Type": "application/json",...headers},
 body: JSON.stringify(body),
 signal: runtime.abortCtl?.signal?? ctl.signal,
 });
-if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
 return (await res.json()) as Record<string, unknown>;
 } finally {
 window.clearTimeout(timer);

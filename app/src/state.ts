@@ -87,10 +87,20 @@ export function isAuto(): boolean {
 }
 
 /** Auto選択時に実際に使うプロバイダー（接続テストOKを優先し、次に優先順位） */
+/** Autoの自動切替で、失敗した会社を一時的に候補から外す */
+const autoSkip = new Set<string>();
+export function skipAutoProviders(ids: string[]): void {
+  ids.forEach((id) => autoSkip.add(id));
+}
+export function clearAutoSkip(): void {
+  autoSkip.clear();
+}
+
 export function resolveAuto(): Provider | null {
   const cands = PROVIDERS.filter(
     (p) =>
       (state.keys[p.id] || "").trim() &&
+      !autoSkip.has(p.id) &&
       (p.id !== "sambanova" || state.conf.proxyOn !== false),
   );
   if (!cands.length) return null;

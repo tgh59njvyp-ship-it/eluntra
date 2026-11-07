@@ -12,7 +12,7 @@ import {
 import { runAgent } from "./agent";
 import { initCodeUI, verifyAndRepair } from "./code";
 import { copyRepairLog, installWatchdog, renderRepairPanel, runSelfRepair, setAutoRepair } from "./selfrepair";
-import { callChat, fetchModels, testConnection } from "./api";
+import { callWithFallback, fetchModels, testConnection, UserError } from "./api";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
 import {
@@ -34,9 +34,13 @@ import {
 } from "./render";
 import { md } from "./markdown";
 import {
+  clearAutoSkip,
   createSession,
   curModel,
   curProv,
+  isAuto,
+  resolveAuto,
+  skipAutoProviders,
   curSession,
   deleteSession,
   ensureSession,
@@ -262,16 +266,43 @@ async function sendMessage(): Promise<void> {
       if (isLoggedIn()) void pushSync();
       return;
     }
-    const full = await callChat(p, key, model, histForCall, onDelta);
+    let attemptP = p;
+    let attemptKey = key;
+    let attemptModel = model;
+    const tried: string[] = [];
+    let full = "";
+    for (;;) {
+      try {
+        full = await callWithFallback(attemptP, attemptKey, attemptModel, histForCall, onDelta);
+        break;
+      } catch (e) {
+        if (e instanceof UserError || (e instanceof DOMException && e.name === "AbortError")) throw e;
+        if (!isAuto()) throw e;
+        tried.push(attemptP.id);
+        skipAutoProviders(tried);
+        const next = resolveAuto();
+        if (!next || tried.includes(next.id)) {
+          clearAutoSkip();
+          throw e;
+        }
+        attemptP = next;
+        attemptKey = (state.keys[next.id] || "").trim();
+        attemptModel = state.conf.models[next.id] || next.def;
+        aiMsg.content = "";
+      }
+    }
+    clearAutoSkip();
     aiMsg.content = full;
     aiMsg.pending = false;
   } catch (e) {
     aiMsg.pending = false;
     if (e instanceof DOMException && e.name === "AbortError") {
       aiMsg.content = aiMsg.content || "（生成を止めました）";
-    } else {
+    } else if (e instanceof UserError) {
       aiMsg.content = "";
-      aiMsg.error = e instanceof Error ? e.message : String(e);
+      aiMsg.error = e.message;
+    } else if (!aiMsg.content) {
+      aiMsg.content = "いま応答が返ってきませんでした。少し時間をおいて、もう一度送ってください。";
     }
   }
   if (!aiMsg.error) await maybeVerify(s, aiMsg);
@@ -568,12 +599,12 @@ $("#btnFetchModels").addEventListener("click", () => {
     btn.disabled = true;
     btn.textContent = "取得中…";
     try {
-      const ids = await fetchModels(state.conf.provider);
+      const ids = await fetchModels(curProv().id);
       renderModelSheet(($("#modelSearch") as HTMLInputElement).value);
       renderAll();
       toast(`${ids.length}件のモデルを取得しました`);
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err));
+      toast(err instanceof UserError ? err.message : "モデル一覧を取得できませんでした");
     } finally {
       btn.disabled = false;
       btn.textContent = "一覧を取得";

@@ -47,9 +47,7 @@ async function fetchWithTimeout(
       host = "";
     }
     const orig = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
-    throw new Error(
-      `通信できませんでした（接続先：${host || "不明"}／方式：${proxyEnabled() ? "サーバー経由" : "直接接続"}／詳細：${orig}／版：v4.10）。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、この文面をそのまま教えてください。`,
-    );
+    throw new Error("通信できませんでした");
   } finally {
     window.clearTimeout(timer);
   }
@@ -58,8 +56,16 @@ async function fetchWithTimeout(
 /** 中継サーバー（Vercel）。ブラウザから直接つなげない会社のために経由する */
 export const PROXY_URL = "https://eluntra.vercel.app/api/proxy";
 
+/** ユーザー側の問題（キー違い・モデル無し等）だけを表すエラー。これ以外は画面に出さない */
+export class UserError extends Error {}
+
+let routeOverride: boolean | null = null;
+export function setRouteOverride(v: boolean | null): void {
+  routeOverride = v;
+}
+
 export function proxyEnabled(): boolean {
-  return state.conf.proxyOn !== false;
+  return routeOverride ?? state.conf.proxyOn !== false;
 }
 
 const SAMBA_PROXY_MSG =
@@ -133,7 +139,7 @@ export async function testConnection(pid: string): Promise<TestResult> {
     }
     return {
       ok: false,
-      msg: "通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）",
+      msg: "いま接続を確認できませんでした。対処：電波の良い場所でもう一度試してください。",
     };
   }
 }
@@ -145,7 +151,7 @@ export async function fetchModels(pid: string): Promise<string[]> {
   if (!key) throw new Error(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
   if (pid === "sambanova" && !proxyEnabled()) throw new Error(SAMBA_PROXY_MSG);
   const res = await modelsRequest(p, key);
-  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as {
     models?: Array<{ id?: string; name?: string } | string>;
     data?: Array<{ id?: string; name?: string } | string>;
@@ -219,7 +225,7 @@ export async function callOpenAI(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${effToken(p, key)}` },
     body: JSON.stringify({ model, messages: msgs, temperature: state.conf.temp, stream: true }),
   });
-  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   let full = "";
   full = await readSse(res, (j: { choices?: Array<{ delta?: { content?: string } }> }) => {
     const delta = j.choices?.[0]?.delta?.content || "";
@@ -265,7 +271,7 @@ export async function callGemini(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   let full = "";
   full = await readSse(
     res,
@@ -301,7 +307,7 @@ export async function callAnthropic(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as { content?: Array<{ text?: string }> };
   const full = (j.content || []).map((c) => c.text || "").join("");
   if (!full) throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
@@ -326,12 +332,49 @@ export async function callCohere(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as { message?: { content?: Array<{ text?: string }> } };
   const full = (j.message?.content || []).map((c) => c.text || "").join("");
   if (!full) throw new Error("応答が空でした。対処：モデルを変えるか、もう一度送ってください。");
   onDelta(full);
   return full;
+}
+
+/**
+ * 送信の自動リカバリ：まず現在の経路（サーバー経由 or 直接）で送り、
+ * 通信系の失敗なら経路を切り替えてもう一度送る。途中で文章が届いていれば
+ * それを答えとして返す。ユーザー側の問題（UserError）はそのまま投げる。
+ */
+export async function callWithFallback(
+  p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
+): Promise<string> {
+  let lastText = "";
+  const wrapped = (t: string): void => {
+    if (t) lastText = t;
+    onDelta(t);
+  };
+  const routes: Array<boolean | null> = [null, state.conf.proxyOn === false];
+  let lastErr: unknown = null;
+  for (const r of routes) {
+    setRouteOverride(r);
+    try {
+      const text = await callChat(p, key, model, history, wrapped);
+      setRouteOverride(null);
+      return text;
+    } catch (e) {
+      if (e instanceof UserError || (e instanceof DOMException && e.name === "AbortError")) {
+        setRouteOverride(null);
+        throw e;
+      }
+      lastErr = e;
+      if (lastText) {
+        setRouteOverride(null);
+        return lastText;
+      }
+    }
+  }
+  setRouteOverride(null);
+  throw lastErr instanceof Error ? lastErr : new Error("通信できませんでした");
 }
 
 /** プロバイダー種別に応じて送信関数を選ぶ */

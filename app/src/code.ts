@@ -1,5 +1,5 @@
 import { runSandboxedJs } from "./agent";
-import { callChat } from "./api";
+import { callWithFallback } from "./api";
 import { PROVIDERS } from "./providers";
 import { closeSheet, normLang, openSheet, renderChat } from "./render";
 import { curModel, curProv, curSession, persistSessions, state } from "./state";
@@ -368,7 +368,7 @@ async function repairCore(errMsg: string): Promise<string | null> {
     `次の${current.lang || "コード"}にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n` +
     `【エラー】\n${errMsg}\n\n【コード】\n\`\`\`${current.lang}\n${current.code}\n\`\`\``;
   try {
-    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => undefined);
+    const full = await callWithFallback(prov, key, model, [{ role: "user", content: prompt }], () => undefined);
     return extractFixedCode(full);
   } catch {
     return null;
