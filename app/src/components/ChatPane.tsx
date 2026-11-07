@@ -257,7 +257,7 @@ export function ChatPane({
             </span>
             {provider && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-3)" }}>
-                <ProviderTile mono={provider.mono} color={provider.color} />
+                <ProviderTile pid={provider.id} mono={provider.mono} color={provider.color} />
                 {provider.name}
               </span>
             )}

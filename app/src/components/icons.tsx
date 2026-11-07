@@ -32,7 +32,28 @@ export function Icon({ name, className = "ic" }: { name: string; className?: str
   );
 }
 
-export function ProviderTile({ mono, color, lg = false }: { mono: string; color: string; lg?: boolean }) {
+/* 公式ロゴ（public/logos/<id>.svg に同梱。出典は DESIGN.md に記録）。
+   ロゴが実在しない会社（llama.cpp）はモノグラムのままにする。 */
+const LOGO_IDS = new Set([
+  "openai", "gemini", "anthropic", "mistral", "groq", "openrouter", "cohere",
+  "cloudflare", "sambanova", "deepseek", "xai", "together", "fireworks",
+  "cerebras", "perplexity", "nvidia", "huggingface", "replicate", "bedrock",
+  "azure", "vertex", "githubmodels", "ai21", "alephalpha", "novita",
+  "hyperbolic", "siliconflow", "ollama", "lmstudio",
+]);
+
+export function hasLogo(id: string): boolean {
+  return LOGO_IDS.has(id);
+}
+
+export function ProviderTile({ pid, mono, color, lg = false }: { pid?: string; mono: string; color: string; lg?: boolean }) {
+  if (pid && LOGO_IDS.has(pid)) {
+    return (
+      <span className={`tile logo${lg ? " lg" : ""}`}>
+        <img src={`${import.meta.env.BASE_URL}logos/${pid}.svg`} alt="" loading="lazy" />
+      </span>
+    );
+  }
   return (
     <span className={`tile${lg ? " lg" : ""}`} style={{ color }}>
       {mono}

@@ -73,7 +73,7 @@ function ProviderItem({ p, toast }: { p: ProviderDef; toast: (m: string) => void
   return (
     <div className="prov-item">
       <button type="button" className="prov-head" onClick={() => setExpanded(!expanded)}>
-        <ProviderTile mono={p.mono} color={p.color} />
+        <ProviderTile pid={p.id} mono={p.mono} color={p.color} />
         <span style={{ flex: 1 }}>
           <span className="nm">{p.name}</span>
           <br />
@@ -234,7 +234,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.0</span>
+          <span className="pill-state">現在の版：v6.1</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>

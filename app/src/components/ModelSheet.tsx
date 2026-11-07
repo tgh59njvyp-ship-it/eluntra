@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { resolveAuto } from "../lib/auto";
 import { fetchModels } from "../lib/providers/chat";
 import { PROVIDERS, findProvider } from "../lib/providers/registry";
 import { UserError } from "../lib/providers/transport";
@@ -25,11 +26,13 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   const [onlyReady, setOnlyReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState("");
+  const [pvOpen, setPvOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
       setProviderId(conf.provider === "auto" ? "gemini" : conf.provider);
       setQuery("");
+      setPvOpen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open ]);
@@ -68,8 +71,17 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   const chooseAuto = () => {
     const st = getState();
     update({ conf: { ...st.conf, provider: "auto" } });
-    onClose();
+    setPvOpen(false);
   };
+
+  const applyProvider = (pid: string) => {
+    const st = getState();
+    update({ conf: { ...st.conf, provider: pid } });
+    setProviderId(pid);
+    setPvOpen(false);
+  };
+
+  const autoChoice = isAuto ? resolveAuto("") : null;
 
   const doFetch = async () => {
     setBusy(true);
@@ -102,30 +114,72 @@ export function ModelSheet({ open, onClose, toast }: Props) {
             接続済みのみ表示
           </label>
 
-          <div className="pv-grid">
-            <button type="button" className={`pv-card${isAuto ? " on" : ""}`} onClick={chooseAuto}>
-              <ProviderTile mono="Au" color="#2563eb" />
-              <span>
-                <span className="nm">Eluntra Auto</span>
-                <br />
-                <span className="st">質問に合わせて自動選択</span>
+          <div className="pv-select">
+            <button
+              type="button"
+              className="pv-box"
+              aria-expanded={pvOpen}
+              aria-label="プロバイダーを選ぶ"
+              onClick={() => setPvOpen(!pvOpen)}
+            >
+              {isAuto ? (
+                <ProviderTile mono="Au" color="#2563eb" lg />
+              ) : (
+                <ProviderTile pid={provider.id} mono={provider.mono} color={provider.color} lg />
+              )}
+              <span className="pv-box-main">
+                <span className="nm">{isAuto ? "Eluntra Auto" : provider.name}</span>
+                <span className="st">
+                  {isAuto
+                    ? autoChoice
+                      ? `質問に合わせて自動選択（目安：${autoChoice.provider.name}）`
+                      : "質問に合わせて自動選択"
+                    : keyStateLabel(providerId)}
+                </span>
+              </span>
+              <span className={`pv-box-chev${pvOpen ? " open" : ""}`}>
+                <Icon name="chevron" className="ic sm" />
               </span>
             </button>
-            {visibleProviders.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`pv-card${!isAuto && conf.provider === p.id ? " on" : ""}`}
-                onClick={() => setProviderId(p.id)}
-              >
-                <ProviderTile mono={p.mono} color={p.color} />
-                <span>
-                  <span className="nm">{p.name}</span>
-                  <br />
-                  <span className="st">{keyStateLabel(p.id)}</span>
-                </span>
-              </button>
-            ))}
+            {pvOpen && (
+              <div className="pv-list" role="listbox" aria-label="プロバイダー一覧">
+                <button type="button" className={`pv-row${isAuto ? " on" : ""}`} onClick={chooseAuto}>
+                  <ProviderTile mono="Au" color="#2563eb" />
+                  <span className="pv-row-main">
+                    <span className="nm">Eluntra Auto</span>
+                    <span className="st">質問に合わせて自動選択</span>
+                  </span>
+                  {isAuto && (
+                    <span className="chk"><Icon name="check" className="ic sm" /></span>
+                  )}
+                </button>
+                {visibleProviders.map((p) => {
+                  const selected = !isAuto && conf.provider === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`pv-row${selected ? " on" : ""}`}
+                      onClick={() => applyProvider(p.id)}
+                    >
+                      <ProviderTile pid={p.id} mono={p.mono} color={p.color} />
+                      <span className="pv-row-main">
+                        <span className="nm">{p.name}</span>
+                        <span className="st">{keyStateLabel(p.id)}</span>
+                      </span>
+                      {selected && (
+                        <span className="chk"><Icon name="check" className="ic sm" /></span>
+                      )}
+                    </button>
+                  );
+                })}
+                {visibleProviders.length === 0 && (
+                  <p className="set-desc" style={{ padding: "10px 12px" }}>
+                    接続済みのプロバイダーがありません。「接続済みのみ表示」を外すか、設定でキーを保存してください。
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="set-sec" style={{ marginTop: 4 }}>

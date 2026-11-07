@@ -60,3 +60,12 @@ v6.0は旧コードを流用せず、React + TypeScript で1から設計し直�
 - プロバイダーは「レジストリ＋アダプター」方式。会社追加はレジストリ1件＋必要ならアダプター1つ
 - エージェントはネイティブ関数呼び出しに依存しない「モデルがJSONでツールを選ぶ」方式で全社共通に動かす
 - 保存データ（localStorageキーと形式・Supabase同期先）は旧版と互換を維持し、ユーザーのキー・会話を引き継ぐ
+
+## v6.1（2026-11-07）プロバイダー選択ボックスと公式ロゴ
+
+- モデル選択シートのプロバイダー部分は、2列グリッドをやめて「選択ボックス」式にした：枠線のある横長の箱（公式ロゴ＋プロバイダー名＋接続状態＋シェブロン）をタップすると、縦スクロールのリストがシート内に展開する。先頭は Eluntra Auto、選択中にはチェック。選択するとリストが閉じ、ボックス表示が切り替わる。開閉は transform/opacity のみの軽いアニメーション
+- プロバイダー表示は頭文字モノグラムをやめ、各社の公式ブランドロゴ（SVGを `app/public/logos/` に同梱し、実行時に外部CDNへ取りに行かない）。表示は白地タイルにロゴを載せる形で統一
+- ロゴ出典（会社ごと）：
+  - Simple Icons：OpenAI（simple-icons v14系。現行版では削除されていたため当該バージョンから取得）／Google Gemini／Anthropic／Mistral AI／OpenRouter／Cloudflare／DeepSeek／Perplexity／NVIDIA／Hugging Face／Replicate／GitHub Models／Ollama／LM Studio
+  - Lobe Icons（@lobehub/icons-static-svg）：Groq／Cohere／SambaNova／xAI／Together AI／Fireworks AI／Cerebras／Amazon Bedrock／Azure／Google Vertex AI／AI21 Labs／Aleph Alpha／Novita AI／Hyperbolic／SiliconFlow（Lobeでは「SiliconCloud」表記）
+  - ロゴなし：llama.cpp（両ライブラリに公式マークが実在しないため、捏造せずモノグラムのまま）

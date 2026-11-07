@@ -43,7 +43,7 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "22px 0 8px" }}>
           {PROVIDERS.slice(0, 12).map((p) => (
             <span key={p.id} className="attach-chip" style={{ margin: 0 }}>
-              <ProviderTile mono={p.mono} color={p.color} />
+              <ProviderTile pid={p.id} mono={p.mono} color={p.color} />
               {p.name}
             </span>
           ))}

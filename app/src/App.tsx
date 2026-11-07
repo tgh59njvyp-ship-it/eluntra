@@ -325,7 +325,7 @@ export default function App() {
           </button>
           <button type="button" className="modelpill" onClick={() => setSheet("model")} aria-label="モデルを選ぶ">
             {pillProvider ? (
-              <ProviderTile mono={pillProvider.mono} color={pillProvider.color} />
+              <ProviderTile pid={pillProvider.id} mono={pillProvider.mono} color={pillProvider.color} />
             ) : (
               <ProviderTile mono="Au" color="#2563eb" />
             )}
