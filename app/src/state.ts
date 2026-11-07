@@ -36,7 +36,7 @@ export const state = {
   tested: load<Record<string, boolean>>(LS.tested, {}),
   fetchedModels: load<Record<string, string[]>>(LS.models, {}),
   conf: Object.assign(
-    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat" } as Config,
+    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium" } as Config,
     load<Partial<Config>>(LS.conf, {}),
   ),
   sessions: load<Session[]>(LS.sess, []),
@@ -151,7 +151,7 @@ export function resetAllData(): void {
   state.sessions = [];
   state.notes = [];
   state.currentId = null;
-  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat" };
+  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium" };
   PROVIDERS.forEach((p) => {
     state.conf.models[p.id] = p.def;
   });

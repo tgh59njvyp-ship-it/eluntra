@@ -67,6 +67,8 @@ export interface Config {
   agent: boolean;
   /** 画面モード：通常チャット／コード特化チャット */
   mode: "chat" | "code";
+  /** 生成の強さ */
+  effort: "low" | "medium" | "high" | "super";
 }
 
 export type KeyState = "ok" | "set" | "none";

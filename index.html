@@ -412,7 +412,6 @@ body.show-welcome #welcomeView{display:block}
 .mode-logo.on .ml-e{display:none}
 .mode-logo.on .ml-code{display:grid;place-items:center}
 .mode-logo.on .ml-code .ic{stroke:currentColor}
-body.mode-code #btnAgent{display:none}
 body.mode-code .send-btn{background:var(--ink)}
 
 /* コード成果物の操作バー */
@@ -490,6 +489,18 @@ body.mode-code #codeChip{display:inline-flex}
 .repair-toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-2);margin-top:6px}
 .repair-log{margin-top:12px;display:grid;gap:6px}
 .repair-log div{font-size:12.5px;color:var(--text-2);background:var(--bg-sub);border:1px solid var(--line);border-radius:10px;padding:8px 10px;line-height:1.55}
+
+/* ===== 最小UI（v4.7） ===== */
+.topbar .icon-btn{border-color:transparent;background:transparent}
+.mode-logo{border-color:transparent;background:transparent}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.model-pill{border:0;box-shadow:none;background:transparent}
+.composer-chips .key-pill{display:none}
+#codeChip{display:none!important}
+.msg.user .msg-body{background:var(--bg-sub)}
+.code-act{padding:6px 11px;font-size:12.5px}
+.effort-note{margin-left:auto;font-size:12px;color:var(--text-3)}
+.effort-row.on{font-weight:700}
 </style>
 </head>
 <body>
@@ -670,6 +681,7 @@ body.mode-code #codeChip{display:inline-flex}
         </div>
         <div class="composer-chips">
           <button class="chip" id="btnAgent" title="エージェントモードの切り替え">エージェント</button>
+          <button class="chip" id="btnEffort">Medium</button>
           <span class="chip static" id="codeChip">コードモード</span>
           <span class="spacer"></span>
           <button class="key-pill" id="keyStateLabel" type="button">キーを設定すると使えます</button>
@@ -839,6 +851,19 @@ body.mode-code #codeChip{display:inline-flex}
   </div>
 </div>
 
+<div class="sheet" id="effortSheet" role="dialog" aria-label="生成の強さ">
+  <div class="sheet-bg" data-close="effortSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-body">
+      <button class="menu-row effort-row" data-effort="low">Low<span class="effort-note">速く・最小限</span></button>
+      <button class="menu-row effort-row" data-effort="medium">Medium<span class="effort-note">標準</span></button>
+      <button class="menu-row effort-row" data-effort="high">High<span class="effort-note">生成後に自動チェック＆修復</span></button>
+      <button class="menu-row effort-row" data-effort="super">Super high<span class="effort-note">エージェント＋修復を繰り返す</span></button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script>
 "use strict";
@@ -884,7 +909,7 @@ const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let keys=load(LS.keys,{});
 let tested=load(LS.tested,{});
 let fetchedModels=load(LS.models,{});
-let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false,mode:"chat"},load(LS.conf,{}));
+let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false,mode:"chat",effort:"medium"},load(LS.conf,{}));
 PROVIDERS.forEach(p=>{if(!conf.models[p.id])conf.models[p.id]=p.def});
 let sessions=load(LS.sess,[]);
 let notes=load(LS.notes,[]);
@@ -973,9 +998,9 @@ function renderChat(){
       const st=keyState(p.id);
       return '<button class="prov-chip '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id,true)+'<span>'+esc(p.name)+'</span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
     }).join("");
-    col.innerHTML=(conf.mode==="code"?'<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>':'<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>')
-      +'<div class="sec-label">プロバイダー</div><div class="prov-row">'+provCells+'</div>'
-      +'<div class="sec-label">たとえば</div><div class="sugg">'+(conf.mode==="code"?CODE_SUGGESTIONS:SUGGESTIONS).map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
+    col.innerHTML=(conf.mode==="code"?'<div class="empty"><h1>何を作りますか。</h1>':'<div class="empty"><h1>何を聞きますか。</h1>')
+      +'<div class="prov-row">'+provCells+'</div>'
+      +'<div class="sugg">'+(conf.mode==="code"?CODE_SUGGESTIONS:SUGGESTIONS).map((t,i)=>'<button data-sugg="'+i+'"><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
     return;
   }
   col.innerHTML=s.messages.map((m,i)=>{try{return renderMsg(m,i,s)}catch(e){return '<div class="msg"><div class="msg-body"><p>このメッセージを表示できませんでした（データが壊れている可能性があります）。設定の「自己修復」で直せます。</p></div></div>'}}).join("");
@@ -983,11 +1008,12 @@ function renderChat(){
 }
 function renderMsg(m,i,s){
   const isUser=m.role==="user";
-  const foot=isUser?"":'<div class="msg-foot"><button class="foot-btn" data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span class="msg-model">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+" ・ "+esc(m.model||"")+'</span></div>';
+  const foot=isUser?"":'<div class="msg-foot"><button class="foot-btn" data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>';
   const stepsHtml=(m.steps&&m.steps.length)?'<div class="msg-steps">'+m.steps.map(st=>'<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(st)+'</span></div>').join("")+'</div>':"";
   return '<div class="msg'+(isUser?" user":"")+'">'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':isUser?md(m.content):addCodeActions(md(m.content)))+'</div>'+foot+'</div>';
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
+
 
 
 
@@ -1292,6 +1318,70 @@ function initCodeUI(){
   $("#btnModeLogo").addEventListener("click", toggleMode);
 }
 
+function effortNote(){
+  if (conf.effort === "low") return "最小限のコードで、簡潔に返してください。";
+  if (conf.effort === "high") return "丁寧に、動作を検証した完成度の高いコードにしてください。";
+  if (conf.effort === "super") return "段階的に考え、ツールも活用して、検証済みの完成コードにしてください。";
+  return "";
+}
+async function repairCore(errMsg){
+  const gemini = PROVIDERS.find(p => p.id === "gemini");
+  const useGemini = gemini && (keys.gemini || "").trim();
+  const prov = useGemini ? gemini : curProv();
+  const key = (keys[prov.id] || "").trim();
+  if (!key) return null;
+  const model = conf.models[prov.id] || prov.def;
+  const prompt = "次の" + (currentArtifact.lang || "コード") + "にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n【エラー】\n" + errMsg + "\n\n【コード】\n```" + currentArtifact.lang + "\n" + currentArtifact.code + "\n```";
+  try {
+    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => {});
+    return extractFixedCode(full);
+  } catch (e) { return null; }
+}
+async function checkArtifact(code, lang){
+  if (lang === "javascript" || lang === "js"){
+    const r = await runSandboxedJs(code);
+    return r.startsWith("エラー:") ? r.slice(4).trim() : null;
+  }
+  if (lang === "html"){
+    return await new Promise(resolve => {
+      const token = Math.random().toString(36).slice(2);
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("sandbox", "allow-scripts");
+      iframe.style.display = "none";
+      let done = false;
+      const onMsg = e => { const d = e.data; if (d && d.__eluntraPv === token) finish(d.msg || "エラー"); };
+      const finish = v => { if (done) return; done = true; clearTimeout(timer); window.removeEventListener("message", onMsg); iframe.remove(); resolve(v); };
+      const timer = setTimeout(() => finish(null), 1600);
+      window.addEventListener("message", onMsg);
+      iframe.srcdoc = withErrorHook(code, token);
+      document.body.appendChild(iframe);
+    });
+  }
+  return null;
+}
+async function verifyAndRepair(sessId, msgIdx, maxFix){
+  const sess = sessions.find(x => x.id === sessId);
+  const msg = sess ? sess.messages[msgIdx] : null;
+  if (!sess || !msg || msg.role !== "assistant") return;
+  const m = msg.content.match(/```(\w*)\s*\n([\s\S]*?)```/);
+  if (!m) return;
+  let code = m[2];
+  const lang = normLang(m[1] || "", code);
+  if (lang !== "javascript" && lang !== "js" && lang !== "html") return;
+  for (let attempt = 0; attempt <= maxFix; attempt++){
+    const err = await checkArtifact(code, lang);
+    if (!err){ if (attempt > 0) toast("コードを自動チェックし、修復しました"); return; }
+    if (attempt === maxFix) return;
+    currentArtifact = { code, lang };
+    currentRef = { sessId, msgIdx, blockIdx: 0 };
+    const fixed = await repairCore(err);
+    if (!fixed) return;
+    currentArtifact = { code: fixed, lang };
+    writeBackFixed(fixed);
+    code = fixed;
+  }
+}
+
 /* ================= 自己修復 ================= */
 const ERR_LOG_KEY = "eluntra_error_log";
 const REPAIR_LOG_KEY = "eluntra_repair_log";
@@ -1512,7 +1602,7 @@ function renderAccount(){
     +'<button class="btn danger" id="btnLogout" style="width:100%;margin-top:10px">'+LOGOUT_SVG+'<span>ログアウト</span></button>'
     +'<p class="login-note">同期されるのは会話と設定だけです。APIキーはこの端末の中にだけ残ります。</p>'}
 
-function renderAll(){const ag=$("#btnAgent");if(ag)ag.classList.toggle("on",!!conf.agent);ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
+function renderAll(){const ag=$("#btnAgent");if(ag)ag.classList.toggle("on",!!conf.agent);const efb=$("#btnEffort");if(efb)efb.textContent={low:"Low",medium:"Medium",high:"High",super:"Super high"}[conf.effort||"medium"];document.querySelectorAll(".effort-row").forEach(r=>r.classList.toggle("on",r.getAttribute("data-effort")===(conf.effort||"medium")));ensureSession();renderPills();renderProvStatus();renderSessions();renderChat();save(LS.conf,conf)}
 
 /* ================= API ================= */
 function friendlyError(status,bodyText,p){
@@ -1827,11 +1917,12 @@ async function sendMessage(){
   }
   generating=true;abortCtl=new AbortController();setSendBtn(true);
   const histForCall=s.messages.slice(0,-1).filter(m=>m.content&&m.content!=="__NOKEY__");
-  if(conf.mode==="code"){const rev=[...histForCall].reverse().find(m=>m.role==="user");if(rev){const ix=histForCall.indexOf(rev);histForCall[ix]={...rev,content:"【コード作成の指示】あなたはコード作成に特化したAIです。依頼に対して、動作する完成コードを ```言語名 のコードブロックで返してください。Webページやアプリは単一HTMLファイル（CSSとJavaScriptを内蔵）で完結させてください。説明は最小限にし、コードを主役にしてください。修正の依頼では、変更後のコード全体を返してください。\n\n【依頼】\n"+rev.content}}}
+  if(conf.mode==="code"){const rev=[...histForCall].reverse().find(m=>m.role==="user");if(rev){const ix=histForCall.indexOf(rev);histForCall[ix]={...rev,content:"【コード作成の指示】あなたはコード作成に特化したAIです。依頼に対して、動作する完成コードを ```言語名 のコードブロックで返してください。Webページやアプリは単一HTMLファイル（CSSとJavaScriptを内蔵）で完結させてください。説明は最小限にし、コードを主役にしてください。修正の依頼では、変更後のコード全体を返してください。"+effortNote()+"\n\n【依頼】\n"+rev.content}}}
+  else if(conf.effort&&conf.effort!=="medium"){const rev2=[...histForCall].reverse().find(m=>m.role==="user");if(rev2){const ix2=histForCall.indexOf(rev2);const note=conf.effort==="low"?"（簡潔に短く答えてください）":conf.effort==="high"?"（詳しく丁寧に答えてください）":"（段階的に深く考えてから、詳しく答えてください）";histForCall[ix2]={...rev2,content:rev2.content+"\n"+note}}}
   const onDelta=full=>{aiMsg.content=full;aiMsg.pending=false;updateStreamingMsg(s,aiMsg)};
   try{
     let full="";
-    if(conf.agent&&conf.mode!=="code"){
+    if(conf.agent||(conf.mode==="code"&&conf.effort==="super")){
       const r=await runAgent(p,key,model,histForCall,steps=>{aiMsg.steps=steps;aiMsg.pending=false;aiMsg.content=aiMsg.content||"エージェントが作業中です…";updateStreamingMsg(s,aiMsg)});
       aiMsg.steps=r.steps;full=r.text;
     }
@@ -1845,6 +1936,7 @@ async function sendMessage(){
     if(e&&e.name==="AbortError"){aiMsg.content=aiMsg.content||"（生成を止めました）"}
     else{aiMsg.content="";aiMsg.error=e.message||String(e)}
   }
+  if(!aiMsg.error&&conf.mode==="code"&&(conf.effort==="high"||conf.effort==="super")){await verifyAndRepair(s.id,s.messages.indexOf(aiMsg),conf.effort==="super"?2:1)}
   generating=false;abortCtl=null;setSendBtn(false);
   save(LS.sess,sessions);renderChat();
   if(aiMsg.error){showErrorBanner(aiMsg.error,p)}
@@ -1984,6 +2076,8 @@ $("#btnPlus").addEventListener("click",()=>{openSheet("plusSheet")});
 $("#btnPlusSettings").addEventListener("click",()=>{openSettings(conf.provider)});
 $("#btnThemePlus").addEventListener("click",toggleTheme);
 $("#btnPlusMode").addEventListener("click",()=>{toggleMode()});
+$("#btnEffort").addEventListener("click",()=>{openSheet("effortSheet")});
+document.querySelectorAll(".effort-row").forEach(r=>{r.addEventListener("click",()=>{const v=r.getAttribute("data-effort");if(["low","medium","high","super"].includes(v)){conf.effort=v;save(LS.conf,conf);renderAll();closeSheet("effortSheet");toast("強さを "+({low:"Low",medium:"Medium",high:"High",super:"Super high"})[v]+" にしました")}})});
 $("#btnAgent").addEventListener("click",()=>{conf.agent=!conf.agent;save(LS.conf,conf);renderAll();toast(conf.agent?"エージェントモードをオンにしました（ツールを使いながら回答します）":"エージェントモードをオフにしました")});
 document.addEventListener("click",e=>{const dn=e.target.closest("[data-del-note]");if(!dn)return;const nid=dn.getAttribute("data-del-note");notes=notes.filter(n=>n.id!==nid);save(LS.notes,notes);if(authSess)pushSync();renderNotes();toast("メモを削除しました")});
 $("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});

@@ -10,7 +10,7 @@ import {
   type OAuthProvider,
 } from "./auth";
 import { runAgent } from "./agent";
-import { initCodeUI } from "./code";
+import { initCodeUI, verifyAndRepair } from "./code";
 import { copyRepairLog, installWatchdog, renderRepairPanel, runSelfRepair, setAutoRepair } from "./selfrepair";
 import { callChat, fetchModels, testConnection } from "./api";
 import { logoTile } from "./logos";
@@ -202,6 +202,14 @@ async function sendMessage(): Promise<void> {
   const histForCall = s.messages
     .slice(0, -1)
     .filter((m) => m.content && m.content !== "__NOKEY__");
+  const effortNote =
+    state.conf.effort === "low"
+      ? "最小限のコードで、簡潔に返してください。"
+      : state.conf.effort === "high"
+        ? "丁寧に、動作を検証した完成度の高いコードにしてください。"
+        : state.conf.effort === "super"
+          ? "段階的に考え、ツールも活用して、検証済みの完成コードにしてください。"
+          : "";
   if (state.conf.mode === "code") {
     const lastUser = [...histForCall].reverse().find((m) => m.role === "user");
     if (lastUser) {
@@ -211,8 +219,22 @@ async function sendMessage(): Promise<void> {
         content:
           "【コード作成の指示】あなたはコード作成に特化したAIです。依頼に対して、動作する完成コードを ```言語名 のコードブロックで返してください。" +
           "Webページやアプリは単一HTMLファイル（CSSとJavaScriptを内蔵）で完結させてください。説明は最小限にし、コードを主役にしてください。" +
-          "修正の依頼では、変更後のコード全体を返してください。\n\n【依頼】\n" + lastUser.content,
+          "修正の依頼では、変更後のコード全体を返してください。" +
+          effortNote +
+          "\n\n【依頼】\n" + lastUser.content,
       };
+    }
+  } else if (state.conf.effort !== "medium") {
+    const lastUser = [...histForCall].reverse().find((m) => m.role === "user");
+    if (lastUser) {
+      const idx = histForCall.indexOf(lastUser);
+      const note =
+        state.conf.effort === "low"
+          ? "（簡潔に短く答えてください）"
+          : state.conf.effort === "high"
+            ? "（詳しく丁寧に答えてください）"
+            : "（段階的に深く考えてから、詳しく答えてください）";
+      histForCall[idx] = { ...lastUser, content: lastUser.content + "\n" + note };
     }
   }
   const onDelta = (full: string): void => {
@@ -221,7 +243,7 @@ async function sendMessage(): Promise<void> {
     updateStreamingMsg(s, aiMsg);
   };
   try {
-    if (state.conf.agent && state.conf.mode !== "code") {
+    if (state.conf.agent || (state.conf.mode === "code" && state.conf.effort === "super")) {
       const r = await runAgent(p, key, model, histForCall, (steps) => {
         aiMsg.steps = steps;
         aiMsg.pending = false;
@@ -236,6 +258,7 @@ async function sendMessage(): Promise<void> {
       setSendBtn(false);
       persistSessions();
       renderAll();
+      await maybeVerify(s, aiMsg);
       if (isLoggedIn()) void pushSync();
       return;
     }
@@ -251,6 +274,7 @@ async function sendMessage(): Promise<void> {
       aiMsg.error = e instanceof Error ? e.message : String(e);
     }
   }
+  if (!aiMsg.error) await maybeVerify(s, aiMsg);
   runtime.generating = false;
   runtime.abortCtl = null;
   setSendBtn(false);
@@ -258,6 +282,16 @@ async function sendMessage(): Promise<void> {
   renderAll();
   if (!aiMsg.error && isLoggedIn()) void pushSync();
   if (aiMsg.error) showErrorBanner(aiMsg.error, p);
+}
+
+/** コードモードのHigh／Super high：生成コードを裏で検証し、エラー時はAI修復する */
+async function maybeVerify(s: Session, aiMsg: Message): Promise<void> {
+  if (state.conf.mode !== "code") return;
+  const ef = state.conf.effort;
+  if (ef !== "high" && ef !== "super") return;
+  const idx = s.messages.indexOf(aiMsg);
+  if (idx < 0) return;
+  await verifyAndRepair(s.id, idx, ef === "super" ? 2 : 1);
 }
 
 /* ---------- モード切替（左上ロゴ） ---------- */
@@ -547,6 +581,20 @@ $("#btnPlusSettings").addEventListener("click", () => {
 $("#btnThemePlus").addEventListener("click", toggleTheme);
 $("#btnPlusMode").addEventListener("click", () => {
   toggleMode();
+});
+$("#btnEffort").addEventListener("click", () => openSheet("effortSheet"));
+document.querySelectorAll(".effort-row").forEach((r) => {
+  r.addEventListener("click", () => {
+    const v = r.getAttribute("data-effort");
+    if (v === "low" || v === "medium" || v === "high" || v === "super") {
+      state.conf.effort = v;
+      persistConf();
+      renderAll();
+      closeSheet("effortSheet");
+      toast(`強さを ${v === "low" ? "Low" : v === "medium" ? "Medium" : v === "high" ? "High" : "Super high"} にしました`);
+      if (isLoggedIn()) void pushSync();
+    }
+  });
 });
 $("#btnAgent").addEventListener("click", () => {
   state.conf.agent = !state.conf.agent;

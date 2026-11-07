@@ -380,7 +380,6 @@ body.show-welcome #welcomeView{display:block}
 .mode-logo.on .ml-e{display:none}
 .mode-logo.on .ml-code{display:grid;place-items:center}
 .mode-logo.on .ml-code .ic{stroke:currentColor}
-body.mode-code #btnAgent{display:none}
 body.mode-code .send-btn{background:var(--ink)}
 
 /* コード成果物の操作バー */
@@ -458,3 +457,15 @@ body.mode-code #codeChip{display:inline-flex}
 .repair-toggle{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-2);margin-top:6px}
 .repair-log{margin-top:12px;display:grid;gap:6px}
 .repair-log div{font-size:12.5px;color:var(--text-2);background:var(--bg-sub);border:1px solid var(--line);border-radius:10px;padding:8px 10px;line-height:1.55}
+
+/* ===== 最小UI（v4.7） ===== */
+.topbar .icon-btn{border-color:transparent;background:transparent}
+.mode-logo{border-color:transparent;background:transparent}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.model-pill{border:0;box-shadow:none;background:transparent}
+.composer-chips .key-pill{display:none}
+#codeChip{display:none!important}
+.msg.user .msg-body{background:var(--bg-sub)}
+.code-act{padding:6px 11px;font-size:12.5px}
+.effort-note{margin-left:auto;font-size:12px;color:var(--text-3)}
+.effort-row.on{font-weight:700}

@@ -208,6 +208,7 @@
         </div>
         <div class="composer-chips">
           <button class="chip" id="btnAgent" title="エージェントモードの切り替え">エージェント</button>
+          <button class="chip" id="btnEffort">Medium</button>
           <span class="chip static" id="codeChip">コードモード</span>
           <span class="spacer"></span>
           <button class="key-pill" id="keyStateLabel" type="button">キーを設定すると使えます</button>
@@ -373,6 +374,19 @@
       <button class="menu-row" id="btnExport" data-close="plusSheet">会話を書き出し</button>
       <button class="menu-row" id="btnPlusSettings" data-close="plusSheet">設定（キー・モデル）</button>
       <button class="menu-row" id="btnThemePlus" data-close="plusSheet">ダークモード切替</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="effortSheet" role="dialog" aria-label="生成の強さ">
+  <div class="sheet-bg" data-close="effortSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-body">
+      <button class="menu-row effort-row" data-effort="low">Low<span class="effort-note">速く・最小限</span></button>
+      <button class="menu-row effort-row" data-effort="medium">Medium<span class="effort-note">標準</span></button>
+      <button class="menu-row effort-row" data-effort="high">High<span class="effort-note">生成後に自動チェック＆修復</span></button>
+      <button class="menu-row effort-row" data-effort="super">Super high<span class="effort-note">エージェント＋修復を繰り返す</span></button>
     </div>
   </div>
 </div>

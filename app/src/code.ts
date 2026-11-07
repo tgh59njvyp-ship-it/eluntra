@@ -355,6 +355,26 @@ let repairing = false;
  * エラーが出たコードをAIに直させる。
  * Geminiのキーが入っていればGeminiを、無ければ現在のプロバイダーを使う。
  */
+/** AIにコードを直させる中核処理。直したコードを返す（失敗時はnull） */
+async function repairCore(errMsg: string): Promise<string | null> {
+  const gemini = PROVIDERS.find((p) => p.id === "gemini");
+  const useGemini = gemini && (state.keys.gemini || "").trim();
+  const prov = useGemini ? gemini : PROVIDERS.find((p) => p.id === state.conf.provider) ?? gemini;
+  if (!prov) return null;
+  const key = (state.keys[prov.id] || "").trim();
+  if (!key) return null;
+  const model = state.conf.models[prov.id] || prov.def || curModel();
+  const prompt =
+    `次の${current.lang || "コード"}にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n` +
+    `【エラー】\n${errMsg}\n\n【コード】\n\`\`\`${current.lang}\n${current.code}\n\`\`\``;
+  try {
+    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => undefined);
+    return extractFixedCode(full);
+  } catch {
+    return null;
+  }
+}
+
 export async function autoRepair(errMsg: string, source: "js" | "preview", manual = false): Promise<void> {
   if (repairing) return;
   const gemini = PROVIDERS.find((p) => p.id === "gemini");
@@ -372,15 +392,10 @@ export async function autoRepair(errMsg: string, source: "js" | "preview", manua
   }
   repairing = true;
   status(`エラーを検知しました。${prov.name}で自動修復中…`);
-  const model = state.conf.models[prov.id] || prov.def || curModel();
-  const prompt =
-    `次の${current.lang || "コード"}にはエラーがあります。エラーの原因を取り除き、全体が正しく動作する完成コードを、説明なしでコードブロック1つだけで返してください。\n\n` +
-    `【エラー】\n${errMsg}\n\n【コード】\n\`\`\`${current.lang}\n${current.code}\n\`\`\``;
   try {
-    const full = await callChat(prov, key, model, [{ role: "user", content: prompt }], () => undefined);
-    const fixed = extractFixedCode(full);
+    const fixed = await repairCore(errMsg);
     if (!fixed) {
-      status("AIの回答からコードを取り出せませんでした。「AIで直す」でもう一度お試しください。");
+      status("AIで直せませんでした。通信とキー設定を確認して、「AIで直す」でもう一度お試しください。");
       return;
     }
     current = { code: fixed, lang: current.lang };
@@ -399,10 +414,70 @@ export async function autoRepair(errMsg: string, source: "js" | "preview", manua
       window.setTimeout(() => $("#pvFix").classList.remove("on"), 2600);
     }
     toast("エラーを自動修復しました");
-  } catch (e) {
-    status(`修復できませんでした：${e instanceof Error ? e.message : String(e)}`);
   } finally {
     repairing = false;
+  }
+}
+
+/* ---------- 生成後の自動検証（High / Super high） ---------- */
+
+async function checkArtifact(code: string, lang: string): Promise<string | null> {
+  if (lang === "javascript" || lang === "js") {
+    const r = await runSandboxedJs(code);
+    return r.startsWith("エラー:") ? r.slice(4).trim() : null;
+  }
+  if (lang === "html") {
+    return await new Promise<string | null>((resolve) => {
+      const token = Math.random().toString(36).slice(2);
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("sandbox", "allow-scripts");
+      iframe.style.display = "none";
+      let done = false;
+      const onMsg = (e: MessageEvent): void => {
+        const d = e.data as { __eluntraPv?: string; msg?: string } | null;
+        if (d && d.__eluntraPv === token) finish(d.msg || "エラー");
+      };
+      const finish = (v: string | null): void => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onMsg);
+        iframe.remove();
+        resolve(v);
+      };
+      const timer = window.setTimeout(() => finish(null), 1600);
+      window.addEventListener("message", onMsg);
+      iframe.srcdoc = withErrorHook(code, token);
+      document.body.appendChild(iframe);
+    });
+  }
+  return null;
+}
+
+/** 生成されたコードを裏で実行チェックし、エラーがあれば最大maxFix回までAI修復する */
+export async function verifyAndRepair(sessId: string, msgIdx: number, maxFix: number): Promise<void> {
+  const sess = state.sessions.find((x) => x.id === sessId);
+  const msg = sess?.messages[msgIdx];
+  if (!sess || !msg || msg.role !== "assistant") return;
+  const m = msg.content.match(/```(\w*)\s*\n([\s\S]*?)```/);
+  if (!m) return;
+  let code = m[2];
+  const lang = normLang(m[1] || "", code);
+  if (lang !== "javascript" && lang !== "js" && lang !== "html") return;
+  for (let attempt = 0; attempt <= maxFix; attempt++) {
+    const err = await checkArtifact(code, lang);
+    if (!err) {
+      if (attempt > 0) toast("コードを自動チェックし、修復しました");
+      return;
+    }
+    if (attempt === maxFix) return;
+    current = { code, lang };
+    currentRef = { sessId, msgIdx, blockIdx: 0 };
+    const fixed = await repairCore(err);
+    if (!fixed) return;
+    current = { code: fixed, lang };
+    writeBackFixed(fixed);
+    code = fixed;
   }
 }
 

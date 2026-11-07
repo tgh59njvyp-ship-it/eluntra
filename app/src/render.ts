@@ -82,14 +82,14 @@ export function renderChat(): void {
     const sugg = isCode ? CODE_SUGGESTIONS : SUGGESTIONS;
     col.innerHTML =
       (isCode
-        ? '<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>'
-        : '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>') +
-      '<div class="sec-label">プロバイダー</div><div class="prov-row">' +
+        ? '<div class="empty"><h1>何を作りますか。</h1>'
+        : '<div class="empty"><h1>何を聞きますか。</h1>') +
+      '<div class="prov-row">' +
       provCells +
       '</div>' +
-      '<div class="sec-label">たとえば</div><div class="sugg">' +
+      '<div class="sugg">' +
       sugg.map(
-        (t, i) => `<button data-sugg="${i}"><span class="n">0${i + 1}</span><span>${esc(t)}</span></button>`,
+        (t, i) => `<button data-sugg="${i}"><span>${esc(t)}</span></button>`,
       ).join("") +
       "</div></div>";
     return;
@@ -112,7 +112,7 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const prov = PROVIDERS.find((x) => x.id === provId);
   const foot = isUser
     ? ""
-    : `<div class="msg-foot"><button class="foot-btn" data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span class="msg-model">${esc(prov?.name ?? "AI")} ・ ${esc(m.model || "")}</span></div>`;
+    : `<div class="msg-foot"><button class="foot-btn" data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>`;
   const stepsHtml = m.steps && m.steps.length
     ? `<div class="msg-steps">${m.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("")}</div>`
     : "";
@@ -202,9 +202,21 @@ export function renderAccount(): void {
     `<p class="login-note">同期されるのは会話と設定だけです。APIキーはこの端末の中にだけ残ります。</p>`;
 }
 
+export const EFFORT_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  super: "Super high",
+};
+
 export function renderAll(): void {
   const ag = document.querySelector<HTMLElement>("#btnAgent");
   if (ag) ag.classList.toggle("on", state.conf.agent);
+  const ef = document.querySelector<HTMLElement>("#btnEffort");
+  if (ef) ef.textContent = EFFORT_LABELS[state.conf.effort] || "Medium";
+  document.querySelectorAll(".effort-row").forEach((r) => {
+    r.classList.toggle("on", r.getAttribute("data-effort") === state.conf.effort);
+  });
   ensureSession();
   renderPills();
   renderProvStatus();
