@@ -198,29 +198,17 @@
           </div>
         </div>
         <div class="input-box">
+          <button class="plus-btn" id="btnPlus" aria-label="その他の操作">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
           <textarea id="input" rows="1" placeholder="AIに質問してみよう" enterkeyhint="send"></textarea>
           <button class="send-btn" id="btnSend" aria-label="送信">
             <svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
         </div>
-        <div class="composer-meta">
-          <button class="meta-btn" id="modelPillBottom">
-            <span class="logo-tile sm" id="pillMono2" style="width:20px;height:20px;border-radius:5px"></span>
-            <span id="pillLabel2">OpenAI ・ gpt-4o-mini</span>
-            <svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <span class="sep">|</span>
-          <button class="meta-btn" id="btnSys">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
-            システム
-          </button>
-          <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
-            エージェント
-          </button>
-          <button class="meta-btn" id="btnExport">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-            書き出し
-          </button>
+        <div class="composer-chips">
+          <button class="chip" id="btnAgent" title="エージェントモードの切り替え">エージェント</button>
+          <span class="chip static" id="codeChip">コードモード</span>
           <span class="spacer"></span>
           <button class="key-pill" id="keyStateLabel" type="button">キーを設定すると使えます</button>
         </div>
@@ -354,6 +342,20 @@
       <div id="publishEmbedBox">
         <script src="https://tgh59njvyp-ship-it.github.io/simple-url-server-redesigned/embed.js" data-key="sus_mj4ty7z6hyb8tw2iw33xcwvd"></script>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="plusSheet" role="dialog" aria-label="その他の操作">
+  <div class="sheet-bg" data-close="plusSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-body">
+      <button class="menu-row" id="btnPlusMode" data-close="plusSheet">コードモードに切り替え</button>
+      <button class="menu-row" id="btnSys" data-close="plusSheet">システムプロンプト</button>
+      <button class="menu-row" id="btnExport" data-close="plusSheet">会話を書き出し</button>
+      <button class="menu-row" id="btnPlusSettings" data-close="plusSheet">設定（キー・モデル）</button>
+      <button class="menu-row" id="btnThemePlus" data-close="plusSheet">ダークモード切替</button>
     </div>
   </div>
 </div>

@@ -266,8 +266,9 @@ export function applyMode(): void {
   document.body.classList.toggle("mode-code", isCode);
   $("#btnModeLogo").classList.toggle("on", isCode);
   ($("#input") as HTMLTextAreaElement).placeholder = isCode
-    ? "作りたいものを説明してください（例：タイマーのページ）"
+    ? "作りたいものを説明してください"
     : "AIに質問してみよう";
+  $("#btnPlusMode").textContent = isCode ? "チャットモードに切り替え" : "コードモードに切り替え";
 }
 
 function toggleMode(): void {
@@ -499,10 +500,6 @@ $("#btnTheme2").addEventListener("click", toggleTheme);
   openModelSheet();
   void autoFetchModels(state.conf.provider);
 });
- $("#modelPillBottom").addEventListener("click", () => {
-  openModelSheet();
-  void autoFetchModels(state.conf.provider);
-});
 $("#modelSearch").addEventListener("input", (e: Event) => {
   renderModelSheet((e.target as HTMLInputElement).value);
 });
@@ -538,6 +535,16 @@ $("#keyStateLabel").addEventListener("click", () => {
 });
 initCodeUI();
 $("#btnModeLogo").addEventListener("click", () => {
+  toggleMode();
+});
+$("#btnPlus").addEventListener("click", () => {
+  openSheet("plusSheet");
+});
+$("#btnPlusSettings").addEventListener("click", () => {
+  openSettings(state.conf.provider);
+});
+$("#btnThemePlus").addEventListener("click", toggleTheme);
+$("#btnPlusMode").addEventListener("click", () => {
   toggleMode();
 });
 $("#btnAgent").addEventListener("click", () => {

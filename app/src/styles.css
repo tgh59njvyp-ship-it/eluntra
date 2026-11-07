@@ -409,3 +409,39 @@ body.mode-code .send-btn{background:var(--ink)}
 .pub-body{overflow-y:auto}
 #publishEmbedBox iframe{margin:0 auto}
 .topbar .icon-btn{width:38px;height:38px}
+
+/* ===== クリーンUI（v4.4） ===== */
+.topbar{border-bottom:0}
+.topbar .icon-btn{border:1px solid var(--line);border-radius:50%;background:var(--surface)}
+.topbar #btnSettingsTop{display:none}
+.mode-logo{border-radius:50%;background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.model-pill{background:var(--surface);border-color:var(--line);box-shadow:0 1px 5px rgba(20,20,15,.05)}
+.msg{padding:13px 0 5px}
+.msg-steps{margin-bottom:8px}
+.msg.user .msg-body{background:#F3F2ED;border-radius:22px;padding:11px 16px;max-width:86%}
+[data-theme="dark"] .msg.user .msg-body{background:var(--user-bubble)}
+.msg-foot{display:flex;align-items:center;gap:8px;margin-top:7px}
+.foot-btn{width:30px;height:30px;display:grid;place-items:center;color:var(--text-3);border-radius:8px;background:none;border:0;cursor:pointer}
+.foot-btn:active{background:var(--bg-sub);color:var(--ink)}
+.msg-model{font-size:12px;color:var(--text-3)}
+.composer{border-top:0;padding-top:6px}
+.input-box{border-radius:28px;border-color:var(--line);box-shadow:0 10px 34px rgba(20,20,15,.10);padding:6px;align-items:flex-end}
+.plus-btn{width:40px;height:40px;border-radius:50%;background:var(--bg-sub);border:0;display:grid;place-items:center;flex:none;color:var(--ink);cursor:pointer}
+.plus-btn:active{background:var(--accent-soft)}
+.input-box textarea{padding:10px 2px}
+.send-btn{width:40px;height:40px}
+.composer-chips{display:flex;gap:8px;align-items:center;margin-top:10px;padding:0 2px}
+.composer-chips .spacer{flex:1}
+.chip{height:34px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;gap:6px;font-family:inherit;cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.static{cursor:default;background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#codeChip{display:none}
+body.mode-code #codeChip{display:inline-flex}
+.composer-chips .key-pill{border:0;background:none;height:34px;padding:0 6px}
+.prov-row{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.prov-row::-webkit-scrollbar{display:none}
+.prov-chip{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 14px 0 7px;border:1px solid var(--line);border-radius:999px;background:var(--surface);flex:none;font-size:13.5px;color:var(--ink);cursor:pointer;font-family:inherit}
+.prov-chip.on{border-color:var(--accent);background:var(--accent-soft)}
+.menu-row{display:flex;width:100%;align-items:center;gap:12px;padding:15px 4px;font-size:15px;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer;font-family:inherit}
+.menu-row:last-child{border-bottom:0}

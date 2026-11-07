@@ -441,6 +441,42 @@ body.mode-code .send-btn{background:var(--ink)}
 .pub-body{overflow-y:auto}
 #publishEmbedBox iframe{margin:0 auto}
 .topbar .icon-btn{width:38px;height:38px}
+
+/* ===== クリーンUI（v4.4） ===== */
+.topbar{border-bottom:0}
+.topbar .icon-btn{border:1px solid var(--line);border-radius:50%;background:var(--surface)}
+.topbar #btnSettingsTop{display:none}
+.mode-logo{border-radius:50%;background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.mode-logo.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.model-pill{background:var(--surface);border-color:var(--line);box-shadow:0 1px 5px rgba(20,20,15,.05)}
+.msg{padding:13px 0 5px}
+.msg-steps{margin-bottom:8px}
+.msg.user .msg-body{background:#F3F2ED;border-radius:22px;padding:11px 16px;max-width:86%}
+[data-theme="dark"] .msg.user .msg-body{background:var(--user-bubble)}
+.msg-foot{display:flex;align-items:center;gap:8px;margin-top:7px}
+.foot-btn{width:30px;height:30px;display:grid;place-items:center;color:var(--text-3);border-radius:8px;background:none;border:0;cursor:pointer}
+.foot-btn:active{background:var(--bg-sub);color:var(--ink)}
+.msg-model{font-size:12px;color:var(--text-3)}
+.composer{border-top:0;padding-top:6px}
+.input-box{border-radius:28px;border-color:var(--line);box-shadow:0 10px 34px rgba(20,20,15,.10);padding:6px;align-items:flex-end}
+.plus-btn{width:40px;height:40px;border-radius:50%;background:var(--bg-sub);border:0;display:grid;place-items:center;flex:none;color:var(--ink);cursor:pointer}
+.plus-btn:active{background:var(--accent-soft)}
+.input-box textarea{padding:10px 2px}
+.send-btn{width:40px;height:40px}
+.composer-chips{display:flex;gap:8px;align-items:center;margin-top:10px;padding:0 2px}
+.composer-chips .spacer{flex:1}
+.chip{height:34px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;gap:6px;font-family:inherit;cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.static{cursor:default;background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#codeChip{display:none}
+body.mode-code #codeChip{display:inline-flex}
+.composer-chips .key-pill{border:0;background:none;height:34px;padding:0 6px}
+.prov-row{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.prov-row::-webkit-scrollbar{display:none}
+.prov-chip{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 14px 0 7px;border:1px solid var(--line);border-radius:999px;background:var(--surface);flex:none;font-size:13.5px;color:var(--ink);cursor:pointer;font-family:inherit}
+.prov-chip.on{border-color:var(--accent);background:var(--accent-soft)}
+.menu-row{display:flex;width:100%;align-items:center;gap:12px;padding:15px 4px;font-size:15px;color:var(--ink);background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer;font-family:inherit}
+.menu-row:last-child{border-bottom:0}
 </style>
 </head>
 <body>
@@ -611,29 +647,17 @@ body.mode-code .send-btn{background:var(--ink)}
           </div>
         </div>
         <div class="input-box">
+          <button class="plus-btn" id="btnPlus" aria-label="その他の操作">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
           <textarea id="input" rows="1" placeholder="AIに質問してみよう" enterkeyhint="send"></textarea>
           <button class="send-btn" id="btnSend" aria-label="送信">
             <svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
         </div>
-        <div class="composer-meta">
-          <button class="meta-btn" id="modelPillBottom">
-            <span class="logo-tile sm" id="pillMono2" style="width:20px;height:20px;border-radius:5px"></span>
-            <span id="pillLabel2">OpenAI ・ gpt-4o-mini</span>
-            <svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          <span class="sep">|</span>
-          <button class="meta-btn" id="btnSys">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
-            システム
-          </button>
-          <button class="meta-btn" id="btnAgent" title="エージェントモードの切り替え">
-            エージェント
-          </button>
-          <button class="meta-btn" id="btnExport">
-            <svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-            書き出し
-          </button>
+        <div class="composer-chips">
+          <button class="chip" id="btnAgent" title="エージェントモードの切り替え">エージェント</button>
+          <span class="chip static" id="codeChip">コードモード</span>
           <span class="spacer"></span>
           <button class="key-pill" id="keyStateLabel" type="button">キーを設定すると使えます</button>
         </div>
@@ -771,6 +795,20 @@ body.mode-code .send-btn{background:var(--ink)}
   </div>
 </div>
 
+<div class="sheet" id="plusSheet" role="dialog" aria-label="その他の操作">
+  <div class="sheet-bg" data-close="plusSheet"></div>
+  <div class="sheet-panel bottom">
+    <div class="grab"></div>
+    <div class="sheet-body">
+      <button class="menu-row" id="btnPlusMode" data-close="plusSheet">コードモードに切り替え</button>
+      <button class="menu-row" id="btnSys" data-close="plusSheet">システムプロンプト</button>
+      <button class="menu-row" id="btnExport" data-close="plusSheet">会話を書き出し</button>
+      <button class="menu-row" id="btnPlusSettings" data-close="plusSheet">設定（キー・モデル）</button>
+      <button class="menu-row" id="btnThemePlus" data-close="plusSheet">ダークモード切替</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script>
 "use strict";
@@ -880,9 +918,7 @@ function logoTile(pid,sm){return '<span class="logo-tile'+(sm?" sm":"")+'"><svg 
 function renderPills(){
   const p=curProv(),m=curModel();
   $("#pillMono").innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+(LOGOS[p.id]||"")+'</svg>';
-  $("#pillMono2").innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+(LOGOS[p.id]||"")+'</svg>';
   $("#pillName").textContent=p.name;$("#pillModel").textContent=m;
-  $("#pillLabel2").textContent=p.name+" ・ "+m;
   const ks=keyState(p.id);
   const pill=$("#keyStateLabel");pill.textContent=ks==="ok"?"キー接続OK":ks==="set"?"キー設定済み（未テスト）":"キーを設定すると使えます";pill.className="key-pill"+(ks==="ok"?" ok":"");
 }
@@ -905,11 +941,10 @@ function renderChat(){
   if(!s||!s.messages.length){
     const provCells=PROVIDERS.map(p=>{
       const st=keyState(p.id);
-      return '<button class="prov-cell '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id)+'<span><span class="pc-name">'+esc(p.name)+'</span><br><span class="pc-state">'+stateLabel(p.id)+' ・ '+esc(conf.models[p.id])+'</span></span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
+      return '<button class="prov-chip '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id,true)+'<span>'+esc(p.name)+'</span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
     }).join("");
     col.innerHTML=(conf.mode==="code"?'<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>':'<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>')
-      +'<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>'
-      +'<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">'+provCells+'</div>'
+      +'<div class="sec-label">プロバイダー</div><div class="prov-row">'+provCells+'</div>'
       +'<div class="sec-label">たとえば</div><div class="sugg">'+(conf.mode==="code"?CODE_SUGGESTIONS:SUGGESTIONS).map((t,i)=>'<button data-sugg="'+i+'"><span class="n">0'+(i+1)+'</span><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
     return;
   }
@@ -918,12 +953,9 @@ function renderChat(){
 }
 function renderMsg(m,i,s){
   const isUser=m.role==="user";
-  const head=isUser
-    ?'<span class="mono-tile sm" style="background:var(--ink);color:var(--bg)">You</span><span class="msg-role">あなた</span>'
-    :logoTile(P(s.providerAtSend||s.provider)?.id||"",true)+'<span class="msg-role">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+'</span><span class="msg-meta">'+esc(m.model||"")+'</span>';
-  const tools=isUser?"":'<span class="msg-tools"><button data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>';
+  const foot=isUser?"":'<div class="msg-foot"><button class="foot-btn" data-copy="'+i+'" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span class="msg-model">'+esc(P(s.providerAtSend||s.provider)?.name||"AI")+" ・ "+esc(m.model||"")+'</span></div>';
   const stepsHtml=(m.steps&&m.steps.length)?'<div class="msg-steps">'+m.steps.map(st=>'<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(st)+'</span></div>').join("")+'</div>':"";
-  return '<div class="msg'+(isUser?" user":"")+'"><div class="msg-head">'+head+tools+'</div>'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':isUser?md(m.content):addCodeActions(md(m.content)))+'</div></div>';
+  return '<div class="msg'+(isUser?" user":"")+'">'+stepsHtml+'<div class="msg-body">'+(m.pending?'<span class="typing"><i></i><i></i><i></i></span>':isUser?md(m.content):addCodeActions(md(m.content)))+'</div>'+foot+'</div>';
 }
 function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFrame(()=>{sc.scrollTo({top:sc.scrollHeight,behavior:smooth?"smooth":"auto"})})}
 
@@ -1069,7 +1101,8 @@ function applyMode(){
   const isCode = conf.mode === "code";
   document.body.classList.toggle("mode-code", isCode);
   $("#btnModeLogo").classList.toggle("on", isCode);
-  $("#input").placeholder = isCode ? "作りたいものを説明してください（例：タイマーのページ）" : "AIに質問してみよう";
+  $("#input").placeholder = isCode ? "作りたいものを説明してください" : "AIに質問してみよう";
+  $("#btnPlusMode").textContent = isCode ? "チャットモードに切り替え" : "コードモードに切り替え";
 }
 function toggleMode(){
   conf.mode = conf.mode === "code" ? "chat" : "code";
@@ -1645,7 +1678,6 @@ $("#btnSettingsTop").addEventListener("click",()=>openSettings());
 $("#btnTheme").addEventListener("click",toggleTheme);
 $("#btnTheme2").addEventListener("click",toggleTheme);
 $("#modelPillTop").addEventListener("click",()=>{openModelSheet();autoFetchModels(conf.provider)});
-$("#modelPillBottom").addEventListener("click",()=>{openModelSheet();autoFetchModels(conf.provider)});
 $("#modelSearch").addEventListener("input",e=>renderModelSheet(e.target.value));
 $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchModels");btn.disabled=true;btn.textContent="取得中…";
   try{const ids=await fetchModels(conf.provider);renderModelSheet($("#modelSearch").value);renderAll();toast(ids.length+"件のモデルを取得しました")}
@@ -1653,6 +1685,10 @@ $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchMo
 $("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
 $("#keyStateLabel").addEventListener("click",()=>{openSettings(conf.provider)});
 initCodeUI();
+$("#btnPlus").addEventListener("click",()=>{openSheet("plusSheet")});
+$("#btnPlusSettings").addEventListener("click",()=>{openSettings(conf.provider)});
+$("#btnThemePlus").addEventListener("click",toggleTheme);
+$("#btnPlusMode").addEventListener("click",()=>{toggleMode()});
 $("#btnAgent").addEventListener("click",()=>{conf.agent=!conf.agent;save(LS.conf,conf);renderAll();toast(conf.agent?"エージェントモードをオンにしました（ツールを使いながら回答します）":"エージェントモードをオフにしました")});
 document.addEventListener("click",e=>{const dn=e.target.closest("[data-del-note]");if(!dn)return;const nid=dn.getAttribute("data-del-note");notes=notes.filter(n=>n.id!==nid);save(LS.notes,notes);if(authSess)pushSync();renderNotes();toast("メモを削除しました")});
 $("#btnSys").addEventListener("click",()=>{$("#sysbar").classList.toggle("on")});

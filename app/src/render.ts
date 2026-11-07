@@ -39,11 +39,8 @@ export function renderPills(): void {
   const m = curModel();
   const mono = $("#pillMono");
   mono.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${LOGOS[p.id] || ""}</svg>`;
-  const mono2 = $("#pillMono2");
-  mono2.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${LOGOS[p.id] || ""}</svg>`;
   $("#pillName").textContent = p.name;
   $("#pillModel").textContent = m;
-  $("#pillLabel2").textContent = `${p.name} ・ ${m}`;
   const ks = keyState(p.id);
   const pill = $("#keyStateLabel");
   pill.textContent =
@@ -79,7 +76,7 @@ export function renderChat(): void {
   if (!s || !s.messages.length) {
     const provCells = PROVIDERS.map((p) => {
       const st = keyState(p.id);
-      return `<button class="prov-cell ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}">${logoTile(p.id)}<span><span class="pc-name">${esc(p.name)}</span><br><span class="pc-state">${stateLabel(p.id)} ・ ${esc(state.conf.models[p.id])}</span></span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
+      return `<button class="prov-chip ${p.id === state.conf.provider ? "on" : ""}" data-pick-prov="${p.id}">${logoTile(p.id, true)}<span>${esc(p.name)}</span><span class="dot ${st === "ok" ? "ok" : st === "set" ? "set" : ""}"></span></button>`;
     }).join("");
     const isCode = state.conf.mode === "code";
     const sugg = isCode ? CODE_SUGGESTIONS : SUGGESTIONS;
@@ -87,8 +84,7 @@ export function renderChat(): void {
       (isCode
         ? '<div class="empty"><h1>何を作りますか。</h1><p class="lead">コードモードは、作りたいものを伝えるとAIが完成コードを返す、コード出力に特化したチャットです。返ってきたコードは、その場でプレビュー（端末幅の切り替えつき）・コード表示・Zip保存ができます。</p>'
         : '<div class="empty"><h1>何を聞きますか。</h1><p class="lead">Eluntraは、10社のAIを自分のAPIキーで使うチャットです。キーは端末内にのみ保存され、選んだ会社のAPIへ直接送られます。</p>') +
-      '<div class="steps"><span class="step"><b>1</b>会社を選ぶ</span><span class="step"><b>2</b>キーを設定する</span><span class="step"><b>3</b>質問する</span></div>' +
-      '<div class="sec-label">プロバイダーを選ぶ（10社）</div><div class="prov-grid">' +
+      '<div class="sec-label">プロバイダー</div><div class="prov-row">' +
       provCells +
       '</div>' +
       '<div class="sec-label">たとえば</div><div class="sugg">' +
@@ -106,17 +102,14 @@ function renderMsg(m: Message, i: number, s: Session): string {
   const isUser = m.role === "user";
   const provId = s.providerAtSend || s.provider;
   const prov = PROVIDERS.find((x) => x.id === provId);
-  const head = isUser
-    ? '<span class="mono-tile sm" style="background:var(--ink);color:var(--bg)">You</span><span class="msg-role">あなた</span>'
-    : `${logoTile(prov?.id ?? "", true)}<span class="msg-role">${esc(prov?.name ?? "AI")}</span><span class="msg-meta">${esc(m.model || "")}</span>`;
-  const tools = isUser
+  const foot = isUser
     ? ""
-    : `<span class="msg-tools"><button data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></span>`;
+    : `<div class="msg-foot"><button class="foot-btn" data-copy="${i}" aria-label="コピー"><svg class="ic sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><span class="msg-model">${esc(prov?.name ?? "AI")} ・ ${esc(m.model || "")}</span></div>`;
   const stepsHtml = m.steps && m.steps.length
     ? `<div class="msg-steps">${m.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("")}</div>`
     : "";
   const bodyHtml = m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : isUser ? md(m.content) : addCodeActions(md(m.content));
-  return `<div class="msg${isUser ? " user" : ""}"><div class="msg-head">${head}${tools}</div>${stepsHtml}<div class="msg-body">${bodyHtml}</div></div>`;
+  return `<div class="msg${isUser ? " user" : ""}">${stepsHtml}<div class="msg-body">${bodyHtml}</div>${foot}</div>`;
 }
 
 /** 言語名の正規化（フェンス表記ゆれ吸収） */
