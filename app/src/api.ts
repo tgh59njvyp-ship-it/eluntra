@@ -37,7 +37,7 @@ async function fetchWithTimeout(
   const ctl = new AbortController();
   const timer = window.setTimeout(() => ctl.abort("timeout"), ms);
   try {
-    return await fetch(url, { ...opts, signal: runtime.abortCtl?.signal ?? ctl.signal });
+    return await apiFetch(url, { ...opts, signal: runtime.abortCtl?.signal ?? ctl.signal });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new Error(
@@ -46,6 +46,24 @@ async function fetchWithTimeout(
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+/** 中継サーバー（Vercel）。ブラウザから直接つなげない会社のために経由する */
+export const PROXY_URL = "https://eluntra.vercel.app/api/proxy";
+
+export function proxyEnabled(): boolean {
+  return state.conf.proxyOn !== false;
+}
+
+const SAMBA_PROXY_MSG =
+  "SambaNovaはブラウザから直接つなげないため、設定の「接続」で「サーバー経由で接続」をオンにしてください。オンにすると中継サーバー経由で使えます。";
+
+/** 経由がオンなら中継サーバーへ、オフなら各社へ直接つなぐ */
+export async function apiFetch(url: string, opts?: RequestInit): Promise<Response> {
+  if (!proxyEnabled()) return fetch(url, opts);
+  const headers = new Headers(opts?.headers);
+  headers.set("x-target-url", url);
+  return fetch(PROXY_URL, { ...opts, headers });
 }
 
 /** Cloudflareは保存キーが "AccountID::トークン" 形式。実ベースURLと実トークンに直す */
@@ -60,10 +78,10 @@ export function effToken(p: Provider, key: string): string {
 
 function modelsRequest(p: Provider, key: string): Promise<Response> {
   if (p.type === "gemini") {
-    return fetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
+    return apiFetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
   }
   if (p.type === "anthropic") {
-    return fetch(`${p.base}/models`, {
+    return apiFetch(`${p.base}/models`, {
       headers: {
         "x-api-key": key,
         "anthropic-version": "2023-06-01",
@@ -72,11 +90,11 @@ function modelsRequest(p: Provider, key: string): Promise<Response> {
     });
   }
   if (p.type === "cohere") {
-    return fetch("https://api.cohere.com/v1/models", {
+    return apiFetch("https://api.cohere.com/v1/models", {
       headers: { Authorization: `Bearer ${key}` },
     });
   }
-  return fetch(`${effBase(p, key)}/models`, {
+  return apiFetch(`${effBase(p, key)}/models`, {
     headers: { Authorization: `Bearer ${effToken(p, key)}` },
   });
 }
@@ -86,6 +104,8 @@ export async function testConnection(pid: string): Promise<TestResult> {
   const p = findProvider(pid);
   const key = (state.keys[pid] || "").trim();
   if (!key) return { ok: false, msg: "キーが未入力です。上の欄にキーを貼ってください。" };
+  if (pid === "sambanova" && !proxyEnabled())
+    return { ok: false, msg: SAMBA_PROXY_MSG };
   try {
     const res = await modelsRequest(p, key);
     if (res.ok) {
@@ -101,7 +121,7 @@ export async function testConnection(pid: string): Promise<TestResult> {
     if (pid === "sambanova") {
       return {
         ok: false,
-        msg: "SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版のEluntraからは接続テストもチャットもできません（キーの問題ではありません）。対処：SambaNovaを使うにはサーバー経由の版が必要です。他の会社はそのまま使えます。",
+        msg: "中継サーバー経由でもSambaNovaへ通信できませんでした。対処：電波を確認し、少し待ってからもう一度試してください。",
       };
     }
     return {
@@ -116,6 +136,7 @@ export async function fetchModels(pid: string): Promise<string[]> {
   const p = findProvider(pid);
   const key = (state.keys[pid] || "").trim();
   if (!key) throw new Error(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
+  if (pid === "sambanova" && !proxyEnabled()) throw new Error(SAMBA_PROXY_MSG);
   const res = await modelsRequest(p, key);
   if (!res.ok) throw new Error(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as {
@@ -310,6 +331,7 @@ export async function callCohere(
 export function callChat(
   p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
 ): Promise<string> {
+  if (p.id === "sambanova" && !proxyEnabled()) throw new Error(SAMBA_PROXY_MSG);
   switch (p.type) {
     case "gemini":
       return callGemini(p, key, model, history, onDelta);

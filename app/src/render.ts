@@ -247,6 +247,8 @@ export function closeSidebar(): void {
 /* ---------- 設定シート ---------- */
 
 export function renderSettings(): void {
+  const chkP = document.querySelector<HTMLInputElement>("#chkProxy");
+  if (chkP) chkP.checked = state.conf.proxyOn !== false;
   $("#provSettings").innerHTML = PROVIDERS.map((p) => {
     const st = keyState(p.id);
     const stCls = st === "ok" ? "ok" : st === "set" ? "set" : "";
@@ -263,7 +265,7 @@ export function renderSettings(): void {
       `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").token)}" autocomplete="off" spellcheck="false">` +
       `<button class="btn secondary" data-show-key="${p.id}">表示</button></div>` +
       (p.id === "sambanova"
-        ? `<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版では接続テスト・チャットとも使えません（キーの問題ではありません）。</p>`
+        ? `<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザから直接つなげないため、設定の「接続」で「サーバー経由で接続」がオンのときだけ使えます。</p>`
         : "") +
       `<div class="key-actions"><button class="btn primary sm" data-save-key="${p.id}">保存</button>` +
       `<button class="btn secondary sm" data-test-key="${p.id}">接続テスト</button>` +

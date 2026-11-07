@@ -36,7 +36,7 @@ export const state = {
   tested: load<Record<string, boolean>>(LS.tested, {}),
   fetchedModels: load<Record<string, string[]>>(LS.models, {}),
   conf: Object.assign(
-    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium" } as Config,
+    { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium", proxyOn: true } as Config,
     load<Partial<Config>>(LS.conf, {}),
   ),
   sessions: load<Session[]>(LS.sess, []),
@@ -79,7 +79,7 @@ export function persistModels(): void {
 /** Eluntra Auto：接続済み（キーあり）の中での優先順位 */
 const AUTO_PRIORITY = [
   "gemini", "groq", "openai", "openrouter", "mistral",
-  "deepseek", "anthropic", "cohere", "cloudflare",
+  "deepseek", "anthropic", "cohere", "cloudflare", "sambanova",
 ];
 
 export function isAuto(): boolean {
@@ -88,7 +88,11 @@ export function isAuto(): boolean {
 
 /** Auto選択時に実際に使うプロバイダー（接続テストOKを優先し、次に優先順位） */
 export function resolveAuto(): Provider | null {
-  const cands = PROVIDERS.filter((p) => (state.keys[p.id] || "").trim());
+  const cands = PROVIDERS.filter(
+    (p) =>
+      (state.keys[p.id] || "").trim() &&
+      (p.id !== "sambanova" || state.conf.proxyOn !== false),
+  );
   if (!cands.length) return null;
   const rank = (p: Provider): number =>
     (state.tested[p.id] ? 0 : 100) + AUTO_PRIORITY.indexOf(p.id);
@@ -172,7 +176,7 @@ export function resetAllData(): void {
   state.sessions = [];
   state.notes = [];
   state.currentId = null;
-  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium" };
+  state.conf = { provider: "gemini", models: {}, system: "", temp: 0.7, agent: false, mode: "chat", effort: "medium", proxyOn: true };
   PROVIDERS.forEach((p) => {
     state.conf.models[p.id] = p.def;
   });

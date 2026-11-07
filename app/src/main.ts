@@ -747,6 +747,13 @@ document
     setAutoRepair((e.target as HTMLInputElement).checked);
     toast((e.target as HTMLInputElement).checked ? "自動修復をオンにしました" : "自動修復をオフにしました");
   });
+  $("#chkProxy").addEventListener("change", (e: Event) => {
+    state.conf.proxyOn = (e.target as HTMLInputElement).checked;
+    persistConf();
+    renderSettings();
+    toast(state.conf.proxyOn ? "サーバー経由で接続します" : "各社へ直接接続します（SambaNovaは使えません）");
+    if (isLoggedIn()) void pushSync();
+  });
   renderRepairPanel();
   const savedTheme = load<string | null>("eluntra_theme", null);
   const prefersDark =

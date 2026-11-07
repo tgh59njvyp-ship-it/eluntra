@@ -1,4 +1,4 @@
-import { effBase, effToken, friendlyError} from "./api";
+import { apiFetch, effBase, effToken, friendlyError } from "./api";
 import { isLoggedIn, pushSync} from "./auth";
 import { persistNotes, runtime, state} from "./state";
 import type { Message, Provider} from "./types";
@@ -192,7 +192,7 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
 const ctl = new AbortController();
 const timer = window.setTimeout(() => ctl.abort("timeout"), 90000);
 try {
-const res = await fetch(url, {
+const res = await apiFetch(url, {
 method: "POST",
 headers: { "Content-Type": "application/json",...headers},
 body: JSON.stringify(body),

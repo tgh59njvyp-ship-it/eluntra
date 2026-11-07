@@ -756,6 +756,9 @@ body.mode-code #codeChip{display:inline-flex}
         <button class="btn secondary" id="btnExportAll">全データを書き出す（JSON）</button>
         <button class="btn danger" id="btnWipe">キーと会話をすべて削除</button>
       </div>
+      <div class="set-sec">接続</div>
+      <p class="set-desc">各社のAPIへ、Eluntraの中継サーバー（Vercel）を通してつなぎます。SambaNovaなど、ブラウザから直接つなげない会社を使うにはオンが必要です。キーは中継サーバーに保存されず、そのまま各社へ渡されます。</p>
+      <label class="repair-toggle"><input type="checkbox" id="chkProxy"> サーバー経由で接続する</label>
       <div class="set-sec">自己修復</div>
       <p class="set-desc">このサイト自体で起きたエラーを記録し、前に保存したGeminiのAPIキーでAIが診断して、壊れた状態を自動で直します。APIキーは修復でも消しません。</p>
       <p class="set-desc" id="repairStatus">エラー記録はありません。</p>
@@ -916,7 +919,7 @@ const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 let keys=load(LS.keys,{});
 let tested=load(LS.tested,{});
 let fetchedModels=load(LS.models,{});
-let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false,mode:"chat",effort:"medium"},load(LS.conf,{}));
+let conf=Object.assign({provider:"gemini",models:{},system:"",temp:0.7,agent:false,mode:"chat",effort:"medium",proxyOn:true},load(LS.conf,{}));
 PROVIDERS.forEach(p=>{if(!conf.models[p.id])conf.models[p.id]=p.def});
 let sessions=load(LS.sess,[]);
 let notes=load(LS.notes,[]);
@@ -926,6 +929,10 @@ let generating=false;
 
 function splitSavedKey(pid,raw){if(pid!=="cloudflare")return{acct:"",token:raw||""};const i=(raw||"").indexOf("::");if(i<0)return{acct:"",token:raw||""};return{acct:raw.slice(0,i),token:raw.slice(i+2)}}
 function joinSavedKey(pid,acct,token){if(pid!=="cloudflare")return token;return acct&&token?acct+"::"+token:(token||acct)}
+const PROXY_URL="https://eluntra.vercel.app/api/proxy";
+function proxyOn(){return conf.proxyOn!==false}
+function AF(url,opts){if(!proxyOn())return fetch(url,opts);const h=new Headers((opts&&opts.headers)||{});h.set("x-target-url",url);return fetch(PROXY_URL,{...(opts||{}),headers:h})}
+const SAMBA_PROXY_MSG="SambaNovaはブラウザから直接つなげないため、設定の「接続」で「サーバー経由で接続」をオンにしてください。オンにすると中継サーバー経由で使えます。";
 function effBase(p,key){if(p.id!=="cloudflare")return p.base;return p.base.replace("{account}",splitSavedKey(p.id,key).acct)}
 function effToken(p,key){if(p.id!=="cloudflare")return key;return splitSavedKey(p.id,key).token}
 function readKeyInput(pid){const token=($("#key-"+pid).value||"").trim();if(!P(pid).dualKey)return token;const acct=($("#acct-"+pid).value||"").trim();return joinSavedKey(pid,acct,token)}
@@ -933,8 +940,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2600)}
-const AUTO_PRIORITY=["gemini","groq","openai","openrouter","mistral","deepseek","anthropic","cohere","cloudflare"];
-function resolveAuto(){const cands=PROVIDERS.filter(p=>(keys[p.id]||"").trim());if(!cands.length)return null;const rank=p=>(tested[p.id]?0:100)+AUTO_PRIORITY.indexOf(p.id);return [...cands].sort((a,b)=>rank(a)-rank(b))[0]}
+const AUTO_PRIORITY=["gemini","groq","openai","openrouter","mistral","deepseek","anthropic","cohere","cloudflare","sambanova"];
+function resolveAuto(){const cands=PROVIDERS.filter(p=>(keys[p.id]||"").trim()&&(p.id!=="sambanova"||proxyOn()));if(!cands.length)return null;const rank=p=>(tested[p.id]?0:100)+AUTO_PRIORITY.indexOf(p.id);return [...cands].sort((a,b)=>rank(a)-rank(b))[0]}
 function curProv(){if(conf.provider==="auto")return resolveAuto()||P("gemini");return P(conf.provider)}
 function curModel(){const p=curProv();return conf.models[p.id]||p.def}
 function modelList(pid){return fetchedModels[pid]&&fetchedModels[pid].length?fetchedModels[pid]:P(pid).models}
@@ -1035,6 +1042,7 @@ function scrollBottom(smooth=true){const sc=$("#chatScroll");requestAnimationFra
 /* ================= コード特化チャット（成果物まわり） ================= */
 const CODES_LS_KEY = "eluntra_codes";
 async function callChat(p, key, model, messages, onDelta){
+  if (p.id === "sambanova" && !proxyOn()) throw new Error(SAMBA_PROXY_MSG);
   if (p.type === "openai") return callOpenAI(p, key, model, messages, onDelta);
   if (p.type === "gemini") return callGemini(p, key, model, messages, onDelta);
   if (p.type === "anthropic") return callAnthropic(p, key, model, messages, onDelta);
@@ -1625,22 +1633,23 @@ function friendlyError(status,bodyText,p){
 async function fetchWithTimeout(url,opts,ms=90000){
   const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort("timeout"),ms);
   const outer=abortCtl?abortCtl.signal:null;
-  try{return await fetch(url,{...opts,signal:outer||ctl.signal})}finally{clearTimeout(timer)}
+  try{return await AF(url,{...opts,signal:outer||ctl.signal})}finally{clearTimeout(timer)}
 }
 async function testConnection(pid){
   const p=P(pid),key=(keys[pid]||"").trim();
   if(!key)return{ok:false,msg:"キーが未入力です。上の欄にキーを貼ってください。"};
+  if(pid==="sambanova"&&!proxyOn())return{ok:false,msg:SAMBA_PROXY_MSG};
   try{
     let res;
-    if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
-    else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
-    else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
-    else{res=await fetch(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
+    if(p.type==="gemini"){res=await AF(p.base+"/models?key="+encodeURIComponent(key))}
+    else if(p.type==="anthropic"){res=await AF(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
+    else if(p.type==="cohere"){res=await AF("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
+    else{res=await AF(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
     if(res.ok){tested[pid]=true;save(LS.tested,tested);return{ok:true,msg:"接続できました。このキーでチャットできます。"}}
     const t=await res.text();delete tested[pid];save(LS.tested,tested);
     return{ok:false,msg:friendlyError(res.status,t,p)};
   }catch(e){
-    return{ok:false,msg:pid==="sambanova"?"SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版のEluntraからは接続テストもチャットもできません（キーの問題ではありません）。対処：SambaNovaを使うにはサーバー経由の版が必要です。他の会社はそのまま使えます。":"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
+    return{ok:false,msg:pid==="sambanova"?"中継サーバー経由でもSambaNovaへ通信できませんでした。対処：電波を確認し、少し待ってからもう一度試してください。":"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
   }
 }
 const autoFetchTried={};
@@ -1656,10 +1665,10 @@ async function fetchModels(pid){
   const p=P(pid),key=(keys[pid]||"").trim();
   if(!key)throw new Error("キーが未設定です。先に設定で"+p.name+"のキーを保存してください。");
   let res;
-  if(p.type==="gemini"){res=await fetch(p.base+"/models?key="+encodeURIComponent(key))}
-  else if(p.type==="anthropic"){res=await fetch(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
-  else if(p.type==="cohere"){res=await fetch("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
-  else{res=await fetch(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
+  if(p.type==="gemini"){res=await AF(p.base+"/models?key="+encodeURIComponent(key))}
+  else if(p.type==="anthropic"){res=await AF(p.base+"/models",{headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}})}
+  else if(p.type==="cohere"){res=await AF("https://api.cohere.com/v1/models",{headers:{Authorization:"Bearer "+key}})}
+  else{res=await AF(effBase(p,key)+"/models",{headers:{Authorization:"Bearer "+effToken(p,key)}})}
   if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
   const j=await res.json();
   let ids=[];
@@ -1800,7 +1809,7 @@ function agentSystemText(){return conf.system?conf.system+"\n"+AGENT_SYS:AGENT_S
 async function agentPostJson(url,headers,body,p){
 const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort("timeout"),90000);
 try{
-const res=await fetch(url,{method:"POST",headers:Object.assign({"Content-Type":"application/json"},headers),body:JSON.stringify(body),signal:(abortCtl&&abortCtl.signal)||ctl.signal});
+const res=await AF(url,{method:"POST",headers:Object.assign({"Content-Type":"application/json"},headers),body:JSON.stringify(body),signal:(abortCtl&&abortCtl.signal)||ctl.signal});
 if(!res.ok)throw new Error(friendlyError(res.status,await res.text(),p));
 return await res.json();
 }finally{clearTimeout(timer)}
@@ -1993,7 +2002,7 @@ function renderSettings(){
       +(p.dualKey?'<div class="key-line" style="margin-bottom:8px"><input type="text" id="acct-'+p.id+'" placeholder="Account ID" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").acct)+'" autocomplete="off" spellcheck="false"></div>':"")
       +'<div class="key-line"><input type="password" id="key-'+p.id+'" placeholder="'+esc(p.keyHint)+'" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").token)+'" autocomplete="off" spellcheck="false">'
       +'<button class="btn secondary" data-show-key="'+p.id+'">表示</button></div>'
-      +(p.id==="sambanova"?'<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版では接続テスト・チャットとも使えません（キーの問題ではありません）。</p>':"")+'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
+      +(p.id==="sambanova"?'<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザから直接つなげないため、設定の「接続」で「サーバー経由で接続」がオンのときだけ使えます。</p>':"")+'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
       +'<button class="btn secondary sm" data-test-key="'+p.id+'">接続テスト</button>'
       +'<button class="btn ghost sm" data-use-prov="'+p.id+'">この会社を使う</button>'
       +'<a class="get-key" href="'+p.getKeyUrl+'" target="_blank" rel="noopener">キーを取得する</a></div>'
@@ -2124,6 +2133,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet("modelSh
   $("#btnSelfRepair").addEventListener("click", () => runSelfRepair(false));
   $("#btnRepairLog").addEventListener("click", copyRepairLog);
   $("#chkAutoRepair").addEventListener("change", e => { save(AUTO_REPAIR_KEY, e.target.checked); toast(e.target.checked ? "自動修復をオンにしました" : "自動修復をオフにしました"); });
+  const chkP=$("#chkProxy");if(chkP){chkP.checked=proxyOn();chkP.addEventListener("change", e => { conf.proxyOn=e.target.checked; save(LS.conf,conf); toast(conf.proxyOn ? "サーバー経由で接続します" : "各社へ直接接続します（SambaNovaは使えません）"); if(authSess)pushSync(); });}
   renderRepairPanel();
   currentId=null;ensureSession();
   const savedTheme=load(LS.theme,null);

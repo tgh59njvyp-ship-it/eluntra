@@ -69,6 +69,7 @@ export interface Config {
   mode: "chat" | "code";
   /** 生成の強さ */
   effort: "low" | "medium" | "high" | "super";
+  proxyOn: boolean;
 }
 
 export type KeyState = "ok" | "set" | "none";
