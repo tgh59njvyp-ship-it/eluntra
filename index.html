@@ -759,7 +759,7 @@ body.mode-code #codeChip{display:inline-flex}
       <div class="set-sec">接続</div>
       <p class="set-desc">各社のAPIへ、Eluntraの中継サーバー（Vercel）を通してつなぎます。SambaNovaなど、ブラウザから直接つなげない会社を使うにはオンが必要です。キーは中継サーバーに保存されず、そのまま各社へ渡されます。</p>
       <label class="repair-toggle"><input type="checkbox" id="chkProxy"> サーバー経由で接続する</label>
-      <p class="set-desc">現在の版：v4.11</p>
+      <p class="set-desc">現在の版：v4.12</p>
       <div class="set-sec">自己修復</div>
       <p class="set-desc">このサイト自体で起きたエラーを記録し、前に保存したGeminiのAPIキーでAIが診断して、壊れた状態を自動で直します。APIキーは修復でも消しません。</p>
       <p class="set-desc" id="repairStatus">エラー記録はありません。</p>
@@ -1596,7 +1596,7 @@ async function ensureFresh(){
   catch(e){storeAuth(null);return false}}
 async function doLogout(){if(authSess){try{await fetch(AUTH_URL+"/auth/v1/logout",{method:"POST",headers:{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken}})}catch(e){}}storeAuth(null)}
 function collectSync(){return{version:1,sessions:sessions,conf:{provider:conf.provider,models:conf.models,system:conf.system,temp:conf.temp,agent:!!conf.agent},notes:notes,code:load(CODE_LS_KEY,"")}}
-function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){sessions=d.sessions;currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;if(typeof d.conf.agent==="boolean")conf.agent=d.conf.agent;save(LS.conf,conf)}if(Array.isArray(d.notes)){notes=d.notes;save(LS.notes,notes)}if(typeof d.code==="string"&&d.code){save(CODE_LS_KEY,d.code)}}
+function applySync(d){if(!d)return;if(Array.isArray(d.sessions)){const byId=new Map();d.sessions.forEach(cs=>{if(cs&&cs.id)byId.set(cs.id,cs)});sessions.forEach(ls=>{if(!ls||!ls.id)return;const c=byId.get(ls.id);if(!c||(ls.messages?ls.messages.length:0)>(c.messages?c.messages.length:0))byId.set(ls.id,ls)});sessions=[...byId.values()].sort((a,b)=>(b.created||0)-(a.created||0));if(!sessions.find(x=>x.id===currentId))currentId=sessions.length?sessions[0].id:null;save(LS.sess,sessions)}if(d.conf){conf.provider=d.conf.provider||conf.provider;conf.models=Object.assign({},conf.models,d.conf.models||{});conf.system=d.conf.system||"";if(typeof d.conf.temp==="number")conf.temp=d.conf.temp;if(typeof d.conf.agent==="boolean")conf.agent=d.conf.agent;save(LS.conf,conf)}if(Array.isArray(d.notes)){const nb=new Map();d.notes.forEach(n=>{if(n&&n.id)nb.set(n.id,n)});notes.forEach(n=>{if(n&&n.id&&!nb.has(n.id))nb.set(n.id,n)});notes=[...nb.values()];save(LS.notes,notes)}if(typeof d.code==="string"&&d.code){save(CODE_LS_KEY,d.code)}}
 async function syncHeaders(){if(!(await ensureFresh())||!authSess)return null;return{apikey:AUTH_KEY,Authorization:"Bearer "+authSess.accessToken,"Content-Type":"application/json"}}
 async function pushSync(){const h=await syncHeaders();if(!h)return false;try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync",{method:"POST",headers:Object.assign({},h,{Prefer:"resolution=merge-duplicates"}),body:JSON.stringify({user_id:authSess.user.id,data:collectSync(),updated_at:new Date().toISOString()})});if(!r.ok)return false;setLastSyncAt(Date.now());return true}catch(e){return false}}
 async function pullSync(){const h=await syncHeaders();if(!h)return"none";try{const r=await fetch(AUTH_URL+"/rest/v1/eluntra_sync?select=data,updated_at&user_id=eq."+authSess.user.id,{headers:h});if(!r.ok)return"none";const rows=await r.json();if(!rows.length)return"none";const ct=new Date(rows[0].updated_at).getTime();if(ct>lastSyncAt()+1000){applySync(rows[0].data);setLastSyncAt(ct);return"applied"}return"exists"}catch(e){return"none"}}
@@ -2078,7 +2078,7 @@ document.querySelectorAll(".w-guest-btn").forEach(b=>b.addEventListener("click",
 document.addEventListener("click",e=>{
   const lg=e.target.closest("[data-login]");if(lg){loginWith(lg.getAttribute("data-login"));return}
   const ol=e.target.closest("[data-open-login]");if(ol){renderAccount();openSheet("loginSheet");closeSidebar();return}
-  if(e.target.closest("#btnSyncNow")){(async()=>{const pulled=await pullSync();if(pulled==="applied"){renderAll();toast("クラウドのデータを取り込みました")}const ok=await pushSync();renderAccount();toast(ok?"同期しました":"同期に失敗しました。通信状態を確認してください")})();return}
+  if(e.target.closest("#btnSyncNow")){(async()=>{const pulled=await pullSync();if(pulled==="applied"){renderAll();pushSync()}const ok=await pushSync();renderAccount();toast(ok?"同期しました":"同期に失敗しました。通信状態を確認してください")})();return}
   if(e.target.closest("#btnLogout")||e.target.closest("#btnLogoutSide")){(async()=>{await doLogout();closeSheet("loginSheet");renderAccount();localStorage.removeItem("eluntra_guest");document.body.classList.add("show-welcome");toast("ログアウトしました")})();return}
 });
 $("#btnAccountTop").addEventListener("click",()=>{renderAccount();openSheet("loginSheet")});

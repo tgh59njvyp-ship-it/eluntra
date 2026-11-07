@@ -292,8 +292,20 @@ function collectSyncData(): SyncData {
 
 function applySyncData(data: SyncData): void {
   if (Array.isArray(data.sessions)) {
-    state.sessions = data.sessions;
-    state.currentId = state.sessions.length ? state.sessions[0].id : null;
+    // 置き換えではなく統合する（端末側だけにある会話を消さない）
+    const byId = new Map<string, Session>();
+    for (const cs of data.sessions) {
+      if (cs && cs.id) byId.set(cs.id, cs);
+    }
+    for (const ls of state.sessions) {
+      if (!ls || !ls.id) continue;
+      const c = byId.get(ls.id);
+      if (!c || (ls.messages?.length ?? 0) > (c.messages?.length ?? 0)) byId.set(ls.id, ls);
+    }
+    state.sessions = [...byId.values()].sort((a, b) => (b.created || 0) - (a.created || 0));
+    if (!state.sessions.find((x) => x.id === state.currentId)) {
+      state.currentId = state.sessions.length ? state.sessions[0].id : null;
+    }
     persistSessions();
   }
   if (data.conf) {
@@ -305,7 +317,10 @@ function applySyncData(data: SyncData): void {
     persistConf();
   }
   if (Array.isArray(data.notes)) {
-    state.notes = data.notes;
+    const byId = new Map<string, Note>();
+    for (const n of data.notes) if (n && n.id) byId.set(n.id, n);
+    for (const n of state.notes) if (n && n.id && !byId.has(n.id)) byId.set(n.id, n);
+    state.notes = [...byId.values()];
     persistNotes();
   }
   if (data.codes && typeof data.codes === "object") {

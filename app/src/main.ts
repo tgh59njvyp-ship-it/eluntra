@@ -828,7 +828,7 @@ document
       const pulled = await pullSync();
       if (pulled === "applied") {
         renderAll();
-        toast("クラウドのデータを取り込みました");
+        await pushSync();
       } else if (pulled === "none") {
         await pushSync();
       }
