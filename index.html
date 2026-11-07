@@ -501,6 +501,12 @@ body.mode-code #codeChip{display:inline-flex}
 .code-act{padding:6px 11px;font-size:12.5px}
 .effort-note{margin-left:auto;font-size:12px;color:var(--text-3)}
 .effort-row.on{font-weight:700}
+
+.mprov-row{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.mprov-row::-webkit-scrollbar{display:none}
+.mprov{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px 0 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);flex:none;font-size:13px;color:var(--ink);cursor:pointer;font-family:inherit}
+.mprov.on{border-color:var(--accent);background:var(--accent-soft)}
+.mprov svg{width:18px;height:18px}
 </style>
 </head>
 <body>
@@ -715,6 +721,7 @@ body.mode-code #codeChip{display:inline-flex}
       <button class="icon-btn" data-close="modelSheet" aria-label="閉じる"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="sheet-body">
+      <div class="mprov-row" id="modelProvRow"></div>
       <input class="model-search" id="modelSearch" placeholder="モデルを検索（モデルIDの一部）">
       <div id="modelList"></div>
       <div class="custom-model">
@@ -926,8 +933,10 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),2600)}
-function curProv(){return P(conf.provider)}
-function curModel(){return conf.models[conf.provider]||curProv().def}
+const AUTO_PRIORITY=["gemini","groq","openai","openrouter","mistral","deepseek","anthropic","cohere","cloudflare"];
+function resolveAuto(){const cands=PROVIDERS.filter(p=>(keys[p.id]||"").trim());if(!cands.length)return null;const rank=p=>(tested[p.id]?0:100)+AUTO_PRIORITY.indexOf(p.id);return [...cands].sort((a,b)=>rank(a)-rank(b))[0]}
+function curProv(){if(conf.provider==="auto")return resolveAuto()||P("gemini");return P(conf.provider)}
+function curModel(){const p=curProv();return conf.models[p.id]||p.def}
 function modelList(pid){return fetchedModels[pid]&&fetchedModels[pid].length?fetchedModels[pid]:P(pid).models}
 function keyState(pid){if(tested[pid])return"ok";if(keys[pid])return"set";return"none"}
 function stateLabel(pid){return keyState(pid)==="ok"?"接続OK":keyState(pid)==="set"?"設定済み":"未設定"}
@@ -973,7 +982,7 @@ function logoTile(pid,sm){return '<span class="logo-tile'+(sm?" sm":"")+'"><svg 
 function renderPills(){
   const p=curProv(),m=curModel();
   $("#pillMono").innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+(LOGOS[p.id]||"")+'</svg>';
-  $("#pillName").textContent=p.name;$("#pillModel").textContent=m;
+  $("#pillName").textContent=conf.provider==="auto"?"Eluntra Auto":p.name;$("#pillModel").textContent=conf.provider==="auto"?p.name+" ・ "+m:m;
   const ks=keyState(p.id);
   const pill=$("#keyStateLabel");pill.textContent=ks==="ok"?"キー接続OK":ks==="set"?"キー設定済み（未テスト）":"キーを設定すると使えます";pill.className="key-pill"+(ks==="ok"?" ok":"");
 }
@@ -999,7 +1008,7 @@ function renderChat(){
       return '<button class="prov-chip '+(p.id===conf.provider?"on":"")+'" data-pick-prov="'+p.id+'">'+logoTile(p.id,true)+'<span>'+esc(p.name)+'</span><span class="dot '+(st==="ok"?"ok":st==="set"?"set":"")+'"></span></button>';
     }).join("");
     col.innerHTML=(conf.mode==="code"?'<div class="empty"><h1>何を作りますか。</h1>':'<div class="empty"><h1>何を聞きますか。</h1>')
-      +'<div class="prov-row">'+provCells+'</div>'
+      +'<div class="prov-row">'+'<button class="prov-chip '+(conf.provider==="auto"?"on":"")+'" data-pick-prov="auto"><span class="logo-tile sm">'+AUTO_SVG+'</span><span>Eluntra Auto</span></button>'+provCells+'</div>' 
       +'<div class="sugg">'+(conf.mode==="code"?CODE_SUGGESTIONS:SUGGESTIONS).map((t,i)=>'<button data-sugg="'+i+'"><span>'+esc(t)+'</span></button>').join("")+'</div></div>';
     return;
   }
@@ -1631,7 +1640,7 @@ async function testConnection(pid){
     const t=await res.text();delete tested[pid];save(LS.tested,tested);
     return{ok:false,msg:friendlyError(res.status,t,p)};
   }catch(e){
-    return{ok:false,msg:"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
+    return{ok:false,msg:pid==="sambanova"?"SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版のEluntraからは接続テストもチャットもできません（キーの問題ではありません）。対処：SambaNovaを使うにはサーバー経由の版が必要です。他の会社はそのまま使えます。":"通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）"};
   }
 }
 const autoFetchTried={};
@@ -1677,8 +1686,9 @@ async function callOpenAI(p,key,model,history,onDelta){
       try{const j=JSON.parse(d);const delta=j.choices?.[0]?.delta?.content||"";if(delta){full+=delta;onDelta(full)}}catch(e){}}}
   return full;
 }
+function mergedHistory(history){const out=[];for(const m of history){const last=out[out.length-1];if(last&&last.role===m.role){last.content=last.content+"\n\n"+m.content}else{out.push({...m})}}return out}
 async function callGemini(p,key,model,history,onDelta){
-  const contents=history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+  const contents=mergedHistory(history).map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
   const body={contents,generationConfig:{temperature:+conf.temp}};
   if(conf.system)body.systemInstruction={parts:[{text:conf.system}]};
   const url=p.base+"/models/"+encodeURIComponent(model)+":streamGenerateContent?alt=sse&key="+encodeURIComponent(key);
@@ -1693,7 +1703,7 @@ async function callGemini(p,key,model,history,onDelta){
   return full;
 }
 async function callAnthropic(p,key,model,history,onDelta){
-  const msgs=history.map(m=>({role:m.role,content:m.content}));
+  const msgs=mergedHistory(history).map(m=>({role:m.role,content:m.content}));
   const body={model,max_tokens:4096,messages:msgs,temperature:+conf.temp};
   if(conf.system)body.system=conf.system;
   const res=await fetchWithTimeout(p.base+"/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify(body)});
@@ -1934,7 +1944,7 @@ async function sendMessage(){
   }catch(e){
     aiMsg.pending=false;
     if(e&&e.name==="AbortError"){aiMsg.content=aiMsg.content||"（生成を止めました）"}
-    else{aiMsg.content="";aiMsg.error=e.message||String(e)}
+    else{aiMsg.content="";aiMsg.error=(e&&(e.name==="TypeError"||/Failed to fetch|NetworkError|Load failed/i.test(e.message||"")))?"通信できませんでした。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、設定で接続テストを押して結果を確認してください（会社側がブラウザからの直接接続を許可していない場合、その会社はブラウザ版では使えません）。":(e.message||String(e))}
   }
   if(!aiMsg.error&&conf.mode==="code"&&(conf.effort==="high"||conf.effort==="super")){await verifyAndRepair(s.id,s.messages.indexOf(aiMsg),conf.effort==="super"?2:1)}
   generating=false;abortCtl=null;setSendBtn(false);
@@ -1983,7 +1993,7 @@ function renderSettings(){
       +(p.dualKey?'<div class="key-line" style="margin-bottom:8px"><input type="text" id="acct-'+p.id+'" placeholder="Account ID" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").acct)+'" autocomplete="off" spellcheck="false"></div>':"")
       +'<div class="key-line"><input type="password" id="key-'+p.id+'" placeholder="'+esc(p.keyHint)+'" value="'+esc(splitSavedKey(p.id,keys[p.id]||"").token)+'" autocomplete="off" spellcheck="false">'
       +'<button class="btn secondary" data-show-key="'+p.id+'">表示</button></div>'
-      +'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
+      +(p.id==="sambanova"?'<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版では接続テスト・チャットとも使えません（キーの問題ではありません）。</p>':"")+'<div class="key-actions"><button class="btn primary sm" data-save-key="'+p.id+'">保存</button>'
       +'<button class="btn secondary sm" data-test-key="'+p.id+'">接続テスト</button>'
       +'<button class="btn ghost sm" data-use-prov="'+p.id+'">この会社を使う</button>'
       +'<a class="get-key" href="'+p.getKeyUrl+'" target="_blank" rel="noopener">キーを取得する</a></div>'
@@ -2010,8 +2020,12 @@ function openSettings(focusPid){
 window.openSettings=openSettings;
 
 /* ================= Model sheet ================= */
+const AUTO_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg>';
 function renderModelSheet(filter=""){
-  const p=curProv();$("#modelSheetTitle").textContent=p.name;
+  const p=curProv();const auto=conf.provider==="auto";
+  $("#modelSheetTitle").textContent=auto?"Eluntra Auto（現在："+p.name+"）":p.name;
+  const mrow=$("#modelProvRow");
+  if(mrow){mrow.innerHTML='<button class="mprov '+(auto?"on":"")+'" data-mprov="auto">'+AUTO_SVG+'<span>Auto</span></button>'+PROVIDERS.map(x=>'<button class="mprov '+(!auto&&x.id===p.id?"on":"")+'" data-mprov="'+x.id+'">'+logoTile(x.id,true)+'<span>'+esc(x.name)+'</span></button>').join("")}
   const list=modelList(p.id).filter(m=>!filter||m.toLowerCase().includes(filter.toLowerCase()));
   $("#modelList").innerHTML=list.length?list.map(m=>'<button class="model-item '+(m===curModel()?"on":"")+'" data-model="'+esc(m)+'"><span class="mi-id">'+esc(m)+'</span><svg class="ic sm check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button>').join(""):'<p style="padding:16px 0;color:var(--text-2);font-size:14px">一致するモデルがありません。下のカスタム入力で直接指定できます。</p>';
 }
@@ -2033,7 +2047,8 @@ document.addEventListener("click",e=>{
   const sess=e.target.closest("[data-sess]");
   if(sess&&!e.target.closest("[data-del]")){currentId=sess.getAttribute("data-sess");renderAll();closeSidebar();return}
   const del=e.target.closest("[data-del]");if(del){e.stopPropagation();if(confirm("この会話を削除しますか？"))deleteSession(del.getAttribute("data-del"));return}
-  const pick=e.target.closest("[data-pick-prov]");if(pick){conf.provider=pick.getAttribute("data-pick-prov");save(LS.conf,conf);renderAll();toast(P(conf.provider).name+"に切り替えました");autoFetchModels(conf.provider);return}
+  const mprov=e.target.closest("[data-mprov]");if(mprov){const mid=mprov.getAttribute("data-mprov");conf.provider=mid;save(LS.conf,conf);renderAll();renderModelSheet(($("#modelSearch")).value||"");if(mid==="auto"){toast("Eluntra Auto：接続済みの中から最適なものを自動で選びます");autoFetchModels(curProv().id)}else{toast(P(mid).name+"に切り替えました");autoFetchModels(mid)}if(authSess)pushSync();return}
+  const pick=e.target.closest("[data-pick-prov]");if(pick){conf.provider=pick.getAttribute("data-pick-prov");save(LS.conf,conf);renderAll();if(conf.provider==="auto"){toast("Eluntra Auto：接続済みの中から最適なものを自動で選びます");autoFetchModels(curProv().id)}else{toast(P(conf.provider).name+"に切り替えました");autoFetchModels(conf.provider)}return}
   const sugg=e.target.closest("[data-sugg]");if(sugg){$("#input").value=SUGGESTIONS[+sugg.getAttribute("data-sugg")];autoGrow($("#input"));$("#input").focus();return}
   const cp=e.target.closest("[data-copy]");if(cp){const s=curSession();const m=s&&s.messages[+cp.getAttribute("data-copy")];if(m){navigator.clipboard.writeText(m.content).then(()=>toast("コピーしました"))}return}
   const tk=e.target.closest("[data-toggle-key]");if(tk){$("#keybox-"+tk.getAttribute("data-toggle-key")).classList.toggle("on");return}
@@ -2043,7 +2058,7 @@ document.addEventListener("click",e=>{
     const box=$("#test-"+pid);box.className="test-result on";box.style.color="var(--text-2)";box.textContent="接続テスト中…";
     const r=await testConnection(pid);box.className="test-result on "+(r.ok?"ok":"ng");box.textContent=(r.ok?"成功：":"失敗：")+r.msg;renderAll()})();return}
   const up=e.target.closest("[data-use-prov]");if(up){conf.provider=up.getAttribute("data-use-prov");save(LS.conf,conf);renderSettings();renderAll();toast(P(conf.provider).name+"を使う設定にしました");autoFetchModels(conf.provider);return}
-  const mi=e.target.closest("[data-model]");if(mi){conf.models[conf.provider]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
+  const mi=e.target.closest("[data-model]");if(mi){conf.models[curProv().id]=mi.getAttribute("data-model");save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+conf.models[conf.provider]+" にしました");return}
 });
 function enterApp(){document.body.classList.remove("show-welcome")}
 function openLoginFromWelcome(){renderAccount();openSheet("loginSheet")}
@@ -2069,7 +2084,7 @@ $("#modelSearch").addEventListener("input",e=>renderModelSheet(e.target.value));
 $("#btnFetchModels").addEventListener("click",async()=>{const btn=$("#btnFetchModels");btn.disabled=true;btn.textContent="取得中…";
   try{const ids=await fetchModels(conf.provider);renderModelSheet($("#modelSearch").value);renderAll();toast(ids.length+"件のモデルを取得しました")}
   catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="一覧を取得"}});
-$("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[conf.provider]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
+$("#btnCustomModel").addEventListener("click",()=>{const v=$("#customModel").value.trim();if(!v)return;conf.models[curProv().id]=v;save(LS.conf,conf);renderAll();closeSheet("modelSheet");toast("モデルを "+v+" にしました")});
 $("#keyStateLabel").addEventListener("click",()=>{openSettings(conf.provider)});
 initCodeUI();
 $("#btnPlus").addEventListener("click",()=>{openSheet("plusSheet")});

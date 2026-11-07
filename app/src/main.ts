@@ -371,13 +371,37 @@ document.addEventListener("click", (e: Event) => {
     closeSidebar();
     return;
   }
-  const pick = target.closest<HTMLElement>("[data-pick-prov]");
-  if (pick) {
-    state.conf.provider = pick.getAttribute("data-pick-prov") as string;
+  const mprov = target.closest<HTMLElement>("[data-mprov]");
+  if (mprov) {
+    const id = mprov.getAttribute("data-mprov") as string;
+    state.conf.provider = id;
     persistConf();
     renderAll();
-    toast(`${findProvider(state.conf.provider).name}に切り替えました`);
-    void autoFetchModels(state.conf.provider);
+    renderModelSheet(($("#modelSearch") as HTMLInputElement).value || "");
+    if (id === "auto") {
+      toast("Eluntra Auto：接続済みの中から最適なものを自動で選びます");
+      void autoFetchModels(curProv().id);
+    } else {
+      toast(`${findProvider(id).name}に切り替えました`);
+      void autoFetchModels(id);
+    }
+    if (isLoggedIn()) void pushSync();
+    return;
+  }
+  const pick = target.closest<HTMLElement>("[data-pick-prov]");
+  if (pick) {
+    const id = pick.getAttribute("data-pick-prov") as string;
+    state.conf.provider = id;
+    persistConf();
+    renderAll();
+    if (id === "auto") {
+      toast("Eluntra Auto：接続済みの中から最適なものを自動で選びます");
+      void autoFetchModels(curProv().id);
+    } else {
+      toast(`${findProvider(id).name}に切り替えました`);
+      void autoFetchModels(id);
+    }
+    if (isLoggedIn()) void pushSync();
     return;
   }
   const sugg = target.closest<HTMLElement>("[data-sugg]");
@@ -501,11 +525,11 @@ document.addEventListener("click", (e: Event) => {
   }
   const mi = target.closest<HTMLElement>("[data-model]");
   if (mi) {
-    state.conf.models[state.conf.provider] = mi.getAttribute("data-model") as string;
+    state.conf.models[curProv().id] = mi.getAttribute("data-model") as string;
     persistConf();
     renderAll();
     closeSheet("modelSheet");
-    toast(`モデルを ${state.conf.models[state.conf.provider]} にしました`);
+    toast(`モデルを ${state.conf.models[curProv().id]} にしました`);
     return;
   }
 });
@@ -559,7 +583,7 @@ $("#btnFetchModels").addEventListener("click", () => {
 $("#btnCustomModel").addEventListener("click", () => {
   const v = ($("#customModel") as HTMLInputElement).value.trim();
   if (!v) return;
-  state.conf.models[state.conf.provider] = v;
+  state.conf.models[curProv().id] = v;
   persistConf();
   renderAll();
   closeSheet("modelSheet");

@@ -38,6 +38,11 @@ async function fetchWithTimeout(
   const timer = window.setTimeout(() => ctl.abort("timeout"), ms);
   try {
     return await fetch(url, { ...opts, signal: runtime.abortCtl?.signal ?? ctl.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new Error(
+      "通信できませんでした。対処：電波の良い場所でもう一度送ってください。それでも直らない場合は、設定で接続テストを押して結果を確認してください（会社側がブラウザからの直接接続を許可していない場合、その会社はブラウザ版では使えません）。",
+    );
   } finally {
     window.clearTimeout(timer);
   }
@@ -93,6 +98,12 @@ export async function testConnection(pid: string): Promise<TestResult> {
     persistTested();
     return { ok: false, msg: friendlyError(res.status, t, p) };
   } catch {
+    if (pid === "sambanova") {
+      return {
+        ok: false,
+        msg: "SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版のEluntraからは接続テストもチャットもできません（キーの問題ではありません）。対処：SambaNovaを使うにはサーバー経由の版が必要です。他の会社はそのまま使えます。",
+      };
+    }
     return {
       ok: false,
       msg: "通信できませんでした。対処：電波を確認し、キーが正しいか見直してください。（ブラウザから各社APIへ直接つなぐ方式のため、会社によっては接続テストだけ失敗し、チャットは使える場合があります）",
@@ -193,11 +204,25 @@ export async function callOpenAI(
   return full;
 }
 
+/** 連続する同じ役割の発言を1つにまとめる（Gemini／Anthropicの交互必須対策） */
+function mergedHistory(history: Message[]): Message[] {
+  const out: Message[] = [];
+  for (const m of history) {
+    const last = out[out.length - 1];
+    if (last && last.role === m.role) {
+      last.content = last.content + "\n\n" + m.content;
+    } else {
+      out.push({ ...m });
+    }
+  }
+  return out;
+}
+
 /** Google Gemini（streamGenerateContent / SSE） */
 export async function callGemini(
   p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
 ): Promise<string> {
-  const contents = history.map((m) => ({
+  const contents = mergedHistory(history).map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
@@ -233,7 +258,7 @@ export async function callGemini(
 export async function callAnthropic(
   p: Provider, key: string, model: string, history: Message[], onDelta: OnDelta,
 ): Promise<string> {
-  const msgs = history.map((m) => ({ role: m.role, content: m.content }));
+  const msgs = mergedHistory(history).map((m) => ({ role: m.role, content: m.content }));
   const body: Record<string, unknown> = {
     model, max_tokens: 4096, messages: msgs, temperature: state.conf.temp,
   };

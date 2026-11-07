@@ -2,7 +2,7 @@ import { runSandboxedJs } from "./agent";
 import { callChat } from "./api";
 import { PROVIDERS } from "./providers";
 import { closeSheet, normLang, openSheet, renderChat } from "./render";
-import { curModel, curSession, persistSessions, state } from "./state";
+import { curModel, curProv, curSession, persistSessions, state } from "./state";
 import { $, toast } from "./util";
 
 /**
@@ -359,7 +359,7 @@ let repairing = false;
 async function repairCore(errMsg: string): Promise<string | null> {
   const gemini = PROVIDERS.find((p) => p.id === "gemini");
   const useGemini = gemini && (state.keys.gemini || "").trim();
-  const prov = useGemini ? gemini : PROVIDERS.find((p) => p.id === state.conf.provider) ?? gemini;
+  const prov = useGemini ? gemini : curProv();
   if (!prov) return null;
   const key = (state.keys[prov.id] || "").trim();
   if (!key) return null;
@@ -379,7 +379,7 @@ export async function autoRepair(errMsg: string, source: "js" | "preview", manua
   if (repairing) return;
   const gemini = PROVIDERS.find((p) => p.id === "gemini");
   const useGemini = gemini && (state.keys.gemini || "").trim();
-  const prov = useGemini ? gemini : PROVIDERS.find((p) => p.id === state.conf.provider) ?? gemini;
+  const prov = useGemini ? gemini : curProv();
   if (!prov) return;
   const key = (state.keys[prov.id] || "").trim();
   const status = (t: string): void => {

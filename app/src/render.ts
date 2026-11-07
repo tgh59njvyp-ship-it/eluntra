@@ -39,8 +39,9 @@ export function renderPills(): void {
   const m = curModel();
   const mono = $("#pillMono");
   mono.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${LOGOS[p.id] || ""}</svg>`;
-  $("#pillName").textContent = p.name;
-  $("#pillModel").textContent = m;
+  const auto = state.conf.provider === "auto";
+  $("#pillName").textContent = auto ? "Eluntra Auto" : p.name;
+  $("#pillModel").textContent = auto ? `${p.name} ・ ${m}` : m;
   const ks = keyState(p.id);
   const pill = $("#keyStateLabel");
   pill.textContent =
@@ -85,6 +86,7 @@ export function renderChat(): void {
         ? '<div class="empty"><h1>何を作りますか。</h1>'
         : '<div class="empty"><h1>何を聞きますか。</h1>') +
       '<div class="prov-row">' +
+      `<button class="prov-chip ${state.conf.provider === "auto" ? "on" : ""}" data-pick-prov="auto"><span class="logo-tile sm">${AUTO_SVG}</span><span>Eluntra Auto</span></button>` +
       provCells +
       '</div>' +
       '<div class="sugg">' +
@@ -260,6 +262,9 @@ export function renderSettings(): void {
         : "") +
       `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").token)}" autocomplete="off" spellcheck="false">` +
       `<button class="btn secondary" data-show-key="${p.id}">表示</button></div>` +
+      (p.id === "sambanova"
+        ? `<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザからの直接接続を受け付けていないため、ブラウザ版では接続テスト・チャットとも使えません（キーの問題ではありません）。</p>`
+        : "") +
       `<div class="key-actions"><button class="btn primary sm" data-save-key="${p.id}">保存</button>` +
       `<button class="btn secondary sm" data-test-key="${p.id}">接続テスト</button>` +
       `<button class="btn ghost sm" data-use-prov="${p.id}">この会社を使う</button>` +
@@ -310,9 +315,22 @@ export function openSettings(focusPid?: string): void {
 
 /* ---------- モデルシート ---------- */
 
+const AUTO_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg>';
+
 export function renderModelSheet(filter = ""): void {
   const p = curProv();
-  $("#modelSheetTitle").textContent = p.name;
+  const auto = state.conf.provider === "auto";
+  $("#modelSheetTitle").textContent = auto ? `Eluntra Auto（現在：${p.name}）` : p.name;
+  const row = document.querySelector<HTMLElement>("#modelProvRow");
+  if (row) {
+    row.innerHTML =
+      `<button class="mprov ${auto ? "on" : ""}" data-mprov="auto">${AUTO_SVG}<span>Auto</span></button>` +
+      PROVIDERS.map(
+        (x) =>
+          `<button class="mprov ${!auto && x.id === p.id ? "on" : ""}" data-mprov="${x.id}">${logoTile(x.id, true)}<span>${esc(x.name)}</span></button>`,
+      ).join("");
+  }
   const list = modelList(p.id).filter(
     (m) => !filter || m.toLowerCase().includes(filter.toLowerCase()),
   );

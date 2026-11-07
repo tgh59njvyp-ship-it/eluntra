@@ -76,11 +76,32 @@ export function persistModels(): void {
   save(LS.models, state.fetchedModels);
 }
 
+/** Eluntra Auto：接続済み（キーあり）の中での優先順位 */
+const AUTO_PRIORITY = [
+  "gemini", "groq", "openai", "openrouter", "mistral",
+  "deepseek", "anthropic", "cohere", "cloudflare",
+];
+
+export function isAuto(): boolean {
+  return state.conf.provider === "auto";
+}
+
+/** Auto選択時に実際に使うプロバイダー（接続テストOKを優先し、次に優先順位） */
+export function resolveAuto(): Provider | null {
+  const cands = PROVIDERS.filter((p) => (state.keys[p.id] || "").trim());
+  if (!cands.length) return null;
+  const rank = (p: Provider): number =>
+    (state.tested[p.id] ? 0 : 100) + AUTO_PRIORITY.indexOf(p.id);
+  return [...cands].sort((a, b) => rank(a) - rank(b))[0];
+}
+
 export function curProv(): Provider {
+  if (isAuto()) return resolveAuto() ?? findProvider("gemini");
   return findProvider(state.conf.provider);
 }
 export function curModel(): string {
-  return state.conf.models[state.conf.provider] || curProv().def;
+  const p = curProv();
+  return state.conf.models[p.id] || p.def;
 }
 export function modelList(pid: string): string[] {
   const fetched = state.fetchedModels[pid];

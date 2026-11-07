@@ -469,3 +469,9 @@ body.mode-code #codeChip{display:inline-flex}
 .code-act{padding:6px 11px;font-size:12.5px}
 .effort-note{margin-left:auto;font-size:12px;color:var(--text-3)}
 .effort-row.on{font-weight:700}
+
+.mprov-row{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.mprov-row::-webkit-scrollbar{display:none}
+.mprov{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px 0 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);flex:none;font-size:13px;color:var(--ink);cursor:pointer;font-family:inherit}
+.mprov.on{border-color:var(--accent);background:var(--accent-soft)}
+.mprov svg{width:18px;height:18px}
