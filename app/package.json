@@ -1,16 +1,25 @@
 {
-  "name": "eluntra-app",
+  "name": "eluntra-rebuild",
   "private": true,
-  "version": "5.0.0",
+  "version": "6.0.0",
   "type": "module",
-  "description": "Eluntra v5.0 — BYOK 30社対応AIチャット（TypeScript版 / Vite）",
+  "description": "Eluntra v6.0 — 1から作り直したBYOK AIチャット（React + TypeScript）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.4",
+    "marked": "^15.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.2.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
     "vite": "^5.4.11"
   }

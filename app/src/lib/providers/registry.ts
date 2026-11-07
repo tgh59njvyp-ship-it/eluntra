@@ -1,0 +1,266 @@
+import type { ProviderDef } from "../types";
+
+/**
+ * プロバイダーレジストリ（30社）。
+ * 新しい会社はここに1エントリ足し、必要ならアダプターを1つ追加するだけで増やせる。
+ * 初期モデルは実在が確認できるIDのみ。能力（vision等）は確認できる範囲だけ付ける。
+ */
+export const PROVIDERS: ProviderDef[] = [
+  {
+    id: "openai", name: "OpenAI", mono: "OA", color: "#191919", kind: "openai",
+    base: "https://api.openai.com/v1",
+    keyUrl: "https://platform.openai.com/api-keys", keyHint: "sk-… で始まるキー",
+    models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o4-mini"],
+    defaultModel: "gpt-4o-mini", vision: true, reasoning: true,
+  },
+  {
+    id: "gemini", name: "Google Gemini", mono: "Ge", color: "#1A56DB", kind: "gemini",
+    base: "https://generativelanguage.googleapis.com/v1beta",
+    keyUrl: "https://aistudio.google.com/apikey", keyHint: "Google AI Studioで無料取得できます",
+    models: ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    defaultModel: "gemini-3.5-flash-lite", vision: true, reasoning: true,
+  },
+  {
+    id: "anthropic", name: "Anthropic", mono: "An", color: "#B45A2D", kind: "anthropic",
+    base: "https://api.anthropic.com/v1",
+    keyUrl: "https://console.anthropic.com/settings/keys", keyHint: "sk-ant-… で始まるキー",
+    models: ["claude-sonnet-4-20250514", "claude-3-7-sonnet-20250224", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+    defaultModel: "claude-sonnet-4-20250514", vision: true, reasoning: true,
+  },
+  {
+    id: "mistral", name: "Mistral AI", mono: "Mi", color: "#E85D04", kind: "openai",
+    base: "https://api.mistral.ai/v1",
+    keyUrl: "https://console.mistral.ai/api-keys", keyHint: "MistralコンソールのAPIキー",
+    models: ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "open-mistral-nemo", "codestral-latest"],
+    defaultModel: "mistral-small-latest", vision: false,
+  },
+  {
+    id: "groq", name: "Groq", mono: "Gr", color: "#3A3A3A", kind: "openai",
+    base: "https://api.groq.com/openai/v1",
+    keyUrl: "https://console.groq.com/keys", keyHint: "gsk_… で始まるキー（無料枠あり）",
+    models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    defaultModel: "openai/gpt-oss-120b", reasoning: true,
+    modelsNote: "モデル構成が変わりやすい会社です。「一覧を取得」であなたのキーで使える実一覧に更新してください。",
+  },
+  {
+    id: "openrouter", name: "OpenRouter", mono: "OR", color: "#5B4BC4", kind: "openai",
+    base: "https://openrouter.ai/api/v1",
+    keyUrl: "https://openrouter.ai/settings/keys", keyHint: "sk-or-… で始まるキー（無料モデルあり）",
+    models: ["openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "google/gemini-2.0-flash-001", "deepseek/deepseek-chat", "meta-llama/llama-3.3-70b-instruct"],
+    defaultModel: "openai/gpt-4o-mini", vision: true,
+  },
+  {
+    id: "cohere", name: "Cohere", mono: "Co", color: "#0F4C3A", kind: "cohere",
+    base: "https://api.cohere.com",
+    keyUrl: "https://dashboard.cohere.com/api-keys", keyHint: "Cohereダッシュボードのキー（試用キーあり）",
+    models: ["command-a-03-2025", "command-r7b-12-2024", "command-r-plus-08-2024", "command-r-08-2024"],
+    defaultModel: "command-a-03-2025",
+  },
+  {
+    id: "cloudflare", name: "Cloudflare Workers AI", mono: "CF", color: "#F38020", kind: "openai",
+    base: "https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1",
+    keyUrl: "https://dash.cloudflare.com/profile/api-tokens", keyHint: "APIトークン",
+    fields: [
+      { id: "acct", label: "Account ID", placeholder: "CloudflareのAccount ID" },
+      { id: "token", label: "APIトークン", secret: true, placeholder: "Workers AIのAPIトークン" },
+    ],
+    models: ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct", "@cf/qwen/qwen1.5-14b-chat", "@cf/mistral/mistral-7b-instruct-v0.2"],
+    defaultModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  },
+  {
+    id: "sambanova", name: "SambaNova Cloud", mono: "SN", color: "#EE7624", kind: "openai",
+    base: "https://api.sambanova.ai/v1",
+    keyUrl: "https://cloud.sambanova.ai/apis", keyHint: "SambaNova CloudのAPIキー",
+    models: ["Meta-Llama-3.3-70B-Instruct"],
+    defaultModel: "Meta-Llama-3.3-70B-Instruct",
+    note: "ブラウザから直接つなげないため、サーバー経由（設定の接続）が必要です。",
+  },
+  {
+    id: "deepseek", name: "DeepSeek", mono: "De", color: "#2B4BFF", kind: "openai",
+    base: "https://api.deepseek.com/v1",
+    keyUrl: "https://platform.deepseek.com/api_keys", keyHint: "sk-… で始まるキー",
+    models: ["deepseek-chat", "deepseek-reasoner"],
+    defaultModel: "deepseek-chat", reasoning: true,
+  },
+  {
+    id: "xai", name: "xAI", mono: "xA", color: "#111111", kind: "openai",
+    base: "https://api.x.ai/v1",
+    keyUrl: "https://console.x.ai/", keyHint: "xAIコンソールのAPIキー",
+    models: ["grok-4", "grok-3", "grok-3-mini", "grok-code-fast-1"],
+    defaultModel: "grok-3", vision: true, reasoning: true,
+  },
+  {
+    id: "together", name: "Together AI", mono: "To", color: "#0C4A8A", kind: "openai",
+    base: "https://api.together.xyz/v1",
+    keyUrl: "https://api.together.ai/settings/api-keys", keyHint: "TogetherのAPIキー",
+    models: ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct-Turbo"],
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  },
+  {
+    id: "fireworks", name: "Fireworks AI", mono: "Fw", color: "#8A2BE2", kind: "openai",
+    base: "https://api.fireworks.ai/inference/v1",
+    keyUrl: "https://fireworks.ai/account/api-keys", keyHint: "FireworksのAPIキー",
+    models: ["accounts/fireworks/models/llama-v3p3-70b-instruct", "accounts/fireworks/models/deepseek-v3", "accounts/fireworks/models/qwen2p5-72b-instruct"],
+    defaultModel: "accounts/fireworks/models/llama-v3p3-70b-instruct",
+  },
+  {
+    id: "cerebras", name: "Cerebras", mono: "Ce", color: "#B3541E", kind: "openai",
+    base: "https://api.cerebras.ai/v1",
+    keyUrl: "https://cloud.cerebras.ai/", keyHint: "Cerebras CloudのAPIキー（高速）",
+    models: ["llama-3.3-70b", "llama3.1-8b", "qwen-3-32b", "gpt-oss-120b"],
+    defaultModel: "llama-3.3-70b",
+  },
+  {
+    id: "perplexity", name: "Perplexity", mono: "Px", color: "#0E6E6E", kind: "perplexity",
+    base: "https://api.perplexity.ai",
+    chatPath: "/chat/completions",
+    keyUrl: "https://www.perplexity.ai/settings/api", keyHint: "pplx-… で始まるキー",
+    models: ["sonar", "sonar-pro", "sonar-reasoning-pro", "sonar-deep-research"],
+    defaultModel: "sonar", modelsMode: "none",
+    modelsNote: "Perplexityにはモデル一覧APIがありません。公式ドキュメント記載のモデルを表示しています。",
+    note: "Web検索つきモデルです。回答には出典（citations）が付くことがあります。",
+  },
+  {
+    id: "nvidia", name: "NVIDIA NIM", mono: "Nv", color: "#4A7A0F", kind: "openai",
+    base: "https://integrate.api.nvidia.com/v1",
+    keyUrl: "https://build.nvidia.com/", keyHint: "nvapi-… で始まるキー",
+    models: ["meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-r1", "nvidia/llama-3.1-nemotron-70b-instruct"],
+    defaultModel: "meta/llama-3.3-70b-instruct", reasoning: true,
+  },
+  {
+    id: "huggingface", name: "Hugging Face", mono: "HF", color: "#B8860B", kind: "openai",
+    base: "https://router.huggingface.co/v1",
+    keyUrl: "https://huggingface.co/settings/tokens", keyHint: "hf_… で始まるトークン（Inference Providers）",
+    models: ["meta-llama/Llama-3.3-70B-Instruct", "deepseek-ai/DeepSeek-R1", "Qwen/Qwen2.5-72B-Instruct"],
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct",
+  },
+  {
+    id: "replicate", name: "Replicate", mono: "Rp", color: "#222222", kind: "replicate",
+    base: "https://api.replicate.com/v1",
+    keyUrl: "https://replicate.com/account/api-tokens", keyHint: "r8_… で始まるトークン",
+    models: ["meta/meta-llama-3.1-405b-instruct", "meta/meta-llama-3-70b-instruct", "meta/meta-llama-3-8b-instruct", "mistralai/mixtral-8x7b-instruct-v0.1"],
+    defaultModel: "meta/meta-llama-3-8b-instruct", modelsMode: "none",
+    modelsNote: "ReplicateにはLLM専用の一覧APIがないため、公式モデルを表示しています。モデルごとに実行形式が異なり、うまく動かないことがあります。",
+    note: "チャットは Predictions API（実行完了を待つ方式）で、ストリーミングしません。",
+  },
+  {
+    id: "bedrock", name: "Amazon Bedrock", mono: "Be", color: "#8A5A00", kind: "bedrock",
+    base: "https://bedrock-runtime.us-east-1.amazonaws.com",
+    keyUrl: "https://console.aws.amazon.com/iam/", keyHint: "AWSアクセスキー",
+    fields: [
+      { id: "accessKey", label: "アクセスキーID", placeholder: "AKIA…" },
+      { id: "secret", label: "シークレットアクセスキー", secret: true, placeholder: "AWSシークレットキー" },
+      { id: "region", label: "リージョン", placeholder: "us-east-1", hint: "例：us-east-1 / ap-northeast-1" },
+    ],
+    models: ["anthropic.claude-3-5-sonnet-20241022-v2:0", "meta.llama3-3-70b-instruct-v1:0", "amazon.nova-pro-v1:0", "amazon.nova-lite-v1:0"],
+    defaultModel: "anthropic.claude-3-5-sonnet-20241022-v2:0", modelsMode: "foundation",
+    note: "AWS署名（SigV4）で接続します。モデルの利用にはBedrock側でモデルアクセスの有効化が必要です。ブラウザのCORS制限で接続できない場合があります。",
+  },
+  {
+    id: "azure", name: "Azure AI Foundry", mono: "Az", color: "#0F5FA8", kind: "azure",
+    base: "",
+    keyUrl: "https://ai.azure.com/", keyHint: "Azure OpenAIリソースのキー",
+    fields: [
+      { id: "endpoint", label: "エンドポイント", placeholder: "https://あなたのリソース.openai.azure.com", hint: "末尾の / は不要です" },
+      { id: "key", label: "APIキー", secret: true, placeholder: "AzureのAPIキー" },
+    ],
+    models: [], defaultModel: "", modelsMode: "deployments",
+    note: "モデル名はAzure側の「デプロイ名」です。一覧取得でデプロイを読み取るか、モデル選択画面でデプロイ名を直接入力してください。",
+  },
+  {
+    id: "vertex", name: "Google Vertex AI", mono: "Vx", color: "#2E6B30", kind: "vertex",
+    base: "",
+    keyUrl: "https://console.cloud.google.com/apis/credentials", keyHint: "gcloudで取得するアクセストークン",
+    fields: [
+      { id: "project", label: "プロジェクトID", placeholder: "my-project-123" },
+      { id: "location", label: "ロケーション", placeholder: "us-central1" },
+      { id: "token", label: "アクセストークン", secret: true, placeholder: "ya29.…", hint: "アクセストークンは約1時間で失効します。その都度貼り直してください" },
+    ],
+    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash-001"],
+    defaultModel: "gemini-2.5-flash", modelsMode: "none", vision: true, reasoning: true,
+    modelsNote: "Vertex AIにはこの方式で使えるモデル一覧APIがないため、代表的なモデルIDを表示しています。",
+  },
+  {
+    id: "githubmodels", name: "GitHub Models", mono: "GM", color: "#24292F", kind: "github",
+    base: "https://models.github.ai/inference",
+    keyUrl: "https://github.com/settings/tokens", keyHint: "GitHubのPAT（Modelsの読み取り権限つき）",
+    models: ["openai/gpt-4o-mini", "openai/gpt-4o", "meta/llama-3.3-70b-instruct", "deepseek/deepseek-r1"],
+    defaultModel: "openai/gpt-4o-mini", modelsMode: "catalog",
+    modelsUrl: "https://models.github.ai/catalog/models",
+  },
+  {
+    id: "ai21", name: "AI21 Labs", mono: "A2", color: "#5B3A8A", kind: "openai",
+    base: "https://api.ai21.com/studio/v1",
+    keyUrl: "https://studio.ai21.com/account/api-key", keyHint: "AI21 StudioのAPIキー",
+    models: ["jamba-large", "jamba-mini"],
+    defaultModel: "jamba-mini",
+    modelsNote: "一覧取得に失敗した場合は、この公式モデル（Jamba系）で接続テストしてください。",
+  },
+  {
+    id: "alephalpha", name: "Aleph Alpha", mono: "AA", color: "#3D5A45", kind: "openai",
+    base: "https://api.aleph-alpha.com",
+    chatPath: "/chat/completions",
+    keyUrl: "https://app.aleph-alpha.com/", keyHint: "Aleph Alphaのトークン",
+    models: ["luminous-extended", "luminous-base", "luminous-supreme"],
+    defaultModel: "luminous-extended", modelsMode: "none",
+    modelsNote: "Aleph Alphaは独自形式のAPIのため、互換形式での送信を試みる実装です。実キーでの動作は未検証で、失敗する場合があります。",
+  },
+  {
+    id: "novita", name: "Novita AI", mono: "No", color: "#7A3B69", kind: "openai",
+    base: "https://api.novita.ai/v3/openai",
+    keyUrl: "https://novita.ai/settings/key-management", keyHint: "sk-… で始まるキー",
+    models: ["meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat-v3-0324", "qwen/qwen-2.5-72b-instruct"],
+    defaultModel: "meta-llama/llama-3.3-70b-instruct",
+  },
+  {
+    id: "hyperbolic", name: "Hyperbolic", mono: "Hy", color: "#6B4FA1", kind: "openai",
+    base: "https://api.hyperbolic.xyz/v1",
+    keyUrl: "https://app.hyperbolic.ai/settings", keyHint: "HyperbolicのAPIキー",
+    models: ["meta-llama/Meta-Llama-3.1-70B-Instruct", "deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"],
+    defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+  },
+  {
+    id: "siliconflow", name: "SiliconFlow", mono: "Si", color: "#4A4A8A", kind: "openai",
+    base: "https://api.siliconflow.cn/v1",
+    keyUrl: "https://cloud.siliconflow.cn/account/ak", keyHint: "sk-… で始まるキー",
+    models: ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct", "meta-llama/Meta-Llama-3.3-70B-Instruct"],
+    defaultModel: "deepseek-ai/DeepSeek-V3",
+  },
+  {
+    id: "ollama", name: "Ollama（ローカル）", mono: "Ol", color: "#333333", kind: "openai",
+    base: "http://localhost:11434/v1",
+    keyUrl: "https://ollama.com/download", keyHint: "キー不要",
+    fields: [
+      { id: "base", label: "接続先URL", placeholder: "http://localhost:11434/v1", hint: "スマホからは自宅PCの localhost には届きません。同じ端末で動かしている場合だけ使えます" },
+    ],
+    models: [], defaultModel: "", noKey: true, local: true, modelsMode: "tags",
+    modelsNote: "モデル一覧は接続先から取得します（Ollamaにpullしたモデルだけが表示されます）。",
+  },
+  {
+    id: "lmstudio", name: "LM Studio（ローカル）", mono: "LM", color: "#5A4632", kind: "openai",
+    base: "http://localhost:1234/v1",
+    keyUrl: "https://lmstudio.ai/", keyHint: "キー不要",
+    fields: [
+      { id: "base", label: "接続先URL", placeholder: "http://localhost:1234/v1", hint: "LM Studioでローカルサーバーを起動してください。スマホからは自宅PCの localhost には届きません" },
+    ],
+    models: [], defaultModel: "", noKey: true, local: true,
+    modelsNote: "モデル一覧は接続先から取得します（読み込み済みモデルだけが表示されます）。",
+  },
+  {
+    id: "llamacpp", name: "llama.cpp（ローカル）", mono: "Lc", color: "#4F6228", kind: "openai",
+    base: "http://localhost:8080/v1",
+    keyUrl: "https://github.com/ggml-org/llama.cpp", keyHint: "キー不要（サーバーにキーを設定した場合はそのキー）",
+    fields: [
+      { id: "base", label: "接続先URL", placeholder: "http://localhost:8080/v1", hint: "llama-serverの接続先。スマホからは自宅PCの localhost には届きません" },
+      { id: "key", label: "APIキー（任意）", secret: true, placeholder: "設定した場合のみ" },
+    ],
+    models: [], defaultModel: "", noKey: true, local: true,
+    modelsNote: "モデル一覧は接続先から取得します。",
+  },
+];
+
+export function findProvider(id: string): ProviderDef {
+  const p = PROVIDERS.find((x) => x.id === id);
+  if (!p) throw new Error(`未知のプロバイダー: ${id}`);
+  return p;
+}

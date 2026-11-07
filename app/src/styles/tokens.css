@@ -1,0 +1,45 @@
+/* Eluntra v6 デザイントークン
+   白基調ミニマル。色は「白＋ほぼ黒＋グレー＋控えめなブルー1色＋意味色」だけ。
+   プロバイダーの色は小さな文字タイルにのみ使う。 */
+:root {
+  --bg: #ffffff;
+  --bg-sub: #f7f7f5;
+  --surface: #ffffff;
+  --ink: #1b1b18;
+  --text-2: #5c5c55;
+  --text-3: #8e8e85;
+  --line: #e8e7e1;
+  --line-strong: #d8d6cc;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+  --accent-soft: #eef3fe;
+  --user-bubble: #eef3fe;
+  --error: #b3261e;
+  --error-bg: #fdf0ef;
+  --success: #1e6b4a;
+  --sheet-shadow: 0 16px 40px rgba(20, 16, 8, 0.22);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --font-body: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-head: "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #131313;
+  --bg-sub: #171717;
+  --surface: #1c1c1c;
+  --ink: #f2f2ee;
+  --text-2: #b5b5ac;
+  --text-3: #7e7e74;
+  --line: #2c2c2c;
+  --line-strong: #45453f;
+  --accent: #7aa5f8;
+  --accent-ink: #0d1526;
+  --accent-soft: #1c2740;
+  --user-bubble: #1c2740;
+  --error: #ff9a92;
+  --error-bg: #33201e;
+  --success: #7ed3a8;
+}
