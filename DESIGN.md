@@ -175,3 +175,14 @@ Eluntraは「8社のAIを、自分のキーで、1つの静かな画面から使
 
 - 上部バーの被りを修正：ピル内の会社名・モデル名をブロック表示にして省略を効かせ、改行要素を除去。アカウントアイコンはサイドバーと重複するため上部から外した。
 - コードモードを追加：単一HTMLの編集・ライブプレビュー・AI生成/修正（コードブロックを抽出して自動反映）・HTML書き出し。コードは端末保存＋Supabase同期対象。
+
+## v5.0（2026-11-07）
+
+- プロバイダーを30社に拡張（新規20社：xAI／Together／Fireworks／Cerebras／Perplexity／NVIDIA NIM／Hugging Face／Replicate／Amazon Bedrock／Azure AI Foundry／Google Vertex AI／GitHub Models／AI21／Aleph Alpha／Novita／Hyperbolic／SiliconFlow／Ollama／LM Studio／llama.cpp）。色は現行の白基調＋深緑アクセントを維持（指示書のブルー案は、ユーザーが承認してきた現行を優先して全面変更しない）
+- 設定のキー入力は汎用 keyFields 化（複数欄：Azureのエンドポイント＋キー、Bedrockの3欄、Vertexの3欄、ローカルのベースURL）。保存形式は従来の "::" 区切りを汎用化し、Cloudflareの既存形式と互換
+- モデル選択シート：検索＋「接続済みのみ表示」＋お気に入り（星）／最近使用／取得日時の表示。能力表示は確認できた範囲だけ（会社情報ベースの「画像・ツール・推論」）
+- 方式差の正直な明示：Perplexityはモデル一覧APIなし、ReplicateはLLM専用一覧なし、Vertexはトークン約1時間で失効、BedrockはSigV4署名＋CORS/権限で失敗しうる、ローカルAIはスマホから自分のPCのlocalhostに届かない、コネクタは実働5種のみで残り11種は未対応表示
+- コネクタ欄（設定内）：実働5種（GitHub／YouTube／Notion／Slack／Discord、トークン方式）＋未対応11種。トークンはAPIキーとは別のlocalStorageキーで端末内のみ
+- 添付：入力欄に添付ボタン。テキスト／画像のみ対応し、PDF・DOCX・XLSXは未対応と理由表示。画像は対応形式の会社でのみ送信し、非対応時は事前に案内
+- 240Hz配慮：アニメーションは transform/opacity のみ、ストリーミング描画は requestAnimationFrame でバッチ、会話要素に content-visibility:auto
+- エージェント：Web検索（/api/search）とページ取得（/api/fetchpage、SSRF防止つき）を追加し、段階表示（分析中／検索中／ページを確認中／整理中／回答を作成中）と出典一覧の保持・表示に対応

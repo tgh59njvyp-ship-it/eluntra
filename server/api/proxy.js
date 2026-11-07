@@ -1,7 +1,7 @@
 // Eluntra 中継サーバー（Vercel Edge Function）
-// ブラウザから直接つなげない会社（SambaNova等）のために、リクエストを中継する。
+// ブラウザから直接つなげない会社のために、リクエストを中継する。
 // キーはリクエストごとにヘッダーで受け取り、そのまま各社へ渡すだけ（保存・記録はしない）。
-// 中継先は対応10社のAPIドメインだけに制限する。
+// 中継先は対応30社のAPIドメイン＋サフィックス許可ドメインだけに制限する。
 export const config = { runtime: "edge" };
 
 const ALLOWED_HOSTS = new Set([
@@ -15,14 +15,43 @@ const ALLOWED_HOSTS = new Set([
   "api.deepseek.com",
   "api.cloudflare.com",
   "api.sambanova.ai",
+  // v5.0 新規
+  "api.x.ai",
+  "api.together.xyz",
+  "api.together.ai",
+  "api.fireworks.ai",
+  "api.cerebras.ai",
+  "api.perplexity.ai",
+  "integrate.api.nvidia.com",
+  "router.huggingface.co",
+  "api.replicate.com",
+  "models.github.ai",
+  "api.ai21.com",
+  "api.aleph-alpha.com",
+  "api.novita.ai",
+  "api.hyperbolic.xyz",
+  "api.siliconflow.cn",
+  "aiplatform.googleapis.com",
 ]);
+
+const ALLOWED_SUFFIXES = [
+  ".openai.azure.com", // Azure OpenAI（リソースごとのホスト名）
+  ".amazonaws.com", // Amazon Bedrock（リージョンごとのホスト名、署名つきリクエストのみ意味を持つ）
+];
+
+function hostAllowed(hostname) {
+  if (ALLOWED_HOSTS.has(hostname)) return true;
+  if (ALLOWED_SUFFIXES.some((s) => hostname.endsWith(s))) return true;
+  if (hostname.endsWith("-aiplatform.googleapis.com")) return true; // Vertex AI（ロケーションごとのホスト名）
+  return false;
+}
 
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers":
-      "authorization, content-type, x-api-key, anthropic-version, anthropic-dangerous-direct-browser-access, x-target-url",
+      "authorization, content-type, x-api-key, api-key, anthropic-version, anthropic-dangerous-direct-browser-access, x-target-url, x-amz-date, x-amz-content-sha256, x-amz-security-token, prefer, notion-version",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
@@ -50,7 +79,7 @@ export default async function handler(req) {
       headers: { "Content-Type": "application/json", ...cors },
     });
   }
-  if (url.protocol !== "https:" || !ALLOWED_HOSTS.has(url.hostname)) {
+  if (url.protocol !== "https:" || !hostAllowed(url.hostname)) {
     return new Response(JSON.stringify({ error: { message: "許可されていない接続先です" } }), {
       status: 403,
       headers: { "Content-Type": "application/json", ...cors },

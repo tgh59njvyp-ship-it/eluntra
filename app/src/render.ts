@@ -7,6 +7,8 @@ import {
   curProv,
   curSession,
   ensureSession,
+  getKeyFields,
+  isFavorite,
   keyState,
   modelList,
   persistConf,
@@ -15,6 +17,7 @@ import {
   state,
   stateLabel,
 } from "./state";
+import { CONNECTORS, connectorTested, connectorToken } from "./connectors";
 import type { Message, Session } from "./types";
 import { $, esc } from "./util";
 
@@ -108,6 +111,12 @@ export function renderChat(): void {
   scrollBottom(false);
 }
 
+export function fmtFetchedAt(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function renderMsg(m: Message, i: number, s: Session): string {
   const isUser = m.role === "user";
   const provId = s.providerAtSend || s.provider;
@@ -119,7 +128,14 @@ function renderMsg(m: Message, i: number, s: Session): string {
     ? `<div class="msg-steps">${m.steps.map((st) => `<div class="step"><svg class="ic sm" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(st)}</span></div>`).join("")}</div>`
     : "";
   const bodyHtml = m.pending ? '<span class="typing"><i></i><i></i><i></i></span>' : isUser ? md(m.content) : addCodeActions(md(m.content));
-  return `<div class="msg${isUser ? " user" : ""}">${stepsHtml}<div class="msg-body">${bodyHtml}</div>${foot}</div>`;
+  const atts = (m.attachments || []).length
+    ? `<div class="msg-atts">${(m.attachments || []).map((a) => a.kind === "image" && a.dataUrl ? `<img class="att-img" src="${a.dataUrl}" alt="${esc(a.name)}">` : `<span class="att-chip">${esc(a.name)}</span>`).join("")}</div>`
+    : "";
+  const srcHtml = m.sources && m.sources.length
+    ? `<div class="msg-sources"><div class="src-head">出典</div>${m.sources.map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>`).join("")}</div>`
+    : "";
+  const metaHtml = m.metaNote ? `<div class="msg-meta-note">${esc(m.metaNote)}</div>` : "";
+  return `<div class="msg${isUser ? " user" : ""}">${stepsHtml}${atts}<div class="msg-body">${bodyHtml}</div>${srcHtml}${metaHtml}${foot}</div>`;
 }
 
 /** 言語名の正規化（フェンス表記ゆれ吸収） */
@@ -259,14 +275,18 @@ export function renderSettings(): void {
       `<span class="st ${stCls}">${stateLabel(p.id)}</span>` +
       `<button class="icon-btn" data-toggle-key="${p.id}" aria-label="キー設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>` +
       `<div class="key-box" id="keybox-${p.id}">` +
-      (p.dualKey
-        ? `<div class="key-line" style="margin-bottom:8px"><input type="text" id="acct-${p.id}" placeholder="Account ID" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").acct)}" autocomplete="off" spellcheck="false"></div>`
-        : "") +
-      `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").token)}" autocomplete="off" spellcheck="false">` +
-      `<button class="btn secondary" data-show-key="${p.id}">表示</button></div>` +
-      (p.id === "sambanova"
-        ? `<p class="set-desc" style="margin:0 0 8px">注意：SambaNovaはブラウザから直接つなげないため、設定の「接続」で「サーバー経由で接続」がオンのときだけ使えます。</p>`
-        : "") +
+      (p.keyFields && p.keyFields.length
+        ? p.keyFields.map((f) => {
+            const v = getKeyFields(p.id)[f.id] || "";
+            return `<div class="key-field"><label for="kf-${p.id}-${f.id}">${esc(f.label)}</label><div class="key-line"><input type="${f.secret ? "password" : "text"}" id="kf-${p.id}-${f.id}" placeholder="${esc(f.placeholder)}" value="${esc(v)}" autocomplete="off" spellcheck="false">${f.secret ? `<button class="btn secondary" data-show-field="kf-${p.id}-${f.id}">表示</button>` : ""}</div>${f.hint ? `<p class="key-hint">${esc(f.hint)}</p>` : ""}</div>`;
+          }).join("")
+        : p.noKey
+          ? `<p class="set-desc" style="margin:0 0 8px">${esc(p.keyHint)}</p>`
+          : `<div class="key-line"><input type="password" id="key-${p.id}" placeholder="${esc(p.keyHint)}" value="${esc(splitSavedKey(p.id, state.keys[p.id] || "").token)}" autocomplete="off" spellcheck="false">` +
+            `<button class="btn secondary" data-show-key="${p.id}">表示</button></div>`) +
+      (p.note ? `<p class="set-desc" style="margin:0 0 8px">${esc(p.note)}</p>` : "") +
+      (p.modelsNote ? `<p class="set-desc" style="margin:0 0 8px">${esc(p.modelsNote)}</p>` : "") +
+      (state.modelMeta[p.id]?.fetchedAt ? `<p class="set-desc" style="margin:0 0 8px">モデル一覧の最終取得：${fmtFetchedAt(state.modelMeta[p.id]?.fetchedAt)}</p>` : "") +
       `<div class="key-actions"><button class="btn primary sm" data-save-key="${p.id}">保存</button>` +
       `<button class="btn secondary sm" data-test-key="${p.id}">接続テスト</button>` +
       `<button class="btn ghost sm" data-use-prov="${p.id}">この会社を使う</button>` +
@@ -276,6 +296,33 @@ export function renderSettings(): void {
     );
   }).join("");
   renderNotes();
+  renderConnectors();
+}
+
+/** コネクタ設定（実働5種＋未対応11種を正直に表示） */
+export function renderConnectors(): void {
+  const box = document.querySelector<HTMLElement>("#connectorsBox");
+  if (!box) return;
+  box.innerHTML = CONNECTORS.map((c) => {
+    if (!c.live) {
+      return `<div class="prov-row"><div class="prov-row-head"><span class="logo-tile"><span class="conn-mono" style="color:${c.color}">${esc(c.mono)}</span></span><span><span class="pr-name">${esc(c.name)}</span></span><span class="st">未対応</span></div><p class="set-desc" style="margin:8px 0 0">${esc(c.unavailableReason || "")}</p></div>`;
+    }
+    const ready = !!connectorToken(c.id);
+    const ok = !!connectorTested[c.id];
+    return (
+      `<div class="prov-row"><div class="prov-row-head"><span class="logo-tile"><span class="conn-mono" style="color:${c.color}">${esc(c.mono)}</span></span>` +
+      `<span><span class="pr-name">${esc(c.name)}</span><br><span class="pr-model">${esc(c.tools.join("・"))}</span></span>` +
+      `<span class="st ${ok ? "ok" : ready ? "set" : ""}">${ok ? "接続OK" : ready ? "設定済み" : "未設定"}</span>` +
+      `<button class="icon-btn" data-toggle-conn="${c.id}" aria-label="コネクタ設定を開く"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button></div>` +
+      `<div class="key-box" id="connbox-${c.id}"><div class="key-field"><label for="conn-${c.id}">${esc(c.tokenLabel || "トークン")}</label>` +
+      `<div class="key-line"><input type="password" id="conn-${c.id}" placeholder="${esc(c.tokenHint || "")}" value="${esc(connectorToken(c.id))}" autocomplete="off" spellcheck="false"><button class="btn secondary" data-show-field="conn-${c.id}">表示</button></div>` +
+      (c.tokenHint ? `<p class="key-hint">${esc(c.tokenHint)}</p>` : "") + `</div>` +
+      `<div class="key-actions"><button class="btn primary sm" data-save-conn="${c.id}">保存</button>` +
+      `<button class="btn secondary sm" data-test-conn="${c.id}">接続テスト</button>` +
+      (c.getTokenUrl ? `<a class="get-key" href="${c.getTokenUrl}" target="_blank" rel="noopener">トークンを取得する</a>` : "") + `</div>` +
+      `<div class="test-result" id="ctest-${c.id}"></div></div></div>`
+    );
+  }).join("");
 }
 
 /** メモ一覧（エージェントが保存。ログイン時はSupabaseへ同期） */
@@ -320,18 +367,61 @@ export function openSettings(focusPid?: string): void {
 const AUTO_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/></svg>';
 
+export const modelSheetOpts = { connectedOnly: false };
+
+const STAR = '<svg class="ic sm" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>';
+const STAR_ON = '<svg class="ic sm" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>';
+
+function capsBadges(pid: string): string {
+  const prov = PROVIDERS.find((x) => x.id === pid);
+  if (!prov?.caps) return "";
+  const b: string[] = [];
+  if (prov.caps.vision) b.push("画像");
+  if (prov.caps.tools) b.push("ツール");
+  if (prov.caps.reasoning) b.push("推論");
+  return b.length ? `<span class="mi-caps">${b.join("・")}対応（会社情報）</span>` : "";
+}
+
 export function renderModelSheet(filter = ""): void {
   const p = curProv();
   const auto = state.conf.provider === "auto";
   $("#modelSheetTitle").textContent = auto ? `Eluntra Auto（現在：${p.name}）` : p.name;
   const row = document.querySelector<HTMLElement>("#modelProvRow");
   if (row) {
+    const provs = modelSheetOpts.connectedOnly
+      ? PROVIDERS.filter((x) => keyState(x.id) !== "none")
+      : PROVIDERS;
     row.innerHTML =
       `<button class="mprov ${auto ? "on" : ""}" data-mprov="auto">${AUTO_SVG}<span>Auto</span></button>` +
-      PROVIDERS.map(
+      provs.map(
         (x) =>
           `<button class="mprov ${!auto && x.id === p.id ? "on" : ""}" data-mprov="${x.id}">${logoTile(x.id, true)}<span>${esc(x.name)}</span></button>`,
       ).join("");
+  }
+  const favBox = document.querySelector<HTMLElement>("#modelFavRec");
+  if (favBox) {
+    const favs = (state.favorites[p.id] || []).filter((m) => modelList(p.id).includes(m));
+    const recents = state.recents
+      .map((r) => { const i = r.indexOf(":"); return { pid: r.slice(0, i), model: r.slice(i + 1) }; })
+      .filter((r) => PROVIDERS.some((x) => x.id === r.pid));
+    const parts: string[] = [];
+    if (favs.length) {
+      parts.push(`<div class="mf-head">お気に入り（${esc(p.name)}）</div>` + favs.map((m) => `<button class="model-item ${m === curModel() && !auto ? "on" : ""}" data-model="${esc(m)}"><span class="mi-id">${esc(m)}</span></button>`).join(""));
+    }
+    if (recents.length) {
+      parts.push(`<div class="mf-head">最近使用</div>` + recents.map((r) => {
+        const rp = PROVIDERS.find((x) => x.id === r.pid);
+        return `<button class="model-item" data-recent="${esc(r.pid)}" data-model="${esc(r.model)}"><span class="mi-id">${esc(rp ? rp.name : r.pid)} ・ ${esc(r.model)}</span></button>`;
+      }).join(""));
+    }
+    favBox.innerHTML = parts.join("");
+  }
+  const meta = state.modelMeta[p.id];
+  const metaBox = document.querySelector<HTMLElement>("#modelMetaLine");
+  if (metaBox) {
+    metaBox.textContent = meta?.fetchedAt
+      ? `モデル一覧の最終取得：${fmtFetchedAt(meta.fetchedAt)}${meta.note ? "（" + meta.note + "）" : ""}`
+      : (findProvider(p.id).modelsNote || "");
   }
   const list = modelList(p.id).filter(
     (m) => !filter || m.toLowerCase().includes(filter.toLowerCase()),
@@ -340,7 +430,7 @@ export function renderModelSheet(filter = ""): void {
     ? list
         .map(
           (m) =>
-            `<button class="model-item ${m === curModel() ? "on" : ""}" data-model="${esc(m)}"><span class="mi-id">${esc(m)}</span><svg class="ic sm check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button>`,
+            `<div class="model-item ${m === curModel() && !auto ? "on" : ""}"><button class="mi-main" data-model="${esc(m)}"><span class="mi-id">${esc(m)}</span>${capsBadges(p.id)}<svg class="ic sm check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button><button class="mi-star ${isFavorite(p.id, m) ? "on" : ""}" data-fav="${esc(m)}" aria-label="お気に入り">${isFavorite(p.id, m) ? STAR_ON : STAR}</button></div>`,
         )
         .join("")
     : '<p style="padding:16px 0;color:var(--text-2);font-size:14px">一致するモデルがありません。下のカスタム入力で直接指定できます。</p>';

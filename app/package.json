@@ -1,9 +1,9 @@
 {
   "name": "eluntra-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "5.0.0",
   "type": "module",
-  "description": "Eluntra — BYOK 8社対応AIチャット（TypeScript版 / Vite）",
+  "description": "Eluntra v5.0 — BYOK 30社対応AIチャット（TypeScript版 / Vite）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

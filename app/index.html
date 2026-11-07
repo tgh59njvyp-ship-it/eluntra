@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Eluntra — 10社のAIを、自分のキーで</title>
+<title>Eluntra — 30社のAIを、自分のキーで</title>
 <meta name="description" content="Eluntraは、OpenAI・Gemini・Anthropic・Mistral・Groq・OpenRouter・Cohere・DeepSeek・Cloudflare・SambaNovaの10社を自分のAPIキー（BYOK）で使うAIチャットサービスです。キーは端末内にのみ保存されます。">
 <meta property="og:title" content="Eluntra">
-<meta property="og:description" content="10社のAIを、自分のキーで。BYOK専用AIチャット。">
+<meta property="og:description" content="30社のAIを、自分のキーで。BYOK専用AIチャット。">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#FFFFFF">
 <meta name="description" content="OpenAI・Gemini・Claudeなど10社のAIを、自分のAPIキーで使うチャット。キーは端末内にのみ保存。ログインで会話をクラウド同期。">
-<meta property="og:title" content="Eluntra — 10社のAIを、自分のキーで">
+<meta property="og:title" content="Eluntra — 30社のAIを、自分のキーで">
 <meta property="og:description" content="10社のAIを自分のAPIキーで使うBYOKチャット。キーは端末内にのみ保存し、選んだ会社のAPIへ直接送信。ログインで会話をクラウド同期。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://simple-url-server.lovable.app/s/eluntra/">
@@ -18,9 +18,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Eluntra — 10社のAIを、自分のキーで。">
+<meta property="og:image:alt" content="Eluntra — 30社のAIを、自分のキーで。">
 <meta name="twitter:image" content="https://simple-url-server.lovable.app/s/eluntra/og-image.png">
-<meta name="twitter:title" content="Eluntra — 10社のAIを、自分のキーで使うチャット">
+<meta name="twitter:title" content="Eluntra — 30社のAIを、自分のキーで使うチャット">
 <meta name="twitter:description" content="OpenAI / Gemini / Claude など10社のAIを、自分のAPIキーで使うBYOKチャット。キーは端末内のみに保存。">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
@@ -42,8 +42,8 @@
       </nav>
     </header>
     <p class="w-kicker">BYOK AI CHAT</p>
-    <h1 class="w-title">10社のAIを、<br><span>自分のキー</span>で。</h1>
-    <p class="w-lead">OpenAI・Gemini・Claudeなど10社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
+    <h1 class="w-title">30社のAIを、<br><span>自分のキー</span>で。</h1>
+    <p class="w-lead">OpenAI・Gemini・Claudeなど30社のAIを、自分のAPIキーで使うチャットです。キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。</p>
     <div class="w-cta">
       <button class="btn primary w-main-btn w-login-btn" id="btnWelcomeLogin">ログインして始める</button>
       <button class="btn ghost w-guest-btn" id="btnWelcomeGuest">ログインせずに使う</button>
@@ -53,7 +53,7 @@
     <section class="w-feats" id="w-features">
       <div class="w-feat">
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>
-        <div><h3>10社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek / Cloudflare / SambaNova。モデル一覧はキーで自動取得します。</p></div>
+        <div><h3>30社のAIに対応</h3><p>OpenAI / Gemini / Claude / Mistral / Groq / OpenRouter / Cohere / DeepSeek / Cloudflare / SambaNova / xAI / Together / Fireworks / Cerebras / Perplexity / NVIDIA / Hugging Face / Replicate / Bedrock / Azure / Vertex / GitHub Models / AI21 / Aleph Alpha / Novita / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp。モデル一覧はキーで自動取得します（一覧APIがない会社はその旨を表示します）。</p></div>
       </div>
       <div class="w-feat">
         <svg class="ic" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3"/><path d="M16.5 6.5 20 10"/><path d="M14 9l3 3"/></svg>
@@ -128,7 +128,7 @@
   <aside class="sidebar" id="sidebar" aria-label="サイドバー">
     <div class="sb-head">
       <div class="logo">Eluntra</div>
-      <div class="logo-sub">10社のAIを、自分のキーで使うチャット</div>
+      <div class="logo-sub">30社のAIを、自分のキーで使うチャット</div>
     </div>
     <div class="sb-new">
       <button class="btn primary block" id="btnNewChat">
@@ -201,11 +201,16 @@
           <button class="plus-btn" id="btnPlus" aria-label="その他の操作">
             <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           </button>
+          <button class="plus-btn" id="btnAttach" aria-label="ファイルを添付" title="ファイルを添付（テキスト／画像。PDF・DOCX・XLSXは未対応）">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13 5a3.7 3.7 0 0 1 5.2 5.2l-8.2 8.2a1.85 1.85 0 0 1-2.6-2.6L15 8.2"/></svg>
+          </button>
+          <input type="file" id="fileInput" hidden multiple accept=".txt,.md,.json,.csv,.ts,.js,.py,.html,.css,.xml,.yml,.yaml,.log,text/*,image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.xlsx">
           <textarea id="input" rows="1" placeholder="AIに質問してみよう" enterkeyhint="send"></textarea>
           <button class="send-btn" id="btnSend" aria-label="送信">
             <svg class="ic" viewBox="0 0 24 24" style="stroke:var(--accent-ink)"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
         </div>
+        <div class="attach-row" id="attachRow"></div>
         <div class="composer-chips">
           <button class="chip" id="btnAgent" title="エージェントモードの切り替え">エージェント</button>
           <button class="chip" id="btnEffort">Medium</button>
@@ -244,6 +249,9 @@
     <div class="sheet-body">
       <div class="mprov-row" id="modelProvRow"></div>
       <input class="model-search" id="modelSearch" placeholder="モデルを検索（モデルIDの一部）">
+      <label class="repair-toggle" style="margin:0 0 10px"><input type="checkbox" id="chkConnOnly"> 接続済みの会社のみ表示</label>
+      <div id="modelFavRec"></div>
+      <p class="model-meta-line" id="modelMetaLine"></p>
       <div id="modelList"></div>
       <div class="custom-model">
         <input id="customModel" placeholder="カスタムモデルIDを直接入力">
@@ -264,8 +272,11 @@
     </div>
     <div class="sheet-body">
       <p class="set-desc">Eluntraは月額なしのBYOK専用です。使う会社のAPIキーを貼るだけで、その会社のモデルと直接通信します。キーはこの端末のブラウザ内（localStorage）にのみ保存され、Eluntraのサーバーには送られません（そもそもサーバーがありません）。料金は各社の従量課金がそのまま適用されます。</p>
-      <div class="set-sec">プロバイダー 10社</div>
+      <div class="set-sec">プロバイダー 30社</div>
       <div id="provSettings"></div>
+      <div class="set-sec">コネクタ</div>
+      <p class="set-desc">外部サービスの接続です。トークン方式で実際に動くのは GitHub / YouTube / Notion / Slack / Discord の5種だけです。残り11種はOAuthアプリの登録が別途必要なため「未対応」と表示しています（接続済みには見せません）。トークンはAPIキーとは別の場所に、この端末内のみ保存されます。接続したコネクタはエージェントモードのツールとしても使えます。</p>
+      <div id="connectorsBox"></div>
       <div class="set-sec">メモ（Supabase連携）</div>
       <p class="set-desc">エージェントが保存したメモです。この端末に保存され、ログイン中はSupabaseにも自動で同期されます。</p>
       <div id="notesList"></div>
@@ -280,7 +291,7 @@
       <div class="set-sec">接続</div>
       <p class="set-desc">各社のAPIへ、Eluntraの中継サーバー（Vercel）を通してつなぎます。SambaNovaなど、ブラウザから直接つなげない会社を使うにはオンが必要です。キーは中継サーバーに保存されず、そのまま各社へ渡されます。</p>
       <label class="repair-toggle"><input type="checkbox" id="chkProxy"> サーバー経由で接続する</label>
-      <p class="set-desc">現在の版：v4.12</p>
+      <p class="set-desc">現在の版：v5.0</p>
       <div class="set-sec">自己修復</div>
       <p class="set-desc">このサイト自体で起きたエラーを記録し、前に保存したGeminiのAPIキーでAIが診断して、壊れた状態を自動で直します。APIキーは修復でも消しません。</p>
       <p class="set-desc" id="repairStatus">エラー記録はありません。</p>

@@ -12,7 +12,8 @@ import {
 import { runAgent } from "./agent";
 import { initCodeUI, verifyAndRepair } from "./code";
 import { copyRepairLog, installWatchdog, renderRepairPanel, runSelfRepair, setAutoRepair } from "./selfrepair";
-import { callWithFallback, fetchModels, testConnection, UserError } from "./api";
+import { callWithFallback, fetchModels, providerSupportsImage, testConnection, UserError } from "./api";
+import { connectorTested, connectorTokens, persistConnectors, testConnector } from "./connectors";
 import { logoTile } from "./logos";
 import { PROVIDERS, findProvider } from "./providers";
 import {
@@ -27,6 +28,7 @@ import {
   openSidebar,
   renderAccount,
   renderAll,
+  modelSheetOpts,
   renderModelSheet,
   renderSettings,
   scrollBottom,
@@ -36,6 +38,11 @@ import { md } from "./markdown";
 import {
   clearAutoSkip,
   createSession,
+  getKeyFields,
+  joinKeyFields,
+  pushRecent,
+  resolveAutoWithReason,
+  toggleFavorite,
   curModel,
   curProv,
   isAuto,
@@ -56,7 +63,7 @@ import {
   runtime,
   state,
 } from "./state";
-import type { Message, Provider, Session } from "./types";
+import type { Attachment, Message, Provider, Session } from "./types";
 import { $, esc, toast } from "./util";
 
 /* バナー内のボタンから呼べるよう公開する */
@@ -84,7 +91,8 @@ const autoFetchTried = new Set<string>();
 
 async function autoFetchModels(pid: string, force = false): Promise<void> {
   const key = (state.keys[pid] || "").trim();
-  if (!key) return;
+  const prov = findProvider(pid);
+  if (!key && !prov.noKey && !prov.local) return;
   if (!force && state.fetchedModels[pid]?.length) return;
   if (autoFetchTried.has(pid) && !force) return;
   autoFetchTried.add(pid);
@@ -99,7 +107,15 @@ async function autoFetchModels(pid: string, force = false): Promise<void> {
   }
 }
 
+let streamFrame = 0;
 function updateStreamingMsg(s: Session, aiMsg: Message): void {
+  if (streamFrame) return;
+  streamFrame = requestAnimationFrame(() => {
+    streamFrame = 0;
+    updateStreamingMsgNow(s, aiMsg);
+  });
+}
+function updateStreamingMsgNow(s: Session, aiMsg: Message): void {
   const col = $("#chatCol");
   const nodes = col.querySelectorAll(".msg");
   const idx = s.messages.indexOf(aiMsg);
@@ -161,38 +177,97 @@ function showErrorBanner(msg: string, p: Provider): void {
   scrollBottom(false);
 }
 
-/** 設定欄の入力を読む（CloudflareはAccount IDとトークンを結合） */
+/** 設定欄の入力を読む（keyFieldsがある会社は全欄を読んで "::" 結合する） */
 function readKeyInput(pid: string): string {
+  const prov = findProvider(pid);
+  if (prov.keyFields && prov.keyFields.length) {
+    const values: Record<string, string> = {};
+    prov.keyFields.forEach((f) => {
+      const inp = document.querySelector<HTMLInputElement>(`#kf-${pid}-${f.id}`);
+      values[f.id] = (inp?.value || "").trim();
+    });
+    return joinKeyFields(pid, values);
+  }
   const keyInp = document.querySelector<HTMLInputElement>(`#key-${pid}`);
-  const token = (keyInp?.value || "").trim();
-  if (!findProvider(pid).dualKey) return token;
-  const acctInp = document.querySelector<HTMLInputElement>(`#acct-${pid}`);
-  return joinSavedKey(pid, (acctInp?.value || "").trim(), token);
+  return (keyInp?.value || "").trim();
+}
+
+/* ---------- ファイル添付 ---------- */
+let pendingAttachments: Attachment[] = [];
+
+const TEXT_EXT = /\.(txt|md|json|csv|ts|tsx|js|jsx|py|html|css|xml|yml|yaml|log|sh|java|c|cpp|h|rb|go|rs|php|sql)$/i;
+export function renderAttachRow(): void {
+  const row = document.querySelector<HTMLElement>("#attachRow");
+  if (!row) return;
+  row.innerHTML = pendingAttachments
+    .map((a, i) => a.kind === "image" && a.dataUrl
+      ? `<span class="att-chip"><img class="att-thumb" src="${a.dataUrl}" alt="">${esc(a.name)}<button data-detach="${i}" aria-label="添付を外す">×</button></span>`
+      : `<span class="att-chip">${esc(a.name)}<button data-detach="${i}" aria-label="添付を外す">×</button></span>`)
+    .join("");
+}
+
+async function handleFiles(files: FileList): Promise<void> {
+  for (const f of [...files]) {
+    const name = f.name;
+    if (/\.(pdf|docx|xlsx)$/i.test(name)) {
+      toast(`${name}：PDF／DOCX／XLSXは未対応です（テキストファイルか画像を添付してください）`);
+      continue;
+    }
+    if (f.type.startsWith("image/")) {
+      if (f.size > 4_000_000) { toast(`${name}：画像が大きすぎます（4MBまで）`); continue; }
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      pendingAttachments.push({ name, kind: "image", dataUrl, mime: f.type });
+    } else if (TEXT_EXT.test(name) || f.type.startsWith("text/") || f.type === "application/json") {
+      if (f.size > 200_000) { toast(`${name}：テキストが大きすぎます（200KBまで）`); continue; }
+      const text = await f.text();
+      pendingAttachments.push({ name, kind: "text", text: text.slice(0, 60000) });
+    } else {
+      toast(`${name}：対応していない形式です（テキストファイル／画像のみ対応）`);
+    }
+  }
+  renderAttachRow();
 }
 
 async function sendMessage(): Promise<void> {
   const ta = $("#input") as HTMLTextAreaElement;
-  const text = ta.value.trim();
+  const rawText = ta.value.trim();
+  const atts = pendingAttachments;
+  const text = rawText || (atts.length ? "添付ファイルを確認してください" : "");
   if (!text || runtime.generating) return;
+  pendingAttachments = [];
+  renderAttachRow();
   ensureSession();
   const s = curSession();
   if (!s) return;
-  const p = curProv();
-  const model = curModel();
+  let p = curProv();
+  let model = curModel();
+  let autoReason = "";
+  if (isAuto()) {
+    const r = resolveAutoWithReason(text, { hasImage: atts.some((a) => a.kind === "image") });
+    if (r) { p = r.provider; model = r.model; autoReason = r.reason; }
+  }
+  if (atts.some((a) => a.kind === "image") && !providerSupportsImage(p)) {
+    toast(`${p.name}では画像を送れないため、テキストのみで送ります`);
+  }
   s.provider = state.conf.provider;
   s.model = model;
-  s.messages.push({ role: "user", content: text });
+  s.messages.push({ role: "user", content: text, attachments: atts.length ? atts : undefined });
   if (s.messages.length === 1) s.title = text.slice(0, 28);
   ta.value = "";
   autoGrow(ta);
-  const aiMsg: Message = { role: "assistant", content: "", model, pending: true };
+  const aiMsg: Message = { role: "assistant", content: "", model, pending: true, metaNote: autoReason ? `Eluntra Auto：${autoReason}` : undefined };
   s.messages.push(aiMsg);
   s.providerAtSend = p.id;
   persistSessions();
   renderAll();
 
   const key = (state.keys[p.id] || "").trim();
-  if (!key) {
+  if (!key && !p.noKey) {
     aiMsg.pending = false;
     aiMsg.content = "__NOKEY__";
     renderChatWithNoKey(p);
@@ -255,6 +330,7 @@ async function sendMessage(): Promise<void> {
         updateStreamingMsg(s, aiMsg);
       });
       aiMsg.steps = r.steps;
+      if (r.sources && r.sources.length) aiMsg.sources = r.sources;
       aiMsg.content = r.text;
       aiMsg.pending = false;
       runtime.generating = false;
@@ -273,7 +349,9 @@ async function sendMessage(): Promise<void> {
     let full = "";
     for (;;) {
       try {
-        full = await callWithFallback(attemptP, attemptKey, attemptModel, histForCall, onDelta);
+        full = await callWithFallback(attemptP, attemptKey, attemptModel, histForCall, onDelta, {
+          onSources: (srcs) => { aiMsg.sources = srcs; },
+        });
         break;
       } catch (e) {
         if (e instanceof UserError || (e instanceof DOMException && e.name === "AbortError")) throw e;
@@ -554,9 +632,80 @@ document.addEventListener("click", (e: Event) => {
     })();
     return;
   }
+  const det = target.closest<HTMLElement>("[data-detach]");
+  if (det) {
+    pendingAttachments.splice(Number(det.getAttribute("data-detach")), 1);
+    renderAttachRow();
+    return;
+  }
+  const sf = target.closest<HTMLElement>("[data-show-field]");
+  if (sf) {
+    const inp = document.querySelector<HTMLInputElement>(`#${sf.getAttribute("data-show-field")}`);
+    if (inp) {
+      inp.type = inp.type === "password" ? "text" : "password";
+      sf.textContent = inp.type === "password" ? "表示" : "隠す";
+    }
+    return;
+  }
+  const tc2 = target.closest<HTMLElement>("[data-toggle-conn]");
+  if (tc2) {
+    document.querySelector(`#connbox-${tc2.getAttribute("data-toggle-conn")}`)?.classList.toggle("on");
+    return;
+  }
+  const svc = target.closest<HTMLElement>("[data-save-conn]");
+  if (svc) {
+    const cid = svc.getAttribute("data-save-conn") as string;
+    const v = (document.querySelector<HTMLInputElement>(`#conn-${cid}`)?.value || "").trim();
+    if (v) connectorTokens[cid] = v; else delete connectorTokens[cid];
+    delete connectorTested[cid];
+    persistConnectors();
+    renderSettings();
+    renderAll();
+    toast(v ? "コネクタのトークンを保存しました" : "コネクタのトークンを削除しました");
+    return;
+  }
+  const tsc = target.closest<HTMLElement>("[data-test-conn]");
+  if (tsc) {
+    void (async () => {
+      const cid = tsc.getAttribute("data-test-conn") as string;
+      const v = (document.querySelector<HTMLInputElement>(`#conn-${cid}`)?.value || "").trim();
+      if (v) { connectorTokens[cid] = v; persistConnectors(); }
+      const box = document.querySelector<HTMLElement>(`#ctest-${cid}`);
+      if (box) { box.className = "test-result on"; box.style.color = "var(--text-2)"; box.textContent = "接続テスト中…"; }
+      const r = await testConnector(cid);
+      if (box) { box.className = "test-result on " + (r.ok ? "ok" : "ng"); box.textContent = (r.ok ? "成功：" : "失敗：") + r.msg; }
+      renderSettings();
+      const nb = document.querySelector<HTMLElement>(`#ctest-${cid}`);
+      if (nb && box) { nb.className = box.className; nb.textContent = box.textContent; }
+      document.querySelector(`#connbox-${cid}`)?.classList.add("on");
+    })();
+    return;
+  }
+  const fv = target.closest<HTMLElement>("[data-fav]");
+  if (fv) {
+    const m = fv.getAttribute("data-fav") as string;
+    const nowFav = toggleFavorite(curProv().id, m);
+    renderModelSheet(($("#modelSearch") as HTMLInputElement).value || "");
+    toast(nowFav ? "お気に入りに追加しました" : "お気に入りから外しました");
+    return;
+  }
+  const rc = target.closest<HTMLElement>("[data-recent]");
+  if (rc) {
+    const pid = rc.getAttribute("data-recent") as string;
+    const m = rc.getAttribute("data-model") as string;
+    state.conf.provider = pid;
+    state.conf.models[pid] = m;
+    persistConf();
+    pushRecent(pid, m);
+    renderAll();
+    closeSheet("modelSheet");
+    toast(`モデルを ${m} にしました`);
+    return;
+  }
   const mi = target.closest<HTMLElement>("[data-model]");
   if (mi) {
     state.conf.models[curProv().id] = mi.getAttribute("data-model") as string;
+    pushRecent(curProv().id, state.conf.models[curProv().id]);
     persistConf();
     renderAll();
     closeSheet("modelSheet");
@@ -615,6 +764,7 @@ $("#btnCustomModel").addEventListener("click", () => {
   const v = ($("#customModel") as HTMLInputElement).value.trim();
   if (!v) return;
   state.conf.models[curProv().id] = v;
+  pushRecent(curProv().id, v);
   persistConf();
   renderAll();
   closeSheet("modelSheet");
@@ -650,6 +800,18 @@ document.querySelectorAll(".effort-row").forEach((r) => {
       if (isLoggedIn()) void pushSync();
     }
   });
+});
+$("#btnAttach").addEventListener("click", () => {
+  ($("#fileInput") as HTMLInputElement).click();
+});
+$("#fileInput").addEventListener("change", (e: Event) => {
+  const inp = e.target as HTMLInputElement;
+  if (inp.files && inp.files.length) void handleFiles(inp.files);
+  inp.value = "";
+});
+$("#chkConnOnly")?.addEventListener("change", (e: Event) => {
+  modelSheetOpts.connectedOnly = (e.target as HTMLInputElement).checked;
+  renderModelSheet(($("#modelSearch") as HTMLInputElement).value || "");
 });
 $("#btnAgent").addEventListener("click", () => {
   state.conf.agent = !state.conf.agent;
