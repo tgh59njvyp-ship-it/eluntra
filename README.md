@@ -1,9 +1,9 @@
-# Eluntra（v6.5・作り直し版）
+# Eluntra（v6.7・作り直し版）
 
 30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。さらに、OpenAI互換のカスタム接続を自分で何件でも作れます。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
 
-- 公開URL: https://eluntra.vercel.app ／ https://simple-url-server.lovable.app/s/eluntra/
+- 公開URL: **https://eluntra.vercel.app（正はこちらに一本化）**。旧URL https://simple-url-server.lovable.app/s/eluntra/ は v6.7 で引っ越し案内（リダイレクト＋引き継ぎ用エクスポーター）へ置き換えた（下記 v6.7 の変更）
 - ソース: `app/`（React + TypeScript）。開発の正はこの版です
 - ルートの `index.html` は旧版（v4.12単一HTML）の凍結コピーです。今後は更新しません
 
@@ -25,7 +25,7 @@ OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / C
 - カスタム：接続は中継サーバーを介さずブラウザから直接行います（中継の許可リスト外のホストでも使えるようにするため）。そのため接続先がブラウザからのアクセス（CORS）を許可していない場合はつながりません
 
 ## 機能
-- BYOK（複数欄キー対応・マスキング・接続テスト・モデル一覧の自動/手動取得・取得日時・お気に入り・最近使用）
+- BYOK（複数欄キー対応・マスキング・接続テスト・モデル一覧の自動/手動取得・取得日時・お気に入り）
 - Eluntra Auto（質問分類でスコアリングし、選択理由を表示。失敗時は次候補へ自動切替）
 - 思考レベル Low / Medium / High / Super high（対応範囲で実リクエストへ反映）
 - Agent Mode（Web検索・ページ取得・JS実行・日時・メモ・コネクタツール・Supabase操作・ブラウザ、最大8手順、出典表示）
@@ -59,6 +59,19 @@ npm run build   # tsc strict + vite build
   - その他のサービス：認可コード＋PKCE の汎用エンジン＋設定テーブル、戻り先ページ（/connectors/callback）、トークン交換エンドポイント（/api/oauth/exchange、シークレットは Vercel 環境変数・未登録）まで基盤を実装。実際に繋げるには各サービスの開発者画面でのアプリ登録（リダイレクト先 https://eluntra.vercel.app/connectors/callback とクライアント情報）＋シークレットの環境変数登録が必要で、未登録の間はアプリ内で説明を表示して「準備中」とする
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
+
+## v6.7の変更（URL統合）
+
+- **公開URLを https://eluntra.vercel.app に一本化した**
+  - 背景：Vercel 側が古い版に戻る事故は、Vercel↔GitHub 連携の自動デプロイが GitHub 同期のたびにリポジトリ直下の旧アプリを上書きしていたことが原因で、連携を切断して根治済み（GitHub 同期ではもう上書きされない）
+  - 旧URL（simple-url-server.lovable.app/s/eluntra/）は単一HTMLのスタブ（`sus-stub.html`）に置き換えた。通常アクセスは「引っ越しました」表示の後 eluntra.vercel.app へ自動遷移する。ただし `?migrate_export=1` 付きで eluntra.vercel.app から iframe 埋め込みされた場合に限り、後述の引き継ぎエクスポーターとして動作する（遅れての引き継ぎに対応するため残置）
+- **データの引き継ぎ機能を追加**（`lib/migrate.ts`、設定「データの引き継ぎ」）
+  - APIキー等は localStorage（オリジンごと）に保存されクラウド同期されないため、旧オリジン→新オリジンへの移行手段を用意した
+  - 送信側：アプリ（およびスタブ）が `?migrate_export=1` かつ iframe 内で開かれた場合に、localStorage の `eluntra_*` 全項目を親へ postMessage する。宛先は本番では `https://eluntra.vercel.app` に厳密限定（開発時のみ localhost 同士を許可）
+  - 受信側：設定の引き継ぎ画面が旧URLを iframe で読み込み、origin を厳密検証して受け取り、内訳（APIキー／会話／カスタム／コネクタの件数）を確認してから取り込む。同名キーは引き継ぎ側が優先し、無い項目は残す。取り込み後にリロードして完了トーストを表示
+  - **データがサーバーを経由することは一切ない**（同一端末・同一ブラウザ内での postMessage のみ）。引き継ぎは利用者本人が自分のスマホで実行する必要がある
+  - ローカル二オリジン検証済み：別ポート同士で、送信側に仕込んだキー2件・会話1件・カスタム1件が受信側へ移ることを実ブラウザ（CDP駆動）で確認
+- **モデル選択シートの「最近使用」セクションを削除した**（ユーザーの指示）。store の recents 自体は互換のため残置し、UIとシート内の描画コードのみ撤去
 
 ## v6.6の変更
 

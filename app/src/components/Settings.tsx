@@ -13,6 +13,7 @@ import {
 } from "../lib/store";
 import type { CustomEntry, ProviderDef } from "../lib/types";
 import { ConnectorTile, Icon, ProviderTile } from "./icons";
+import { MigrateSection } from "./MigrateSection";
 
 interface Props {
   open: boolean;
@@ -657,7 +658,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.6</span>
+          <span className="pill-state">現在の版：v6.7</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -809,6 +810,8 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
               </button>
             </div>
           ))}
+
+          <MigrateSection />
 
           <div className="set-sec">データ管理</div>
           <p className="set-desc">キー・会話・設定・メモなど、この端末に保存されたEluntraのデータをすべて削除します（クラウド側の同期データは対象外です）。</p>

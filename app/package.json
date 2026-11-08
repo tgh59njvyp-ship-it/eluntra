@@ -1,9 +1,9 @@
 {
   "name": "eluntra-rebuild",
   "private": true,
-  "version": "6.6.0",
+  "version": "6.7.0",
   "type": "module",
-  "description": "Eluntra v6.6 — 1から作り直したBYOK AIチャット（React + TypeScript）",
+  "description": "Eluntra v6.7 — 1から作り直したBYOK AIチャット（React + TypeScript）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

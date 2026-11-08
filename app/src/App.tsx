@@ -11,6 +11,7 @@ import { clearAutoSkip, resolveAuto, skipAutoProviders } from "./lib/auto";
 import { runAgent } from "./lib/agent/engine";
 import { handleAuthCallback, isLoggedIn, onAuthChange, pullSync, pushSync } from "./lib/auth";
 import { handleOAuthCallback } from "./lib/connectors/oauth";
+import { consumeMigratedFlag } from "./lib/migrate";
 import { streamWithFallback } from "./lib/providers/chat";
 import { UserError } from "./lib/providers/transport";
 import {
@@ -50,6 +51,11 @@ export default function App() {
     setToastMsg(msg);
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMsg(""), 3600);
+  }, []);
+
+  useEffect(() => {
+    if (consumeMigratedFlag()) toast("以前のURLからデータを引き継ぎました");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

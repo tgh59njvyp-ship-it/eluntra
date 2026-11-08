@@ -3,7 +3,7 @@ import { resolveAuto } from "../lib/auto";
 import { fetchModels } from "../lib/providers/chat";
 import { UserError } from "../lib/providers/transport";
 import {
-  allProviders, getState, hasCredentials, isCustomId, keyStateLabel, keyStateOf, modelListOf, providerDefOf, pushRecent, toggleFavorite, update, useStore,
+  allProviders, getState, hasCredentials, isCustomId, keyStateLabel, keyStateOf, modelListOf, providerDefOf, toggleFavorite, update, useStore,
 } from "../lib/store";
 import { Icon, ProviderTile } from "./icons";
 
@@ -21,7 +21,6 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   const modelMeta = useStore((s) => s.modelMeta);
   const modelFlags = useStore((s) => s.modelFlags);
   const favorites = useStore((s) => s.favorites);
-  const recents = useStore((s) => s.recents);
   void fetchedModels;
   const [providerId, setProviderId] = useState<string>("gemini");
   const [query, setQuery] = useState("");
@@ -71,13 +70,6 @@ export function ModelSheet({ open, onClose, toast }: Props) {
     return [...list.filter((m) => favs.includes(m)), ...list.filter((m) => !favs.includes(m))];
   }, [models, query, favorites, providerId]);
 
-  const recentPairs = recents
-    .map((r) => {
-      const [pid, ...rest] = r.split(":");
-      return { pid, model: rest.join(":") };
-    })
-    .filter((r) => !!providerDefOf(r.pid));
-
   const choose = (pid: string, model: string) => {
     const st = getState();
     update({
@@ -87,7 +79,6 @@ export function ModelSheet({ open, onClose, toast }: Props) {
         models: { ...st.conf.models, [pid]: model },
       },
     });
-    pushRecent(pid, model);
     onClose();
   };
 
@@ -255,18 +246,6 @@ export function ModelSheet({ open, onClose, toast }: Props) {
               {busy ? "取得中…" : "一覧を取得"}
             </button>
           </div>
-
-          {recentPairs.length > 0 && !query && (
-            <>
-              <div className="set-sec">最近使用</div>
-              {recentPairs.slice(0, 4).map((r) => (
-                <button key={`${r.pid}:${r.model}`} type="button" className="model-row" onClick={() => choose(r.pid, r.model)}>
-                  <span className="mid">{r.model}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-3)" }}>{providerDefOf(r.pid)?.name ?? r.pid}</span>
-                </button>
-              ))}
-            </>
-          )}
 
           <div>
             {grouped ? (
