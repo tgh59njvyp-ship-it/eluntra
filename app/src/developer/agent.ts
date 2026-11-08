@@ -5,6 +5,7 @@
 import { completeChat} from "../lib/providers/chat";
 import type { ChatMessage, ProviderDef} from "../lib/types";
 import { devUid, listPaths, runFsTool, type FsChange} from "./fs";
+import { isReadOnlySql } from "./db";
 
 export type DevMode = "plan" | "build" | "debug" | "review" | "ask" | "auto";
 
@@ -40,6 +41,14 @@ confirm: (description: string) => Promise<boolean>;
 termExec: (command: string) => Promise<string>;
 /** プレビューの状態説明 */
 previewInfo: () => string;
+/** データベース一覧（テキスト） */
+dbList?: () => Promise<string>;
+/** データベースのスキーマ（テキスト） */
+dbSchema?: (name: string) => Promise<string>;
+/** SQL実行（結果テキスト） */
+dbQuery?: (name: string, sql: string) => Promise<string>;
+/** 実行環境などの追加コンテキスト */
+contextNote?: () => string;
 /** このセッションで作成・確認済みのファイル（再確認を省略する） */
 sessionFiles: Set<string>;
 signal?: AbortSignal;
@@ -62,7 +71,10 @@ const TOOL_GUIDE = [
 "- fs_edit {path, old, new, replaceAll?}: 正確に一致する部分文字列を置換する（old は一意に特定できる長さにする）",
 "- fs_delete {path}: ファイルを削除する",
 "- code_search {query}: プロジェクト全体を文字列検索する",
-"- term_exec {command}: ターミナルでコマンドを実行する（Node.js環境のみ。npm install / npm run build / npm test / node など）",
+"- term_exec {command}: ターミナルでコマンドを実行する。Node.js系（npm install / npm run build / npm test / node など）は WebContainer、Python系（python file.py / python -c \"...\" / pip install <純Pythonパッケージ>）は Pyodide（CPython のWASM版）で実行される",
+"- db_list {}: このプロジェクトのデータベース一覧（SQLite / PostgreSQL。どちらもブラウザ内で実際に動作する）",
+"- db_schema {db}: データベースのテーブルと列を確認する",
+"- db_query {db, sql}: SQLを実行する（結果は最大100行）。書き込みSQLは読み取り専用モードでは実行できない",
 "- preview_info {}: プレビューの状態を確認する",
 "ルール:",
 "- 存在を確かめていないファイルは、まず fs_list / fs_read で確認してから編集する",
@@ -122,6 +134,9 @@ fs_delete: "ファイルを削除",
 code_search: "コードを検索",
 term_exec: "ターミナルで実行",
 preview_info: "プレビューを確認",
+db_list: "データベース一覧を確認",
+db_schema: "スキーマを確認",
+db_query: "SQLを実行",
 };
 
 /** ツール1件を実行し、モデルへ返す結果文字列を返す（変更があれば ctx 経由で反映・記録される） */
@@ -140,6 +155,25 @@ return out.slice(0, 8000);
 }
 if (tool === "preview_info") {
 return ctx.previewInfo();
+}
+
+if (tool === "db_list" || tool === "db_schema" || tool === "db_query") {
+ctx.onEvent({ kind: "tool", tool, detail: args.db || "", output: ""});
+let out = "";
+if (tool === "db_list") {
+out = ctx.dbList? await ctx.dbList(): "データベース機能が接続されていません";
+} else if (tool === "db_schema") {
+out = ctx.dbSchema? await ctx.dbSchema(args.db || ""): "データベース機能が接続されていません";
+} else {
+const sql = args.sql || "";
+if (READONLY_MODES.has(mode) &&!isReadOnlySql(sql)) {
+out = `モード ${mode.toUpperCase()} ではデータベースへの書き込みSQLは実行できません。SELECTなどの読み取りのみ可能です。`;
+} else {
+out = ctx.dbQuery? await ctx.dbQuery(args.db || "", sql): "データベース機能が接続されていません";
+}
+}
+ctx.onEvent({ kind: "tool", tool, detail: args.db || "", output: out.slice(0, 2000)});
+return out.slice(0, 8000);
 }
 
 // fs系: 確認ポリシー
@@ -189,7 +223,7 @@ ctx: AgentContext;
 const { provider, model, mode, ctx} = opts;
 const files = ctx.getFiles();
 const convo: ChatMessage[] = [
-{ role: "user", content: [TOOL_GUIDE, MODE_GUIDE[mode], projectContext(files)].join("\n\n")},
+{ role: "user", content: [TOOL_GUIDE, MODE_GUIDE[mode], projectContext(files), ctx.contextNote? ctx.contextNote(): ""].filter(Boolean).join("\n\n")},
 { role: "assistant", content: "了解しました。プロジェクトを確認しながら進めます。"},
 ...opts.history.slice(-10),
 { role: "user", content: opts.userText},

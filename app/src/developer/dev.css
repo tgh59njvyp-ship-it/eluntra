@@ -1,4 +1,4 @@
-/* Eluntra Developer（v7.1）スタイル
+/* Eluntra Developer（v7.2）スタイル
    v7トークン（tokens.css）を前提に、開発環境のレイアウトだけを定義する。
    白基調・ネイビー文字・青アクセント・線描きアイコン・柔らかい影。 */
 
@@ -395,4 +395,49 @@ input, select, textarea { font-family: inherit; }
   .dev-header { gap: 8px; padding: 8px 10px; }
   .dev-projname { flex: 1 1 120px; min-width: 100px; }
   .dev-title-text .dev-version { display: none; }
+}
+
+/* v7.2: サブタブ（ターミナル/データベース切替） */
+.dev-subtabs { display: flex; gap: 4px; padding: 5px 12px 0; }
+.dev-subtabs button {
+  border: 1px solid transparent; background: transparent; color: var(--text-2);
+  border-radius: 8px 8px 0 0; padding: 6px 12px; font-size: 12.5px; cursor: pointer; min-height: 32px;
+}
+.dev-subtabs button.on { color: var(--accent); background: var(--accent-soft); }
+.dev-subtabs + .dev-pane { height: calc(100% - 37px); }
+
+/* v7.2: データベースパネル */
+.dev-db-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.dev-db-create { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dev-db-create input, .dev-db-create select {
+  border: 1px solid var(--line-strong); border-radius: 10px; padding: 7px 10px;
+  font-size: 13px; background: var(--surface); color: var(--ink); min-height: 36px;
+}
+.dev-db-error { background: var(--error-bg); border-radius: 10px; padding: 9px 12px; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+.dev-db-info { background: var(--accent-soft); border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+.dev-db-main { display: flex; gap: 12px; align-items: flex-start; }
+.dev-db-schema { flex: 0 0 230px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; max-height: 320px; overflow-y: auto; }
+.dev-db-schema-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
+.dev-db-notables { font-size: 12px; color: var(--text-3); }
+.dev-db-table { margin-bottom: 8px; }
+.dev-db-table-name { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--accent); }
+.dev-db-col { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-2); padding-left: 10px; }
+.dev-db-col .ty { color: var(--text-3); }
+.dev-db-console { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.dev-db-console textarea {
+  border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px;
+  font-family: var(--font-mono); font-size: 13px; background: var(--surface); color: var(--ink); resize: vertical;
+}
+.dev-db-console-btns { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dev-db-msg { font-size: 12px; color: var(--text-2); }
+.dev-db-result { overflow: auto; border: 1px solid var(--line); border-radius: 10px; max-height: 300px; }
+.dev-db-result table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.dev-db-result th, .dev-db-result td { border-bottom: 1px solid var(--line); padding: 5px 9px; text-align: left; white-space: nowrap; }
+.dev-db-result th { background: var(--bg-sub); font-weight: 700; }
+.dev-db-result td.null { color: var(--text-3); font-style: italic; }
+.dev-db-rowcount { font-size: 11.5px; color: var(--text-3); padding: 4px 9px; }
+.dev-db-footnote { font-size: 11.5px; color: var(--text-3); }
+@media (max-width: 1023.98px) {
+  .dev-db-main { flex-direction: column; }
+  .dev-db-schema { flex: none; width: 100%; max-height: 180px; }
 }

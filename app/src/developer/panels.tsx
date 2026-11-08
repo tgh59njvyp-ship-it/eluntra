@@ -18,10 +18,14 @@ import {
   normalizePath, renamePath, revertChange, searchFiles, type DevProject,
 } from "./fs";
 import {
-  ghChangedFiles, ghCreatePR, ghCreateRepo, ghHeadSha, ghListBranches, ghListRepos, ghOpenRepo, ghPush,
-  ghViewer, githubConnected, type GhRepo,
+  ghChangedFiles, ghCreateBranch, ghCreatePR, ghCreateRepo, ghHeadSha, ghListBranches, ghListBranchesDetailed, ghListRepos, ghOpenRepo, ghPush,
+  ghViewer, githubConnected, type GhBranch, type GhRepo,
 } from "./github";
 import { wcService } from "./webcontainer";
+import { applyPyChanges, parsePythonCommand, pyService, type ParsedTermCommand, type PyChange } from "./python";
+import { dbService, formatOutcomeForAgent, formatSchemaForAgent, type DbMeta } from "./db";
+import { termBus } from "./term";
+import { DbPane } from "./dbpanel";
 
 /* ---------- アイコン（線描き） ---------- */
 
@@ -31,6 +35,7 @@ const DEV_PATHS: Record<string, React.ReactNode> = {
   terminal: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3m5 0h5" /></>,
   play: <><path d="M7 4.5v15l13-7.5Z" /></>,
   branch: <><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="8" r="2.5" /><path d="M6 8.5v7m12-5c0 4-5 4-8.5 5.5" /></>,
+  db: <><ellipse cx="12" cy="5.5" rx="8" ry="3" /><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>,
   back: <><path d="M15 5l-7 7 7 7" /></>,
   monitor: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6m-3-4v4" /></>,
   phone: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></>,
@@ -196,7 +201,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.1 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         {p.project ? (
@@ -267,7 +272,10 @@ export function ShellMain(p: ShellProps) {
         <button type="button" className={p.bottomTab === "problems" ? "on" : ""} onClick={() => goBottom("problems")}>
           <Icon name="alert" className="ic sm" /> 問題{p.markers.length ? `（${p.markers.length}）` : ""}
         </button>
-        <span className="dev-desktopbar-note">実行環境はブラウザ内Node.js（WebContainer）です。Python等の他言語は実行できません。</span>
+        <button type="button" className={p.bottomTab === "database" ? "on" : ""} onClick={() => goBottom("database")}>
+          <DIcon name="db" className="dev-ic sm" /> データベース
+        </button>
+        <span className="dev-desktopbar-note">実行環境はブラウザ内です（Node.js=WebContainer / Python=Pyodide / DB=SQLite・PostgreSQL）。</span>
       </div>
 
       {sheet === "new" && (
@@ -671,6 +679,20 @@ p.closeTab(path);
 <div className="dev-editorbar">
 <span className="dev-editorpath">{p.activePath || "—"}</span>
 <div className="dev-editoracts">
+{p.activePath?.endsWith(".py") && (
+<button
+type="button"
+className="btn sm primary"
+onClick={() => {
+p.flushEdit();
+p.setBottomTab("terminal");
+p.setMobileTab("terminal");
+termBus.requestRunFile(p.activePath!);
+}}
+>
+<DIcon name="play" className="dev-ic sm" /> 実行
+</button>
+)}
 <button type="button" className="btn sm" onClick={() => p.editorApiRef.current?.find()} disabled={!p.activePath}>
 検索・置換
 </button>
@@ -866,10 +888,50 @@ return next;
 },
 confirm: props.askConfirm,
 termExec: async (command: string) => {
+const parsedPy = parsePythonCommand(command);
+if (parsedPy.kind !== "other") {
+if (parsedPy.kind === "python-repl") {
+return "対話モード（python単体）はエージェントからは使えません。python -c \"...\" か、ファイルを作成して python file.py で実行してください。";
+}
+try {
+const filesNow = projectRef.current?.files || {};
+if (parsedPy.kind === "pip-install") {
+const r = await pyService.pipInstall(parsedPy.packages);
+return [`$ ${command}（Python / Pyodide）`, r.error? `micropip エラー: ${r.error}`: r.output.trim() || "インストールしました"].join("\n");
+}
+const res =
+parsedPy.kind === "python-file"
+? await pyService.runFile(filesNow, parsedPy.path, parsedPy.args)
+: await pyService.runCode(filesNow, parsedPy.kind === "python-code"? parsedPy.code: "");
+if (res.changes.length) {
+const cur = projectRef.current;
+if (cur) {
+const applied = applyPyChanges(cur.files, res.changes);
+if (applied.touched.length) {
+p.updateProject(cur.id, (pr) => ({
+...pr,
+files: applied.files,
+changeLog: [
+{ at: Date.now(), path: applied.touched[0], kind: "edit" as const, source: "ai" as const, detail: `Python実行で${applied.touched.length}件変更` },
+...(pr.changeLog || []),
+].slice(0, 100),
+}));
+}
+}
+}
+return [
+`$ ${command}（Python / Pyodide）`,
+res.output.trim()? res.output.trim().slice(-6000): "（出力なし）",
+res.error? `エラー: ${res.error.slice(0, 2000)}`: "（終了コード: 0）",
+].join("\n");
+} catch (e) {
+return `Pythonは利用できません: ${pyService.errorReason || (e instanceof Error? e.message: String(e))}`;
+}
+}
 try {
 await ensureWcMounted(projectRef.current);
 } catch (e) {
-return `ターミナルは利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}`;
+return `ターミナル（Node.js）は利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}。Pythonコマンド（python file.py 等）は Pyodide で実行できます。`;
 }
 const res = await wcService.exec(command, { timeoutMs: 120_000});
 const out = res.output.trim();
@@ -884,6 +946,41 @@ if (wcService.previewUrl) return `開発サーバーが起動しています。�
 const cur = projectRef.current;
 if (cur && "index.html" in cur.files) return "開発サーバーは未起動です。静的プレビュー（index.html）が利用できます。";
 return "プレビューは未起動です。ターミナルで開発サーバー（npm run dev）を起動するとURLが発行されます（WebContainerが必要）";
+},
+dbList: async () => {
+const cur = projectRef.current;
+if (!cur) return "プロジェクトが選択されていません";
+const metas = await dbService.listDbs(cur.id);
+if (!metas.length) return "このプロジェクトにはデータベースがまだありません。データベースはユーザーが下部パネルの「データベース」タブで作成します（あなたは作成できません）。必要なら最終報告で作成を依頼してください。";
+return metas.map((m) => `${m.name}（${m.engine === "sqlite"? "SQLite": "PostgreSQL"}）`).join("\n");
+},
+dbSchema: async (name: string) => {
+const cur = projectRef.current;
+if (!cur) return "プロジェクトが選択されていません";
+const metas = await dbService.listDbs(cur.id);
+const meta = metas.find((m) => m.name === name);
+if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
+const tables = await dbService.schema(meta);
+return formatSchemaForAgent(tables);
+},
+dbQuery: async (name: string, sql: string) => {
+const cur = projectRef.current;
+if (!cur) return "プロジェクトが選択されていません";
+const metas = await dbService.listDbs(cur.id);
+const meta = metas.find((m) => m.name === name);
+if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
+const outcome = await dbService.execSql(meta, sql);
+return formatOutcomeForAgent(outcome, meta.name);
+},
+contextNote: () => {
+const cur = projectRef.current;
+const dbs: DbMeta[] = cur? dbService.cachedList(cur.id): [];
+return [
+"実行環境: Node.js は WebContainer、Python は Pyodide（CPython のWASM版）で実際に実行できます。python file.py / python -c / pip install（純Pythonのみ）が使えます。",
+dbs.length
+? `利用可能なデータベース: ${dbs.map((m) => `${m.name}（${m.engine === "sqlite"? "SQLite": "PostgreSQL"}）`).join("、")}。db_list / db_schema / db_query ツールで操作できます。`
+: "データベースはまだ作成されていません（作成はユーザー操作です）。",
+].join("\n");
 },
 sessionFiles: p.sessionFilesRef.current,
 signal: ctl.signal,
@@ -1064,9 +1161,23 @@ aria-label="AIへの指示"
 
 function BottomPanel(p: ShellProps) {
 const tab = p.bottomTab;
+const [sub, setSub] = useState<"term" | "db">("term");
 return (
 <section className={`dev-bottom${tab? " open": ""}`} aria-label="下部パネル">
-{tab === "terminal" && <TerminalPane {...p} />}
+{tab === "terminal" && (
+<>
+<div className="dev-subtabs" role="tablist" aria-label="ターミナルとデータベース">
+<button type="button" role="tab" aria-selected={sub === "term"} className={sub === "term"? "on": ""} onClick={() => setSub("term")}>
+ターミナル
+</button>
+<button type="button" role="tab" aria-selected={sub === "db"} className={sub === "db"? "on": ""} onClick={() => setSub("db")}>
+データベース
+</button>
+</div>
+{sub === "term"? <TerminalPane {...p} />: <DbPane {...p} />}
+</>
+)}
+{tab === "database" && <DbPane {...p} />}
 {tab === "preview" && <PreviewPane {...p} />}
 {tab === "problems" && <ProblemsPane {...p} />}
 {tab === null && (
@@ -1092,12 +1203,18 @@ off2();
 
 function TerminalPane(p: ShellProps) {
 useWcTick();
+const [, setPyTick] = useState(0);
+useEffect(() => pyService.onState(() => setPyTick((n) => n + 1)), []);
 const [text, setText] = useState("");
 const [cmd, setCmd] = useState("");
 const [running, setRunning] = useState(false);
+const [repl, setRepl] = useState(false);
+const runningRef = useRef(false);
 const preRef = useRef<HTMLPreElement>(null);
 const projectRef = useRef(p.project);
 projectRef.current = p.project;
+const propsRef = useRef(p);
+propsRef.current = p;
 
 useEffect(() => {
 const el = preRef.current;
@@ -1108,16 +1225,115 @@ const append = useCallback((chunk: string) => {
 setText((prev) => (prev + chunk).slice(-120_000));
 }, []);
 
+useEffect(() => termBus.onAppend(append), [append]);
+
+const applyChanges = useCallback(
+(changes: PyChange[]) => {
+const cur = projectRef.current;
+if (!cur || !changes.length) return;
+const applied = applyPyChanges(cur.files, changes);
+if (!applied.touched.length) return;
+propsRef.current.applyFileChange(applied.files, {
+path: applied.touched[0],
+kind: "edit",
+source: "user",
+detail: `Python実行で${applied.touched.length}件のファイルを変更: ${applied.touched.slice(0, 5).join(", ")}${applied.touched.length > 5? " ほか": ""}`,
+});
+append(`[Python: ${applied.touched.length}件のファイルをプロジェクトへ反映しました: ${applied.touched.join(", ")}]\n`);
+},
+[append],
+);
+
+const runPythonParsed = useCallback(
+async (parsed: ParsedTermCommand) => {
+const files = projectRef.current?.files || {};
+try {
+if (parsed.kind === "python-repl") {
+setRepl(true);
+append("Python対話モードを開始しました（変数は保持されます）。終了するには exit() と入力してください。\n");
+return;
+}
+if (parsed.kind === "pip-install") {
+append("micropip でインストールしています（純Pythonパッケージのみ対応）…\n");
+const res = await pyService.pipInstall(parsed.packages, append);
+if (res.error) append(`micropip エラー: ${res.error}\n`);
+return;
+}
+const res =
+parsed.kind === "python-file"
+? await pyService.runFile(files, parsed.path, parsed.args, append)
+: await pyService.runCode(files, parsed.kind === "python-code"? parsed.code: "", { onOutput: append});
+if (res.error) append(`${res.error}\n`);
+applyChanges(res.changes);
+} catch (e) {
+append(`Pythonを利用できません: ${pyService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+}
+},
+[append, applyChanges],
+);
+
+const runFileExternal = useCallback(
+async (path: string) => {
+if (runningRef.current) return;
+propsRef.current.flushEdit();
+append(`\n$ python ${path}\n`);
+runningRef.current = true;
+setRunning(true);
+try {
+const res = await pyService.runFile(projectRef.current?.files || {}, path, [], append);
+if (res.error) append(`${res.error}\n`);
+applyChanges(res.changes);
+} catch (e) {
+append(`Pythonを利用できません: ${pyService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+}
+runningRef.current = false;
+setRunning(false);
+},
+[append, applyChanges],
+);
+
+useEffect(() => termBus.onRunFile((path) => void runFileExternal(path)), [runFileExternal]);
+
 const run = useCallback(async () => {
 const command = cmd.trim();
-if (!command || running) return;
+if (!command || runningRef.current) return;
 setCmd("");
+if (repl) {
+append(`\n>>> ${command}\n`);
+if (command === "exit()" || command === "quit()") {
+setRepl(false);
+append("Python対話モードを終了しました。\n");
+return;
+}
+runningRef.current = true;
+setRunning(true);
+try {
+const res = await pyService.runSnippet(command, append);
+if (res.error) append(`${res.error}\n`);
+} catch (e) {
+append(`Pythonを利用できません: ${pyService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+}
+runningRef.current = false;
+setRunning(false);
+return;
+}
 append(`\n$ ${command}\n`);
+const parsed = parsePythonCommand(command);
+if (parsed.kind !== "other") {
+runningRef.current = true;
+setRunning(true);
+await runPythonParsed(parsed);
+runningRef.current = false;
+setRunning(false);
+return;
+}
+runningRef.current = true;
 setRunning(true);
 try {
 await ensureWcMounted(projectRef.current);
 } catch (e) {
-append(`ターミナルを利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+append(`ターミナル（Node.js）を利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+runningRef.current = false;
 setRunning(false);
 return;
 }
@@ -1127,21 +1343,23 @@ append(`\n[終了コード ${res.code?? "不明"}${res.timedOut? "（タイム�
 } catch (e) {
 append(`実行できませんでした: ${e instanceof Error? e.message: String(e)}\n`);
 }
+runningRef.current = false;
 setRunning(false);
-}, [cmd, running, append]);
+}, [cmd, repl, append, runPythonParsed]);
 
 const state = wcService.state;
+const pyState = pyService.state;
 return (
 <div className="dev-pane terminal">
 <div className="dev-pane-head">
 <span>
-<DIcon name="terminal" className="dev-ic sm" /> ターミナル（ブラウザ内Node.js）
+<DIcon name="terminal" className="dev-ic sm" /> ターミナル（Node.js / Python）
 </span>
 <span className="dev-pane-state">
-{state === "ready" && "起動済み"}
-{state === "booting" && "起動中…"}
-{state === "idle" && "未起動（コマンド実行時に起動します）"}
-{state === "error" && `利用できません: ${wcService.errorReason}`}
+Node: {state === "ready"? "起動済み": state === "booting"? "起動中…": state === "error"? `利用不可`: "未起動"}
+{" ／ Python: "}
+{pyState === "ready"? `利用可能（CPython ${pyService.version || ""}）`: pyState === "loading"? "読み込み中…": pyState === "error"? `利用不可: ${pyService.errorReason}`: "未読み込み（pythonコマンド実行時に読み込みます）"}
+{state === "error" && ` ／ Nodeを利用できません: ${wcService.errorReason}`}
 </span>
 <span className="dev-pane-btns">
 {running && (
@@ -1158,17 +1376,17 @@ return (
 </span>
 </div>
 <pre className="dev-term-out" ref={preRef}>
-{text || "コマンドを実行すると、ここに出力が表示されます。例: npm install / npm run dev / node -v / ls\n（本物のOSシェルではなく、ブラウザ内のNode.js環境です）"}
+{text || "コマンドを実行すると、ここに出力が表示されます。\nNode.js の例: npm install / npm run dev / node -v / ls\nPython の例: python hello.py / python -c \"print(1+2)\" / python（対話モード） / pip install <純Pythonパッケージ>\n（本物のOSシェルではなく、ブラウザ内の実行環境です。PythonはPyodide＝CPythonのWASM版で動き、ファイルはプロジェクトと同期されます）"}
 </pre>
 <div className="dev-term-input">
-<span>$</span>
+<span>{repl? ">>>": "$"}</span>
 <input
 value={cmd}
 onChange={(e) => setCmd(e.target.value)}
 onKeyDown={(e) => {
 if (e.key === "Enter") void run();
 }}
-placeholder="コマンドを入力してEnter"
+placeholder={repl? "Pythonコードを入力（exit()で終了）": "コマンドを入力してEnter"}
 aria-label="ターミナルコマンド"
 />
 <button type="button" className="btn primary sm" onClick={() => void run()} disabled={running ||!cmd.trim()}>
@@ -1474,6 +1692,10 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
   const [prTitle, setPrTitle] = useState("");
   const [prBody, setPrBody] = useState("");
   const [prBase, setPrBase] = useState("main");
+  const [repoBranches, setRepoBranches] = useState<GhBranch[]>([]);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [newBranchBase, setNewBranchBase] = useState("");
+  const [switchTo, setSwitchTo] = useState("");
   const [busy, setBusy] = useState("");
   const [info, setInfo] = useState("");
   const [error, setError] = useState("");
@@ -1605,10 +1827,74 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
       return `再取得しました（${Object.keys(res.files).length}ファイル）`;
     });
 
+  const linkKey = link ? `${link.owner}/${link.repo}` : "";
+
+  useEffect(() => {
+    if (!connected || !link) {
+      setRepoBranches([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const bs = await ghListBranchesDetailed(link.owner, link.repo);
+        if (!alive) return;
+        setRepoBranches(bs);
+        setNewBranchBase(link.branch);
+        setSwitchTo(link.branch);
+        setPrBase((cur) => (bs.some((b) => b.name === cur) ? cur : bs.find((b) => b.name !== link.branch)?.name || bs[0]?.name || cur));
+      } catch {
+        if (alive) setRepoBranches([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, linkKey]);
+
+  const switchBranch = () =>
+    run("switch", async () => {
+      if (!project || !link) throw new Error("プロジェクトがGitHubと紐付いていません");
+      const target = switchTo;
+      if (!target || target === link.branch) throw new Error("現在のブランチと同じです");
+      if (changed.length > 0) {
+        const ok = await props.askConfirm(
+          `未プッシュの変更が ${changed.length} 件あります。ブランチを切り替えると現在のファイルは「${target}」の内容に置き換わります。続行しますか？`,
+        );
+        if (!ok) return "ブランチ切替を中止しました";
+      }
+      const res = await ghOpenRepo(link.owner, link.repo, target);
+      p.updateProject(project.id, (pr) => ({
+        ...pr,
+        files: res.files,
+        github: { ...link, branch: target, headSha: res.headSha, baseFiles: { ...res.files } },
+        changeLog: [
+          { at: Date.now(), path: "", kind: "edit" as const, source: "github" as const, detail: `ブランチを ${target} に切り替え` },
+          ...(pr.changeLog || []),
+        ].slice(0, 100),
+      }));
+      p.baselineRef.current = { ...res.files };
+      return `ブランチを ${target} に切り替えました（${Object.keys(res.files).length}ファイル）`;
+    });
+
+  const createBranch = () =>
+    run("branch", async () => {
+      if (!project || !link) throw new Error("プロジェクトがGitHubと紐付いていません");
+      const name = newBranchName.trim();
+      if (!name) throw new Error("新しいブランチ名を入力してください");
+      const base = newBranchBase || link.branch;
+      await ghCreateBranch(link.owner, link.repo, name, base);
+      setNewBranchName("");
+      const bs = await ghListBranchesDetailed(link.owner, link.repo);
+      setRepoBranches(bs);
+      return `ブランチ「${name}」を作成しました（起点: ${base}）。使う場合は「ブランチを切り替え」で選んでください。`;
+    });
+
   const createPR = () =>
     run("pr", async () => {
       if (!link) throw new Error("プロジェクトがGitHubと紐付いていません");
-      if (link.branch === prBase) throw new Error("headブランチとbaseブランチが同じです。PRには別ブランチが必要です（ブランチ作成は今後の対応です）");
+      if (link.branch === prBase) throw new Error("headブランチとbaseブランチが同じです。別のbaseを選ぶか、「ブランチ」欄で新しいブランチを作成して切り替えてください");
       const pr = await ghCreatePR(link.owner, link.repo, prTitle.trim() || "Eluntra Developer からの変更", prBody, link.branch, prBase);
       return `Pull Request #${pr.number} を作成しました: ${pr.url}`;
     });
@@ -1708,16 +1994,60 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
                   </div>
                 </div>
                 <div className="dev-field">
+                  <span>
+                    <DIcon name="branch" className="dev-ic sm" /> ブランチ（現在: {link.branch}）
+                  </span>
+                  <div className="dev-gh-row">
+                    <select value={switchTo} onChange={(e) => setSwitchTo(e.target.value)} aria-label="切替先ブランチ">
+                      {repoBranches.map((b) => (
+                        <option key={b.name} value={b.name}>
+                          {b.name}
+                          {b.name === link.branch ? "（現在）" : ""}
+                        </option>
+                      ))}
+                      {repoBranches.length === 0 && <option value={link.branch}>{link.branch}</option>}
+                    </select>
+                    <button type="button" className="btn sm" disabled={!!busy || !switchTo || switchTo === link.branch} onClick={() => void switchBranch()}>
+                      {busy === "switch" ? "切替中…" : "ブランチを切り替え"}
+                    </button>
+                  </div>
+                  <div className="dev-gh-row">
+                    <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)} placeholder="新しいブランチ名（例: feature/login）" aria-label="新しいブランチ名" />
+                    <select value={newBranchBase} onChange={(e) => setNewBranchBase(e.target.value)} aria-label="起点ブランチ">
+                      {repoBranches.map((b) => (
+                        <option key={b.name} value={b.name}>
+                          起点: {b.name}
+                        </option>
+                      ))}
+                      {repoBranches.length === 0 && <option value={link.branch}>起点: {link.branch}</option>}
+                    </select>
+                    <button type="button" className="btn sm" disabled={!!busy || !newBranchName.trim()} onClick={() => void createBranch()}>
+                      {busy === "branch" ? "作成中…" : "ブランチを作成"}
+                    </button>
+                  </div>
+                  <span className="dev-gh-note-inline">プッシュ先は現在のブランチ（{link.branch}）です。切替時はそのブランチの内容でファイルが置き換わります。</span>
+                </div>
+                <div className="dev-field">
                   <span>Pull Request作成（head: {link.branch}）</span>
                   <div className="dev-gh-row">
-                    <input value={prBase} onChange={(e) => setPrBase(e.target.value)} placeholder="baseブランチ" aria-label="baseブランチ" />
+                    {repoBranches.length > 0 ? (
+                      <select value={prBase} onChange={(e) => setPrBase(e.target.value)} aria-label="baseブランチ">
+                        {repoBranches.map((b) => (
+                          <option key={b.name} value={b.name}>
+                            base: {b.name}
+                          </option>
+                        ))}
+                        {!repoBranches.some((b) => b.name === prBase) && <option value={prBase}>base: {prBase}</option>}
+                      </select>
+                    ) : (
+                      <input value={prBase} onChange={(e) => setPrBase(e.target.value)} placeholder="baseブランチ" aria-label="baseブランチ" />
+                    )}
                     <input value={prTitle} onChange={(e) => setPrTitle(e.target.value)} placeholder="タイトル" aria-label="PRタイトル" />
                   </div>
                   <textarea value={prBody} onChange={(e) => setPrBody(e.target.value)} placeholder="本文" rows={2} aria-label="PR本文" />
                   <button type="button" className="btn sm" disabled={!!busy} onClick={() => void createPR()}>
                     {busy === "pr" ? "作成中…" : "Pull Requestを作成"}
                   </button>
-                  <span className="dev-gh-note-inline">※ ブランチの新規作成・切替はこのバージョンでは未対応です（現在のブランチ表示とPR作成のみ）。</span>
                 </div>
               </>
             )}

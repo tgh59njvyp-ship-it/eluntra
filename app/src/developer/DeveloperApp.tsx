@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.1）
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2）
    構成: 左=プロジェクト/ファイルツリー、中央=Monacoエディター、右=AI開発チャット、
    下部=ターミナル/プレビュー/問題。モバイルは下部タブで画面を切り替える。
    ファイルは eluntra_dev_projects（localStorage）に実保存され、ターミナルと
@@ -18,7 +18,7 @@ import { wcService } from "./webcontainer";
 
 export type { ShellProps };
 
-export type BottomTab = "terminal" | "preview" | "problems";
+export type BottomTab = "terminal" | "preview" | "problems" | "database";
 export type MobileTab = "files" | "editor" | "ai" | "preview" | "terminal";
 
 const ACTIVE_PROJECT_LS = "eluntra_dev_active_project";

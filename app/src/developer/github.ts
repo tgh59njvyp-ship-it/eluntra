@@ -100,6 +100,47 @@ export async function ghListBranches(owner: string, repo: string): Promise<strin
   return arr.map((b) => b.name);
 }
 
+export interface GhBranch {
+  name: string;
+  sha: string;
+  protected: boolean;
+}
+
+/** ブランチ一覧（名前・先端SHA・保護フラグつき） */
+export async function ghListBranchesDetailed(owner: string, repo: string): Promise<GhBranch[]> {
+  const arr = await gh<Array<{ name: string; commit: { sha: string }; protected: boolean }>>(
+    `/repos/${owner}/${repo}/branches?per_page=100`,
+  );
+  return arr.map((b) => ({ name: b.name, sha: b.commit.sha, protected: !!b.protected }));
+}
+
+/** git/refs 作成リクエストのボディ（純粋関数。単体テスト対象） */
+export function buildCreateRefBody(branch: string, sha: string): { ref: string; sha: string } {
+  const name = (branch || "").trim();
+  if (!name) throw new Error("ブランチ名が空です");
+  if (/[\s~^:?*[\\]/.test(name) || name.startsWith("/") || name.endsWith("/") || name.includes("..")) {
+    throw new Error(`ブランチ名に使えない文字が含まれています: ${branch}`);
+  }
+  if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error(`SHAの形式が不正です: ${sha}`);
+  return { ref: `refs/heads/${name}`, sha };
+}
+
+/** 既存ブランチ（base）の先端から新しいブランチを作成する */
+export async function ghCreateBranch(owner: string, repo: string, newBranch: string, baseBranch: string): Promise<GhBranch> {
+  const sha = await ghHeadSha(owner, repo, baseBranch);
+  const body = buildCreateRefBody(newBranch, sha);
+  try {
+    await gh(`/repos/${owner}/${repo}/git/refs`, { method: "POST", body: JSON.stringify(body) });
+  } catch (e) {
+    const err = e as GhError;
+    if (err.status === 422) {
+      throw new Error(`ブランチを作成できませんでした（422）。「${newBranch}」がすでに存在するか、名前が不正です。`);
+    }
+    throw e;
+  }
+  return { name: newBranch.trim(), sha, protected: false };
+}
+
 export async function ghCreateRepo(name: string, priv: boolean): Promise<GhRepo> {
   const j = await gh<{
     full_name: string;
