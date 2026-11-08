@@ -156,3 +156,28 @@ npm run build   # tsc strict + vite build
   - 接続方式：中継サーバー（/api/proxy）のホスト許可リストに無い任意ホストへ送るため、カスタムはブラウザから直接接続する（ProviderDef の `direct` フラグ）。このため接続先の CORS 設定が前提になる。Auto の候補には入る（local ではないため）
   - 表示ロゴは線描きスライダーの自作 SVG（public/logos/custom.svg）
 - 表記を「30社」→「31社」に更新（タイトル・OG・各画面）
+
+## v7.1の変更（Eluntra Developer：AIソフトウェア開発環境）
+
+Eluntra Code（軽量なコード生成・編集）とは別に、本格的なAI開発環境「Eluntra Developer」を追加した。
+
+- 入口: **https://eluntra.vercel.app/developer.html**（本体サイドバーの「Developer」から新しいタブで開く）。本体とは別エントリだが同一オリジンのため、本体の localStorage（APIキー `eluntra_keys`、カスタム接続、`eluntra_conf`、コネクタ状態、テーマ、Supabaseログインセッション `eluntra_auth`）をそのまま共有する。未ログイン時は案内を表示し、AI開発とGitHub操作は無効化する（閲覧・編集は可能）
+- ファイルシステム: プロジェクトを `eluntra_dev_projects`（localStorage）に実保存。複数プロジェクト、テンプレート（空／静的サイト／React+TypeScript(Vite)）、作成・名前変更・削除・移動、プロジェクト全体検索、行単位LCS差分、ファイル単位Undo/Redo、自動保存、変更履歴、JSON書き出し/読み込み
+- エディター: Monaco Editor（npm同梱、遅延読み込み）。シンタックスハイライト（主要言語）、行番号、タブ、検索・置換、整形、折りたたみ、TypeScript/JavaScriptの診断（問題パネルに表示）。読み込み失敗時はプレーンなテキスト編集へフォールバックし、その旨を表示する
+- ターミナル／プレビュー: WebContainer（ブラウザ内Node.js）。`/developer.html` にだけ COOP/COEP ヘッダー（`deploy/vercel.json`）を付け crossOriginIsolated 化。コマンド実行（npm install / npm run dev / node 等、停止ボタン、120秒上限）、開発サーバーの server-ready URL を iframe プレビュー（モバイル/タブレット/PC幅切替）。ファイル編集はコンテナへ自動同期。静的プロジェクト向けに index.html へ css/js を埋め込む静的プレビューも併設。起動できない環境では理由（crossOriginIsolatedでない／60秒タイムアウト等）を表示する
+- AI開発エージェント: 本体のプロバイダー層を再利用（現在の選択モデル＋Eluntra Auto、思考レベルも共通設定）。モードは PLAN / BUILD / DEBUG / REVIEW / ASK / AUTO。PLAN・REVIEW・ASK では書き込みツールをコード側で拒否する。ツールは fs_list / fs_read / fs_write / fs_edit / fs_delete / code_search / term_exec / preview_info（すべて実実行）。既存ファイルの上書き・削除は、このセッションで作ったファイル以外は実行前にインライン確認を出す。変更はすべて差分サマリ付きの変更カード（個別に元に戻すボタン付き）で表示する。上限は25手順、同一呼び出し・同一エラーの繰り返しは3回で停止する。実行していない作業を完了と表示しない
+- GitHub連携: 本体のGitHubコネクタのトークンで api.github.com へ直接アクセス。接続状態（ログイン名）、リポジトリ一覧、開く（ツリー＋ファイル内容を新規プロジェクトとして取得。バイナリ・256KB超・package-lock は対象外と明示）、新規リポジトリ作成、コミット＆プッシュ（Git Data API で全ファイル＋削除を反映。実行前にHEADとの変更一覧を表示）、再取得（Pull）、 Pull Request作成。ブランチの新規作成・切替は未対応（現在のブランチ表示のみ）と明示した
+- UI: デスクトップは左（プロジェクト/ツリー/GitHub）＋中央（エディター）＋右（AIチャット/実行状況）＋下部（ターミナル/プレビュー/問題）。モバイルは下部タブ（ファイル/エディタ/AI/プレビュー/ターミナル）で全画面切替。v7トークン準拠、ダークテーマ対応
+
+### v7.1で対応していないもの（仕様上の制約）
+- Node.js以外のランタイム実行（Python / Java / C / C++ / Go / Rust / PHP）: WebContainerがNode.js専用のため。編集（Monacoのハイライト）は可能
+- データベースサーバー（PostgreSQL / MySQL / MongoDB）の実行とコンテナ隔離: ブラウザ内では提供できない。Supabaseは外部APIとして生成コードから使う形（利用者自身のキー）か、本体コネクタ経由で利用する
+- 本物のOSシェル／システムパッケージ／任意バイナリの実行
+- GitHubのブランチ作成・切替
+
+### v7.1の検証状況
+- FS層の単体テスト28件（作成/編集/リネーム/削除/検索/差分/Undo・Redo/ツール層/差分の取り消し）: 全通過
+- エージェント統合テスト10件（ローカルの偽OpenAI互換エンドポイントで実駆動）: BUILDでの作成・上書き・確認回数・確認拒否時の不変・PLANでの書き込み拒否を実測し全通過
+- 画面: ローカル配信＋ヘッドレスChromeで、デスクトップ1280px（Reactテンプレート＋MonacoのTSXハイライト＋診断6件を問題数として表示）とモバイル390px（ファイル/エディタ/AIタブ）を撮影確認
+- WebContainer: この開発VMのヘッドレスChromeは外部CDNへ到達できない（トンネル接続失敗）ため、起動そのものは未検証。crossOriginIsolated=true は実測。起動できない場合は60秒でタイムアウトし、理由をターミナルとパネルに表示することを実測した。実ブラウザ（インターネット接続あり）での起動・npm install・開発サーバーは未検証
+- GitHub連携の実操作（開く/作成/プッシュ/PR）: コード実装とUI表示まで。実アカウントでの往復は未検証（利用者のトークンは端末側にのみ存在するため）

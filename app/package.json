@@ -1,22 +1,25 @@
 {
   "name": "eluntra-rebuild",
   "private": true,
-  "version": "7.0.0",
+  "version": "7.1.0",
   "type": "module",
-  "description": "Eluntra v7.0 — 1から作り直したBYOK AIチャット（React + TypeScript）",
+  "description": "Eluntra v7.1 — 1から作り直したBYOK AIチャット（React + TypeScript）＋ Eluntra Developer",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@webcontainer/api": "^1.6.4",
     "dompurify": "^3.2.4",
     "marked": "^15.0.7",
+    "monaco-editor": "^0.57.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/dompurify": "^3.2.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

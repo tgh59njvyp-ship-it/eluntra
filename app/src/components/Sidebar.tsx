@@ -45,7 +45,7 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
         <div className="side-head">
           <Logo size={32} />
           <span className="logo">Eluntra</span>
-          <span className="pill-state">v7.0</span>
+          <span className="pill-state">v7.1</span>
         </div>
         <div className="logo-sub">30社のAIを、自分のキーで使うチャット</div>
         <div style={{ display: "flex", gap: 6, padding: "0 12px 10px" }}>
@@ -104,6 +104,16 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
           ))}
         </div>
         <div className="side-foot">
+          <a
+            className="session-item"
+            href="developer.html"
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: "none" }}
+          >
+            <Icon name="codeB" className="ic sm" />
+            <span className="t">Developer（AI開発環境）</span>
+          </a>
           <button
             type="button"
             className="session-item"

@@ -1,0 +1,1730 @@
+/* Eluntra Developer: 描画層（ShellMain と各パネル）
+   状態の正は DeveloperApp.tsx が持ち、ここは props 経由で描画と操作を行う。 */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isLoggedIn } from "../lib/auth";
+import { resolveAuto } from "../lib/auto";
+import { allProviders, getState, hasCredentials, modelListOf, providerDefOf, selectedModel, update } from "../lib/store";
+import type { AppConfig, ChatMessage, Effort } from "../lib/types";
+import { Logo } from "../components/Logo";
+import { Icon } from "../components/icons";
+import {
+  DEV_MODES, READONLY_MODES, runDevAgent, type AgentEvent, type ChangeRecord, type DevMode,
+} from "./agent";
+import type { BottomTab, MobileTab } from "./DeveloperApp";
+import { Editor, type EditorApi, type MarkerInfo } from "./Editor";
+import {
+  TEMPLATES, buildStaticPreview, createProject, deletePath, diffLines, diffStat, foldersOf, listPaths,
+  normalizePath, renamePath, revertChange, searchFiles, type DevProject,
+} from "./fs";
+import {
+  ghChangedFiles, ghCreatePR, ghCreateRepo, ghHeadSha, ghListBranches, ghListRepos, ghOpenRepo, ghPush,
+  ghViewer, githubConnected, type GhRepo,
+} from "./github";
+import { wcService } from "./webcontainer";
+
+/* ---------- アイコン（線描き） ---------- */
+
+const DEV_PATHS: Record<string, React.ReactNode> = {
+  folder: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
+  file: <><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7Z" /><path d="M14 3v4h4" /></>,
+  terminal: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="m7 9 3 3-3 3m5 0h5" /></>,
+  play: <><path d="M7 4.5v15l13-7.5Z" /></>,
+  branch: <><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="8" r="2.5" /><path d="M6 8.5v7m12-5c0 4-5 4-8.5 5.5" /></>,
+  back: <><path d="M15 5l-7 7 7 7" /></>,
+  monitor: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6m-3-4v4" /></>,
+  phone: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></>,
+  tablet: <><rect x="5" y="2.5" width="14" height="19" rx="2" /><path d="M11 18.5h2" /></>,
+};
+
+export function DIcon({ name, className = "dev-ic" }: { name: string; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      {DEV_PATHS[name]}
+    </svg>
+  );
+}
+
+export function fmtTime(at: number): string {
+  return new Date(at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+}
+
+/* ---------- 共有型 ---------- */
+
+export interface ShellProps {
+  theme: "light" | "dark";
+  conf: AppConfig;
+  loggedIn: boolean;
+  projects: DevProject[];
+  project: DevProject | null;
+  activeId: string;
+  setActiveId: (id: string) => void;
+  commitProjects: (next: DevProject[]) => void;
+  updateProject: (id: string, fn: (p: DevProject) => DevProject) => void;
+  applyFileChange: (
+    files: Record<string, string>,
+    log?: { path: string; kind: "create" | "edit" | "delete" | "rename"; source: "user" | "ai" | "github"; detail?: string },
+  ) => void;
+  openTabs: string[];
+  activePath: string | null;
+  openFile: (path: string) => void;
+  closeTab: (path: string) => void;
+  setActivePath: (p: string | null) => void;
+  activeContent: string;
+  onEditorChange: (v: string) => void;
+  flushEdit: () => void;
+  doUndo: () => void;
+  doRedo: () => void;
+  bottomTab: BottomTab | null;
+  setBottomTab: (t: BottomTab | null) => void;
+  mobileTab: MobileTab;
+  setMobileTab: (t: MobileTab) => void;
+  showDiff: boolean;
+  setShowDiff: (b: boolean) => void;
+  diffPair: { title: string; before: string; after: string } | null;
+  setDiffPair: (d: { title: string; before: string; after: string } | null) => void;
+  markers: MarkerInfo[];
+  setMarkers: (m: MarkerInfo[]) => void;
+  editorApiRef: React.MutableRefObject<EditorApi | null>;
+  baselineRef: React.MutableRefObject<Record<string, string>>;
+  sessionFilesRef: React.MutableRefObject<Set<string>>;
+  getConf: () => AppConfig;
+}
+
+export type AskConfirm = (desc: string) => Promise<boolean>;
+
+/* ---------- ファイルツリー ---------- */
+
+export interface TreeNode {
+  name: string;
+  path: string;
+  folder: boolean;
+  children: TreeNode[];
+}
+
+export function buildTree(files: Record<string, string>): TreeNode[] {
+  const root: TreeNode = { name: "", path: "", folder: true, children: [] };
+  const folders = new Set(foldersOf(files));
+  const ensure = (path: string, isFolder: boolean): TreeNode => {
+    const parts = path.split("/");
+    let node = root;
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts.slice(0, i + 1).join("/");
+      let child = node.children.find((c) => c.path === p);
+      if (!child) {
+        child = { name: parts[i], path: p, folder: i < parts.length - 1 || isFolder, children: [] };
+        node.children.push(child);
+      }
+      node = child;
+    }
+    return node;
+  };
+  for (const f of foldersOf(files)) ensure(f, true);
+  for (const path of listPaths(files)) {
+    if (path.endsWith("/.gitkeep")) continue;
+    ensure(path, false);
+  }
+  const sortNodes = (nodes: TreeNode[]): TreeNode[] =>
+    nodes
+      .sort((a, b) => (a.folder === b.folder ? a.name.localeCompare(b.name) : a.folder ? -1 : 1))
+      .map((n) => ({ ...n, children: sortNodes(n.children) }));
+  return sortNodes(root.children);
+}
+
+/* ---------- 差分ビュー ---------- */
+
+export function DiffView({ before, after }: { before: string; after: string }) {
+  const lines = diffLines(before, after);
+  const shown = lines.slice(0, 900);
+  return (
+    <div className="dev-diff">
+      {shown.map((l, i) => (
+        <div key={i} className={`dev-diff-line ${l.type}`}>
+          <span className="no">{l.type === "add" ? "" : l.oldNo ?? ""}</span>
+          <span className="no">{l.type === "del" ? "" : l.newNo ?? ""}</span>
+          <span className="sign">{l.type === "add" ? "+" : l.type === "del" ? "−" : " "}</span>
+          <span className="tx">{l.text || " "}</span>
+        </div>
+      ))}
+      {lines.length > shown.length && <div className="dev-diff-note">差分が大きいため先頭900行まで表示しています</div>}
+    </div>
+  );
+}
+
+/* ---------- ShellMain ---------- */
+
+export function ShellMain(p: ShellProps) {
+  const [sheet, setSheet] = useState<"new" | "github" | "model" | null>(null);
+  const [confirmDesc, setConfirmDesc] = useState<string | null>(null);
+  const confirmResolveRef = useRef<((ok: boolean) => void) | null>(null);
+
+  const askConfirm: AskConfirm = useCallback(
+    (desc: string) =>
+      new Promise<boolean>((resolve) => {
+        confirmResolveRef.current = resolve;
+        setConfirmDesc(desc);
+      }),
+    [],
+  );
+  const answerConfirm = (ok: boolean) => {
+    confirmResolveRef.current?.(ok);
+    confirmResolveRef.current = null;
+    setConfirmDesc(null);
+  };
+
+  const modelLabel =
+    p.conf.provider === "auto"
+      ? "Eluntra Auto"
+      : `${providerDefOf(p.conf.provider)?.name || p.conf.provider} / ${selectedModel(p.conf.provider) || "モデル未選択"}`;
+
+  const goBottom = (t: BottomTab) => {
+    p.setBottomTab(p.bottomTab === t ? null : t);
+  };
+  const goMobile = (t: MobileTab) => {
+    p.setMobileTab(t);
+    if (t === "preview") p.setBottomTab("preview");
+    if (t === "terminal") p.setBottomTab("terminal");
+  };
+
+  return (
+    <div className="dev-root" data-mobile={p.mobileTab}>
+      <header className="dev-header">
+        <a className="dev-back" href="./index.html">
+          <DIcon name="back" className="dev-ic sm" /> Eluntra
+        </a>
+        <div className="dev-title">
+          <Logo size={30} />
+          <div className="dev-title-text">
+            <span className="dev-appname">Eluntra Developer</span>
+            <span className="dev-version">v7.1 ・ AIソフトウェア開発環境</span>
+          </div>
+        </div>
+        {p.project ? (
+          <input
+            className="dev-projname"
+            value={p.project.name}
+            onChange={(e) => p.updateProject(p.project!.id, (pr) => ({ ...pr, name: e.target.value }))}
+            aria-label="プロジェクト名"
+          />
+        ) : (
+          <span className="dev-projname-none">プロジェクト未選択</span>
+        )}
+        <button type="button" className="dev-modelpill" onClick={() => setSheet("model")}>
+          {modelLabel} <Icon name="chevron" className="ic sm" />
+        </button>
+      </header>
+
+      {!p.loggedIn && (
+        <div className="dev-login-notice">
+          <Icon name="alert" className="ic sm" />
+          <span>
+            AI開発とGitHub連携を使うにはログインが必要です。プロジェクトの閲覧・編集はこのままできます。
+          </span>
+          <a className="btn primary sm" href="./index.html">
+            Eluntraでログインしてください
+          </a>
+        </div>
+      )}
+
+      <div className="dev-main">
+        <LeftPanel {...p} askConfirm={askConfirm} onNewProject={() => setSheet("new")} onGitHub={() => setSheet("github")} />
+        <CenterPanel {...p} onNewProject={() => setSheet("new")} />
+        <RightPanel {...p} askConfirm={askConfirm} onOpenModel={() => setSheet("model")} />
+      </div>
+
+      <BottomPanel {...p} />
+
+      <nav className="dev-mobiletabs" aria-label="画面切替">
+        <button type="button" className={p.mobileTab === "files" ? "on" : ""} onClick={() => goMobile("files")}>
+          <DIcon name="folder" className="dev-ic" />
+          <span>ファイル</span>
+        </button>
+        <button type="button" className={p.mobileTab === "editor" ? "on" : ""} onClick={() => goMobile("editor")}>
+          <Icon name="code" className="ic" />
+          <span>エディタ</span>
+        </button>
+        <button type="button" className={p.mobileTab === "ai" ? "on" : ""} onClick={() => goMobile("ai")}>
+          <Icon name="bot" className="ic" />
+          <span>AI</span>
+        </button>
+        <button type="button" className={p.mobileTab === "preview" ? "on" : ""} onClick={() => goMobile("preview")}>
+          <DIcon name="monitor" className="dev-ic" />
+          <span>プレビュー</span>
+        </button>
+        <button type="button" className={p.mobileTab === "terminal" ? "on" : ""} onClick={() => goMobile("terminal")}>
+          <DIcon name="terminal" className="dev-ic" />
+          <span>ターミナル</span>
+        </button>
+      </nav>
+
+      <div className="dev-desktopbar">
+        <button type="button" className={p.bottomTab === "terminal" ? "on" : ""} onClick={() => goBottom("terminal")}>
+          <DIcon name="terminal" className="dev-ic sm" /> ターミナル
+        </button>
+        <button type="button" className={p.bottomTab === "preview" ? "on" : ""} onClick={() => goBottom("preview")}>
+          <DIcon name="monitor" className="dev-ic sm" /> プレビュー
+        </button>
+        <button type="button" className={p.bottomTab === "problems" ? "on" : ""} onClick={() => goBottom("problems")}>
+          <Icon name="alert" className="ic sm" /> 問題{p.markers.length ? `（${p.markers.length}）` : ""}
+        </button>
+        <span className="dev-desktopbar-note">実行環境はブラウザ内Node.js（WebContainer）です。Python等の他言語は実行できません。</span>
+      </div>
+
+      {sheet === "new" && (
+        <NewProjectSheet
+          onClose={() => setSheet(null)}
+          onCreate={(name, tpl) => {
+            const pr = createProject(name, tpl);
+            p.commitProjects([pr, ...p.projects]);
+            p.setActiveId(pr.id);
+            setSheet(null);
+          }}
+        />
+      )}
+      {sheet === "github" && <GitHubSheet {...p} onClose={() => setSheet(null)} askConfirm={askConfirm} />}
+      {sheet === "model" && <ModelSheet onClose={() => setSheet(null)} />}
+
+      {confirmDesc && (
+        <div className="dev-confirm-back">
+          <div className="dev-confirm-card" role="alertdialog" aria-label="変更の確認">
+            <div className="dev-confirm-title">
+              <Icon name="alert" className="ic sm" /> 確認が必要です
+            </div>
+            <p>{confirmDesc}</p>
+            <div className="dev-confirm-btns">
+              <button type="button" className="btn sm" onClick={() => answerConfirm(false)}>
+                キャンセル
+              </button>
+              <button type="button" className="btn primary sm" onClick={() => answerConfirm(true)}>
+                実行する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 左パネル ---------- */
+
+function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: () => void; onGitHub: () => void }) {
+  const p = props;
+  const project = p.project;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [newName, setNewName] = useState("");
+  const [targetDir, setTargetDir] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const tree = useMemo(() => (project ? buildTree(project.files) : []), [project]);
+  const hits = useMemo(() => (project && query.trim() ? searchFiles(project.files, query) : []), [project, query]);
+
+  const toggle = (path: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+
+  const createEntry = (folder: boolean) => {
+    if (!project) return;
+    const name = newName.trim();
+    if (!name) return;
+    const base = targetDir ? `${targetDir}/` : "";
+    try {
+      if (folder) {
+        const path = normalizePath(`${base}${name}/.gitkeep`);
+        if (path in project.files) return;
+        p.applyFileChange({ ...project.files, [path]: "" }, { path: normalizePath(`${base}${name}`), kind: "create", source: "user", detail: "フォルダ作成" });
+        setExpanded((prev) => new Set(prev).add(normalizePath(`${base}${name}`)));
+      } else {
+        const path = normalizePath(`${base}${name}`);
+        if (path in project.files) {
+          p.openFile(path);
+          return;
+        }
+        p.applyFileChange({ ...project.files, [path]: "" }, { path, kind: "create", source: "user" });
+        p.openFile(path);
+      }
+      setNewName("");
+    } catch {
+      /* 入力不備は無視 */
+    }
+  };
+
+  const doRename = (from: string) => {
+    if (!project) return;
+    const to = renameValue.trim();
+    setRenaming(null);
+    if (!to || to === from) return;
+    try {
+      const next = renamePath(project.files, from, to.includes("/") || from.includes("/") ? to : to);
+      p.applyFileChange(next, { path: to, kind: "rename", source: "user", detail: `${from} → ${to}` });
+      if (p.activePath === from) p.setActivePath(to);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const doDelete = (path: string) => {
+    if (!project) return;
+    try {
+      const next = deletePath(project.files, path);
+      p.applyFileChange(next, { path, kind: "delete", source: "user" });
+      if (p.activePath === path) p.setActivePath(null);
+    } catch {
+      /* ignore */
+    }
+    setDeleting(null);
+  };
+
+  const exportJson = () => {
+    if (!project) return;
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.name || "eluntra-project"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importJson = (file: File) => {
+    void file.text().then((text) => {
+      try {
+        const j = JSON.parse(text) as Partial<DevProject>;
+        if (!j.files || typeof j.files !== "object") throw new Error("files がありません");
+        const pr = createProject(typeof j.name === "string" && j.name ? j.name : "読み込んだプロジェクト", "empty");
+        pr.files = j.files as Record<string, string>;
+        p.commitProjects([pr, ...p.projects]);
+        p.setActiveId(pr.id);
+      } catch {
+        window.alert("プロジェクトJSONを読み込めませんでした。形式を確認してください。");
+      }
+    });
+  };
+
+  const renderNode = (node: TreeNode, depth: number): React.ReactNode => {
+    const isOpen = expanded.has(node.path);
+    const isActive = p.activePath === node.path;
+    return (
+      <div key={node.path}>
+        <div
+          className={`dev-tree-row${isActive ? " on" : ""}`}
+          style={{ paddingLeft: 8 + depth * 14 }}
+          onClick={() => {
+            if (node.folder) {
+              toggle(node.path);
+              setTargetDir(node.path);
+            } else {
+              p.openFile(node.path);
+            }
+          }}
+        >
+          {node.folder ? (
+            <>
+              <span className={`dev-tree-chev${isOpen ? " open" : ""}`}>
+                <Icon name="chevR" className="ic sm" />
+              </span>
+              <DIcon name="folder" className="dev-ic sm" />
+            </>
+          ) : (
+            <DIcon name="file" className="dev-ic sm" />
+          )}
+          {renaming === node.path ? (
+            <input
+              className="dev-tree-rename"
+              value={renameValue}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") doRename(node.path);
+                if (e.key === "Escape") setRenaming(null);
+              }}
+              onBlur={() => doRename(node.path)}
+            />
+          ) : (
+            <span className="dev-tree-name">{node.name}</span>
+          )}
+          <span className="dev-tree-acts" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              aria-label="名前変更"
+              onClick={() => {
+                setRenaming(node.path);
+                setRenameValue(node.name);
+              }}
+            >
+              <Icon name="pencil" className="ic sm" />
+            </button>
+            <button type="button" aria-label="削除" onClick={() => setDeleting(node.path)}>
+              <Icon name="trash" className="ic sm" />
+            </button>
+          </span>
+        </div>
+        {deleting === node.path && (
+          <div className="dev-tree-confirm" style={{ marginLeft: 8 + depth * 14 }}>
+            「{node.name}」{node.folder ? "とその中身" : ""}を削除しますか？
+            <button type="button" className="btn danger sm" onClick={() => doDelete(node.path)}>
+              削除
+            </button>
+            <button type="button" className="btn sm" onClick={() => setDeleting(null)}>
+              取消
+            </button>
+          </div>
+        )}
+        {node.folder && isOpen && node.children.map((c) => renderNode(c, depth + 1))}
+      </div>
+    );
+  };
+
+  return (
+    <aside className="dev-left">
+      <div className="dev-sec">
+        <div className="dev-sec-head">
+          <span>プロジェクト</span>
+          <button type="button" className="btn primary sm" onClick={props.onNewProject}>
+            <Icon name="plus" className="ic sm" /> 新規
+          </button>
+        </div>
+        {p.projects.length === 0 && <div className="dev-empty-note">まだプロジェクトがありません。「新規」から作成してください。</div>}
+        <div className="dev-proj-list">
+          {p.projects.map((pr) => (
+            <button
+              key={pr.id}
+              type="button"
+              className={`dev-proj-item${pr.id === p.activeId ? " on" : ""}`}
+              onClick={() => p.setActiveId(pr.id)}
+            >
+              <span className="t">{pr.name}</span>
+              <span className="sub">{Object.keys(pr.files).length} ファイル</span>
+            </button>
+          ))}
+        </div>
+        {project && (
+          <div className="dev-proj-acts">
+            <button type="button" className="btn sm" onClick={exportJson}>
+              <Icon name="download" className="ic sm" /> JSONで書き出し
+            </button>
+            <button type="button" className="btn sm" onClick={() => importRef.current?.click()}>
+              読み込み
+            </button>
+            <button
+              type="button"
+              className="btn sm danger"
+              onClick={() => {
+                void props.askConfirm(`プロジェクト「${project.name}」を削除しますか？この操作は取り消せません。`).then((ok) => {
+                  if (!ok) return;
+                  const next = p.projects.filter((x) => x.id !== project.id);
+                  p.commitProjects(next);
+                  p.setActiveId(next[0]?.id || "");
+                });
+              }}
+            >
+              削除
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importJson(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        )}
+        <button type="button" className="dev-github-entry" onClick={props.onGitHub}>
+          <img src="./logos/conn-github.svg" alt="" width={18} height={18} />
+          <span>GitHub</span>
+          <span className="sub">{githubConnected() ? "接続済み" : "未接続"}</span>
+        </button>
+      </div>
+
+      {project && (
+        <div className="dev-sec grow">
+          <div className="dev-sec-head">
+            <span>ファイル</span>
+            <span className="dev-target">追加先: /{targetDir}</span>
+          </div>
+          <div className="dev-newentry">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="ファイル名 / フォルダ名"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") createEntry(false);
+              }}
+              aria-label="新規ファイル・フォルダ名"
+            />
+            <button type="button" className="btn sm" onClick={() => createEntry(false)}>
+              ファイル
+            </button>
+            <button type="button" className="btn sm" onClick={() => createEntry(true)}>
+              フォルダ
+            </button>
+            <button type="button" className="btn sm" onClick={() => setTargetDir("")}>
+              ルートへ
+            </button>
+          </div>
+          <div className="dev-tree">{tree.map((n) => renderNode(n, 0))}</div>
+          <div className="dev-searchbox">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="プロジェクト内を検索"
+              aria-label="プロジェクト内検索"
+            />
+            {query.trim() && (
+              <div className="dev-search-results">
+                {hits.length === 0 && <div className="dev-empty-note">一致なし</div>}
+                {hits.slice(0, 50).map((h, i) => (
+                  <button key={i} type="button" className="dev-search-hit" onClick={() => p.openFile(h.path)}>
+                    <span className="loc">
+                      {h.path}:{h.line}
+                    </span>
+                    <span className="tx">{h.text}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <details className="dev-changelog">
+            <summary>変更履歴（直近）</summary>
+            {(project.changeLog || []).slice(0, 30).map((c, i) => (
+              <div key={i} className="dev-changelog-row">
+                <span className="time">{fmtTime(c.at)}</span>
+                <span className="kind">{c.kind}</span>
+                <span className="path">{c.detail || c.path}</span>
+                <span className="src">{c.source === "ai" ? "AI" : c.source === "github" ? "GitHub" : "あなた"}</span>
+              </div>
+            ))}
+            {(project.changeLog || []).length === 0 && <div className="dev-empty-note">まだ変更がありません</div>}
+          </details>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+/* ---------- 中央パネル（エディター） ---------- */
+
+function CenterPanel(props: ShellProps & { onNewProject: () => void}) {
+const p = props;
+const project = p.project;
+
+if (!project) {
+return (
+<section className="dev-center">
+<div className="dev-center-empty">
+<Logo size={72} />
+<h2>Eluntra Developer</h2>
+<p>プロジェクトを作成すると、ファイル編集・AI開発・ターミナル・プレビューが使えます。</p>
+<button type="button" className="btn primary" onClick={props.onNewProject}>
+<Icon name="plus" className="ic sm" /> プロジェクトを作成
+</button>
+</div>
+</section>
+);
+}
+
+const showingPair = p.diffPair;
+const baseline = p.activePath? p.baselineRef.current[p.activePath]?? "": "";
+
+return (
+<section className="dev-center">
+<div className="dev-tabs" role="tablist">
+{p.openTabs.map((path) => (
+<button
+key={path}
+type="button"
+role="tab"
+aria-selected={p.activePath === path}
+className={`dev-tab${p.activePath === path? " on": ""}`}
+onClick={() => p.setActivePath(path)}
+>
+<span className="t">{path.split("/").pop()}</span>
+<span
+className="x"
+role="button"
+aria-label="タブを閉じる"
+onClick={(e) => {
+e.stopPropagation();
+p.flushEdit();
+p.closeTab(path);
+}}
+>
+<Icon name="x" className="ic sm" />
+</span>
+</button>
+))}
+{p.openTabs.length === 0 && <span className="dev-tabs-none">ファイルツリーからファイルを選んでください</span>}
+</div>
+<div className="dev-editorbar">
+<span className="dev-editorpath">{p.activePath || "—"}</span>
+<div className="dev-editoracts">
+<button type="button" className="btn sm" onClick={() => p.editorApiRef.current?.find()} disabled={!p.activePath}>
+検索・置換
+</button>
+<button type="button" className="btn sm" onClick={() => p.editorApiRef.current?.format()} disabled={!p.activePath}>
+整形
+</button>
+<button type="button" className="btn sm" onClick={p.doUndo} disabled={!p.activePath}>
+元に戻す
+</button>
+<button type="button" className="btn sm" onClick={p.doRedo} disabled={!p.activePath}>
+やり直し
+</button>
+<button
+type="button"
+className={`btn sm${p.showDiff? " primary": ""}`}
+onClick={() => p.setShowDiff(!p.showDiff)}
+disabled={!p.activePath}
+>
+差分
+</button>
+</div>
+</div>
+<div className="dev-editor-wrap">
+{showingPair? (
+<div className="dev-pairdiff">
+<div className="dev-pairdiff-head">
+<span>{showingPair.title}</span>
+<button type="button" className="btn sm" onClick={() => p.setDiffPair(null)}>
+エディターに戻る
+</button>
+</div>
+<DiffView before={showingPair.before} after={showingPair.after} />
+</div>
+): p.showDiff && p.activePath? (
+<DiffView before={baseline} after={p.activeContent} />
+): (
+<Editor
+path={p.activePath}
+value={p.activeContent}
+dark={p.theme === "dark"}
+onChange={p.onEditorChange}
+onReady={(api) => {
+p.editorApiRef.current = api;
+}}
+onMarkers={p.setMarkers}
+/>
+)}
+</div>
+</section>
+);
+}
+
+/* ---------- AIパネル ---------- */
+
+interface StreamMsg {
+type: "msg";
+id: string;
+role: "user" | "assistant" | "system";
+content: string;
+}
+interface StreamEvent {
+type: "event";
+id: string;
+item: TimelineItem;
+}
+type StreamItem = StreamMsg | StreamEvent;
+
+interface TimelineItem {
+id: string;
+kind: string;
+label: string;
+detail?: string;
+output?: string;
+change?: ChangeRecord;
+at: number;
+}
+
+let wcMountedProjectId = "";
+
+export async function ensureWcMounted(project: DevProject | null): Promise<void> {
+await wcService.ensureBoot();
+if (project && wcMountedProjectId!== project.id) {
+await wcService.mountProject(project.files);
+wcMountedProjectId = project.id;
+}
+}
+
+function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: () => void}) {
+const p = props;
+const [mode, setMode] = useState<DevMode>("auto");
+const [input, setInput] = useState("");
+const [stream, setStream] = useState<StreamItem[]>([]);
+const [running, setRunning] = useState(false);
+const [undone, setUndone] = useState<Set<string>>(new Set());
+const abortRef = useRef<AbortController | null>(null);
+const projectRef = useRef(p.project);
+projectRef.current = p.project;
+const streamRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+const el = streamRef.current;
+if (el) el.scrollTop = el.scrollHeight;
+}, [stream, running]);
+
+const pushMsg = useCallback((role: StreamMsg["role"], content: string) => {
+setStream((prev) => [...prev, { type: "msg", id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, content}]);
+}, []);
+
+const pushEvent = useCallback((item: TimelineItem) => {
+setStream((prev) => [...prev.slice(-300), { type: "event", id: item.id, item}]);
+}, []);
+
+const stop = useCallback(() => {
+abortRef.current?.abort();
+wcService.stopCurrent();
+}, []);
+
+const send = useCallback(async () => {
+const text = input.trim();
+if (!text || running) return;
+const project = projectRef.current;
+if (!project) {
+pushMsg("system", "プロジェクトが選択されていません。左のパネルでプロジェクトを作成・選択してください。");
+return;
+}
+if (!p.loggedIn) {
+pushMsg("system", "AI開発を使うにはログインが必要です。上の案内から本体でログインしてください。");
+return;
+}
+setInput("");
+pushMsg("user", text);
+
+const confNow = p.getConf();
+let provider: import("../lib/types").ProviderDef | null = null;
+let model = "";
+if (confNow.provider === "auto") {
+const choice = resolveAuto(text);
+if (!choice) {
+pushMsg("system", "接続済みのAIがありません。本体（Eluntra）の設定でAPIキーを設定してから、もう一度お試しください。");
+return;
+}
+provider = choice.provider;
+model = choice.model;
+pushEvent({ id: `e${Date.now()}`, kind: "note", label: `Eluntra Auto: ${choice.reason}`, at: Date.now()});
+} else {
+provider = providerDefOf(confNow.provider) || null;
+model = selectedModel(confNow.provider);
+if (!provider) {
+pushMsg("system", "選択中のプロバイダーが見つかりません。本体の設定で選び直してください。");
+return;
+}
+if (!hasCredentials(provider.id)) {
+pushMsg(
+"system",
+`${provider.name} のAPIキーが未設定です。本体（Eluntra）の「設定 → APIプロバイダー」でキーを設定してから、もう一度お試しください。`,
+);
+return;
+}
+}
+
+const history: ChatMessage[] = stream
+.filter((s): s is StreamMsg => s.type === "msg" && (s.role === "user" || s.role === "assistant"))
+.map((s) => ({ role: s.role as "user" | "assistant", content: s.content}));
+
+const ctl = new AbortController();
+abortRef.current = ctl;
+setRunning(true);
+try {
+const result = await runDevAgent({
+provider,
+model,
+mode,
+history,
+userText: text,
+ctx: {
+getFiles: () => projectRef.current?.files || {},
+applyFiles: (nextFiles, change) => {
+const cur = projectRef.current;
+if (!cur) return;
+p.updateProject(cur.id, (pr) => {
+let next: DevProject = {...pr, files: nextFiles, updatedAt: Date.now()};
+if (change) {
+next = {
+...next,
+changeLog: [
+{ at: Date.now(), path: change.path, kind: change.kind, source: "ai" as const},
+...(next.changeLog || []),
+].slice(0, 100),
+};
+}
+return next;
+});
+},
+confirm: props.askConfirm,
+termExec: async (command: string) => {
+try {
+await ensureWcMounted(projectRef.current);
+} catch (e) {
+return `ターミナルは利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}`;
+}
+const res = await wcService.exec(command, { timeoutMs: 120_000});
+const out = res.output.trim();
+return [
+`$ ${command}`,
+out? out.slice(-6000): "（出力なし）",
+res.timedOut? "（120秒でタイムアウトし、停止しました）": `（終了コード: ${res.code?? "不明"}）`,
+].join("\n");
+},
+previewInfo: () => {
+if (wcService.previewUrl) return `開発サーバーが起動しています。プレビューURL: ${wcService.previewUrl}`;
+const cur = projectRef.current;
+if (cur && "index.html" in cur.files) return "開発サーバーは未起動です。静的プレビュー（index.html）が利用できます。";
+return "プレビューは未起動です。ターミナルで開発サーバー（npm run dev）を起動するとURLが発行されます（WebContainerが必要）";
+},
+sessionFiles: p.sessionFilesRef.current,
+signal: ctl.signal,
+onEvent: (e: AgentEvent) => {
+if (e.kind === "change") {
+pushEvent({ id: e.change.id, kind: "change", label: e.change.path, change: e.change, at: e.change.at});
+} else if (e.kind === "tool") {
+pushEvent({
+id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+kind: "tool",
+label: e.tool,
+detail: e.detail,
+output: e.output || undefined,
+at: Date.now(),
+});
+} else if (e.kind === "step") {
+pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, at: Date.now()});
+}
+},
+},
+});
+const body = [result.text, result.stopped? `${result.stopped}`: ""].filter(Boolean).join("\n\n");
+pushMsg("assistant", body || "（報告がありませんでした）");
+} catch (e) {
+if (e instanceof DOMException && e.name === "AbortError") {
+pushMsg("system", "停止しました。");
+} else {
+pushMsg("system", `実行できませんでした: ${e instanceof Error? e.message: String(e)}`);
+}
+} finally {
+setRunning(false);
+abortRef.current = null;
+}
+}, [input, running, mode, p, props.askConfirm, pushMsg, pushEvent, stream]);
+
+const undoChange = (change: ChangeRecord) => {
+const cur = projectRef.current;
+if (!cur) return;
+const next = revertChange(cur.files, change);
+p.updateProject(cur.id, (pr) => ({
+...pr,
+files: next,
+changeLog: [
+{ at: Date.now(), path: change.path, kind: "edit" as const, source: "user" as const, detail: "AIの変更を元に戻した"},
+...(pr.changeLog || []),
+].slice(0, 100),
+}));
+setUndone((prev) => new Set(prev).add(change.id));
+};
+
+return (
+<aside className="dev-right">
+<div className="dev-sec-head" style={{ padding: "10px 12px 0"}}>
+<span>AI Developer</span>
+<button type="button" className="btn sm" onClick={props.onOpenModel}>
+モデル変更
+</button>
+</div>
+<div className="dev-modes" role="tablist" aria-label="開発モード">
+{DEV_MODES.map((m) => (
+<button
+key={m.id}
+type="button"
+role="tab"
+aria-selected={mode === m.id}
+className={`dev-mode${mode === m.id? " on": ""}`}
+title={m.desc}
+onClick={() => setMode(m.id)}
+>
+{m.label}
+</button>
+))}
+</div>
+<div className="dev-mode-desc">
+{DEV_MODES.find((m) => m.id === mode)?.desc}
+{READONLY_MODES.has(mode)? "（このモードではファイルを変更しません）": ""}
+</div>
+<div className="dev-stream" ref={streamRef}>
+{stream.length === 0 && (
+<div className="dev-empty-note" style={{ padding: 12}}>
+作りたいものを伝えてください。プロジェクトを調査し、計画・実装・動作確認まで進めます。実行していない作業を完了とは表示しません。
+</div>
+)}
+{stream.map((s) => {
+if (s.type === "msg") {
+return (
+<div key={s.id} className={`dev-msg ${s.role}`}>
+<div className="dev-msg-role">{s.role === "user"? "あなた": s.role === "assistant"? "AI Developer": "案内"}</div>
+<div className="dev-msg-body">{s.content}</div>
+</div>
+);
+}
+const it = s.item;
+if (it.kind === "change" && it.change) {
+const st = diffStat(it.change.before?? "", it.change.after?? "");
+const done = undone.has(it.change.id);
+return (
+<div key={s.id} className="dev-changecard">
+<div className="dev-changecard-head">
+<Icon name="doc" className="ic sm" />
+<span className="path">{it.change.path}</span>
+<span className="kind">
+{it.change.kind === "create"? "作成": it.change.kind === "delete"? "削除": "編集"}
+</span>
+<span className="stat">
++{st.added} / −{st.removed}
+</span>
+</div>
+<div className="dev-changecard-btns">
+<button
+type="button"
+className="btn sm"
+onClick={() =>
+p.setDiffPair({
+title: `${it.change!.path} の変更`,
+before: it.change!.before?? "",
+after: it.change!.after?? "",
+})
+}
+>
+差分を見る
+</button>
+<button type="button" className="btn sm" disabled={done} onClick={() => undoChange(it.change!)}>
+{done? "元に戻し済み": "この変更を元に戻す"}
+</button>
+</div>
+</div>
+);
+}
+if (it.kind === "tool") {
+return (
+<details key={s.id} className="dev-tool">
+<summary>
+<DIcon name="terminal" className="dev-ic sm" /> {it.label}
+{it.detail? ` — ${it.detail}`: ""}
+</summary>
+{it.output && <pre>{it.output}</pre>}
+</details>
+);
+}
+return (
+<div key={s.id} className="dev-step">
+<span className="time">{fmtTime(it.at)}</span> {it.label}
+</div>
+);
+})}
+{running && <div className="dev-running">実行中…（実際に実行した手順だけが上に表示されます）</div>}
+</div>
+<div className="dev-composer">
+<textarea
+value={input}
+onChange={(e) => setInput(e.target.value)}
+placeholder={p.project? "作りたいもの・直したいことを入力": "プロジェクトを選んでください"}
+rows={3}
+onKeyDown={(e) => {
+if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
+}}
+aria-label="AIへの指示"
+/>
+<div className="dev-composer-btns">
+<span className="dev-composer-note">Ctrl+Enterで送信</span>
+{running? (
+<button type="button" className="btn danger sm" onClick={stop}>
+<Icon name="stop" className="ic sm" /> 停止
+</button>
+): (
+<button type="button" className="btn primary sm" onClick={() => void send()} disabled={!input.trim()}>
+送信
+</button>
+)}
+</div>
+</div>
+</aside>
+);
+}
+
+/* ---------- 下部パネル ---------- */
+
+function BottomPanel(p: ShellProps) {
+const tab = p.bottomTab;
+return (
+<section className={`dev-bottom${tab? " open": ""}`} aria-label="下部パネル">
+{tab === "terminal" && <TerminalPane {...p} />}
+{tab === "preview" && <PreviewPane {...p} />}
+{tab === "problems" && <ProblemsPane {...p} />}
+{tab === null && (
+<div className="dev-bottom-mobile-default">
+<TerminalPane {...p} />
+</div>
+)}
+</section>
+);
+}
+
+function useWcTick(): void {
+const [, setTick] = useState(0);
+useEffect(() => {
+const off1 = wcService.onState(() => setTick((n) => n + 1));
+const off2 = wcService.onPreview(() => setTick((n) => n + 1));
+return () => {
+off1();
+off2();
+};
+}, []);
+}
+
+function TerminalPane(p: ShellProps) {
+useWcTick();
+const [text, setText] = useState("");
+const [cmd, setCmd] = useState("");
+const [running, setRunning] = useState(false);
+const preRef = useRef<HTMLPreElement>(null);
+const projectRef = useRef(p.project);
+projectRef.current = p.project;
+
+useEffect(() => {
+const el = preRef.current;
+if (el) el.scrollTop = el.scrollHeight;
+}, [text]);
+
+const append = useCallback((chunk: string) => {
+setText((prev) => (prev + chunk).slice(-120_000));
+}, []);
+
+const run = useCallback(async () => {
+const command = cmd.trim();
+if (!command || running) return;
+setCmd("");
+append(`\n$ ${command}\n`);
+setRunning(true);
+try {
+await ensureWcMounted(projectRef.current);
+} catch (e) {
+append(`ターミナルを利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+setRunning(false);
+return;
+}
+try {
+const res = await wcService.exec(command, { onOutput: append});
+append(`\n[終了コード ${res.code?? "不明"}${res.timedOut? "（タイムアウトで停止）": ""}]\n`);
+} catch (e) {
+append(`実行できませんでした: ${e instanceof Error? e.message: String(e)}\n`);
+}
+setRunning(false);
+}, [cmd, running, append]);
+
+const state = wcService.state;
+return (
+<div className="dev-pane terminal">
+<div className="dev-pane-head">
+<span>
+<DIcon name="terminal" className="dev-ic sm" /> ターミナル（ブラウザ内Node.js）
+</span>
+<span className="dev-pane-state">
+{state === "ready" && "起動済み"}
+{state === "booting" && "起動中…"}
+{state === "idle" && "未起動（コマンド実行時に起動します）"}
+{state === "error" && `利用できません: ${wcService.errorReason}`}
+</span>
+<span className="dev-pane-btns">
+{running && (
+<button type="button" className="btn danger sm" onClick={() => wcService.stopCurrent()}>
+停止
+</button>
+)}
+<button type="button" className="btn sm" onClick={() => setText("")}>
+クリア
+</button>
+<button type="button" className="btn sm dev-pane-close" onClick={() => p.setBottomTab(null)}>
+閉じる
+</button>
+</span>
+</div>
+<pre className="dev-term-out" ref={preRef}>
+{text || "コマンドを実行すると、ここに出力が表示されます。例: npm install / npm run dev / node -v / ls\n（本物のOSシェルではなく、ブラウザ内のNode.js環境です）"}
+</pre>
+<div className="dev-term-input">
+<span>$</span>
+<input
+value={cmd}
+onChange={(e) => setCmd(e.target.value)}
+onKeyDown={(e) => {
+if (e.key === "Enter") void run();
+}}
+placeholder="コマンドを入力してEnter"
+aria-label="ターミナルコマンド"
+/>
+<button type="button" className="btn primary sm" onClick={() => void run()} disabled={running ||!cmd.trim()}>
+実行
+</button>
+</div>
+</div>
+);
+}
+
+function PreviewPane(p: ShellProps) {
+useWcTick();
+const [source, setSource] = useState<"server" | "static">("server");
+const [viewport, setViewport] = useState<"pc" | "tablet" | "mobile">("pc");
+const [reloadKey, setReloadKey] = useState(0);
+const [busy, setBusy] = useState(false);
+const [log, setLog] = useState("");
+const files = p.project?.files || {};
+const projectRef = useRef(p.project);
+projectRef.current = p.project;
+
+const staticDoc = useMemo(() => buildStaticPreview(files), [files]);
+const url = wcService.previewUrl;
+const width = viewport === "mobile"? 390: viewport === "tablet"? 768: undefined;
+
+const startServer = async () => {
+setBusy(true);
+try {
+await ensureWcMounted(projectRef.current);
+await wcService.startDevServer((chunk) => setLog((prev) => (prev + chunk).slice(-20_000)));
+setLog((prev) => prev + "\n[開発サーバーを起動しました。URLが発行されるとプレビューに表示されます]\n");
+} catch (e) {
+setLog(`開発サーバーを起動できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}`);
+}
+setBusy(false);
+};
+
+return (
+<div className="dev-pane preview">
+<div className="dev-pane-head">
+<span>
+<DIcon name="monitor" className="dev-ic sm" /> プレビュー
+</span>
+<span className="dev-preview-toggle">
+<button type="button" className={source === "server"? "on": ""} onClick={() => setSource("server")}>
+開発サーバー
+</button>
+<button type="button" className={source === "static"? "on": ""} onClick={() => setSource("static")}>
+静的プレビュー
+</button>
+</span>
+<span className="dev-pane-btns">
+<button type="button" className={viewport === "mobile"? "btn sm primary": "btn sm"} onClick={() => setViewport("mobile")} aria-label="モバイル表示">
+<DIcon name="phone" className="dev-ic sm" />
+</button>
+<button type="button" className={viewport === "tablet"? "btn sm primary": "btn sm"} onClick={() => setViewport("tablet")} aria-label="タブレット表示">
+<DIcon name="tablet" className="dev-ic sm" />
+</button>
+<button type="button" className={viewport === "pc"? "btn sm primary": "btn sm"} onClick={() => setViewport("pc")} aria-label="PC表示">
+<DIcon name="monitor" className="dev-ic sm" />
+</button>
+<button type="button" className="btn sm" onClick={() => setReloadKey((k) => k + 1)}>
+<Icon name="refresh" className="ic sm" /> 再読み込み
+</button>
+<button type="button" className="btn sm dev-pane-close" onClick={() => p.setBottomTab(null)}>
+閉じる
+</button>
+</span>
+</div>
+{source === "server"? (
+<div className="dev-preview-body">
+<div className="dev-preview-bar">
+{wcService.devServerRunning? (
+<button type="button" className="btn danger sm" onClick={() => void wcService.stopDevServer()}>
+サーバー停止
+</button>
+): (
+<button type="button" className="btn primary sm" onClick={() => void startServer()} disabled={busy ||!p.project}>
+<DIcon name="play" className="dev-ic sm" /> 開発サーバーを起動（npm run dev）
+</button>
+)}
+{url? (
+<>
+<span className="dev-preview-url">{url}</span>
+<a className="btn sm" href={url} target="_blank" rel="noreferrer">
+<Icon name="ext" className="ic sm" /> 新しいタブで開く
+</a>
+</>
+): (
+<span className="dev-preview-note">
+{wcService.state === "error"
+? `ターミナルを利用できないため、開発サーバーも使えません: ${wcService.errorReason}`
+: "サーバーが起動すると、ここにURLが表示されます"}
+</span>
+)}
+</div>
+{url? (
+<div className="dev-preview-framewrap">
+<iframe key={reloadKey} className="dev-preview-frame" style={width? { width}: undefined} src={url} title="開発サーバープレビュー" />
+</div>
+): (
+log && <pre className="dev-preview-log">{log}</pre>
+)}
+</div>
+): (
+<div className="dev-preview-body">
+<div className="dev-preview-bar">
+<span className="dev-preview-note">
+静的プレビュー: index.html に css/js を埋め込んで表示します（開発サーバー不要）。ファイルを変更すると反映されます。
+</span>
+</div>
+{staticDoc? (
+<div className="dev-preview-framewrap">
+<iframe
+key={`${reloadKey}-${staticDoc.length}`}
+className="dev-preview-frame"
+style={width? { width}: undefined}
+srcDoc={staticDoc}
+sandbox="allow-scripts"
+title="静的プレビュー"
+/>
+</div>
+): (
+<div className="dev-empty-note" style={{ padding: 12}}>
+このプロジェクトには index.html がないため、静的プレビューは使えません。
+</div>
+)}
+</div>
+)}
+</div>
+);
+}
+
+function ProblemsPane(p: ShellProps) {
+const errors = p.markers.filter((m) => m.severity >= 4);
+return (
+<div className="dev-pane problems">
+<div className="dev-pane-head">
+<span>
+<Icon name="alert" className="ic sm" /> 問題（エディターの診断）
+</span>
+<span className="dev-pane-btns">
+<button type="button" className="btn sm dev-pane-close" onClick={() => p.setBottomTab(null)}>
+閉じる
+</button>
+</span>
+</div>
+<div className="dev-problems-list">
+{errors.length === 0 && <div className="dev-empty-note">現在、開いているファイルに問題は検出されていません（TypeScript/JavaScript の診断が対象です）。</div>}
+{errors.map((m, i) => (
+<button key={i} type="button" className="dev-problem-row" onClick={() => p.openFile(m.path)}>
+<span className={`sev${m.severity >= 8? " err": ""}`}>{m.severity >= 8? "エラー": "警告"}</span>
+<span className="loc">
+{m.path}:{m.startLineNumber}
+</span>
+<span className="msg">{m.message}</span>
+</button>
+))}
+</div>
+</div>
+);
+}
+
+/* ---------- シート類 ---------- */
+
+function NewProjectSheet({ onClose, onCreate}: { onClose: () => void; onCreate: (name: string, tpl: string) => void}) {
+const [name, setName] = useState("");
+const [tpl, setTpl] = useState("static");
+return (
+<div className="dev-sheet-back" onClick={onClose}>
+<div className="dev-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="新規プロジェクト">
+<div className="dev-sheet-head">
+<span>新規プロジェクト</span>
+<button type="button" className="btn sm" onClick={onClose}>
+<Icon name="x" className="ic sm" />
+</button>
+</div>
+<label className="dev-field">
+<span>名前</span>
+<input value={name} onChange={(e) => setName(e.target.value)} placeholder="プロジェクト名" autoFocus />
+</label>
+<div className="dev-field">
+<span>テンプレート</span>
+{TEMPLATES.map((t) => (
+<label key={t.id} className={`dev-tpl${tpl === t.id? " on": ""}`}>
+<input type="radio" name="tpl" checked={tpl === t.id} onChange={() => setTpl(t.id)} />
+<span className="t">{t.name}</span>
+<span className="d">{t.desc}</span>
+</label>
+))}
+</div>
+<button type="button" className="btn primary" onClick={() => onCreate(name.trim() || "新規プロジェクト", tpl)}>
+作成する
+</button>
+</div>
+</div>
+);
+}
+
+function ModelSheet({ onClose}: { onClose: () => void}) {
+const conf = useStoreLocal((s) => s.conf);
+const [selProvider, setSelProvider] = useState(conf.provider === "auto"? "gemini": conf.provider);
+const providers = allProviders();
+const models = modelListOf(selProvider);
+const efforts: Array<{ id: Effort; label: string}> = [
+{ id: "low", label: "低"},
+{ id: "medium", label: "中"},
+{ id: "high", label: "高"},
+{ id: "super", label: "最大"},
+];
+return (
+<div className="dev-sheet-back" onClick={onClose}>
+<div className="dev-sheet wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="モデル選択">
+<div className="dev-sheet-head">
+<span>AIモデル（本体と共通の設定です）</span>
+<button type="button" className="btn sm" onClick={onClose}>
+<Icon name="x" className="ic sm" />
+</button>
+</div>
+<button
+type="button"
+className={`dev-model-auto${conf.provider === "auto"? " on": ""}`}
+onClick={() => {
+const st = getState();
+update({ conf: {...st.conf, provider: "auto"}});
+onClose();
+}}
+>
+Eluntra Auto（質問に合わせて自動選択）
+</button>
+<div className="dev-model-cols">
+<div className="dev-model-providers">
+{providers.map((pr) => (
+<button
+key={pr.id}
+type="button"
+className={selProvider === pr.id? "on": ""}
+onClick={() => setSelProvider(pr.id)}
+>
+{pr.name}
+<span className="st">{hasCredentials(pr.id)? "": "（キー未設定）"}</span>
+</button>
+))}
+</div>
+<div className="dev-model-models">
+{models.length === 0 && <div className="dev-empty-note">モデル一覧がありません。本体で一覧取得してください。</div>}
+{models.map((m) => (
+<button
+key={m}
+type="button"
+className={conf.provider === selProvider && selectedModel(selProvider) === m? "on": ""}
+onClick={() => {
+const st = getState();
+update({
+conf: {...st.conf, provider: selProvider, models: {...st.conf.models, [selProvider]: m}},
+});
+onClose();
+}}
+>
+{m}
+</button>
+))}
+</div>
+</div>
+<div className="dev-field">
+<span>思考レベル</span>
+<div className="dev-efforts">
+{efforts.map((e) => (
+<button
+key={e.id}
+type="button"
+className={conf.effort === e.id? "on": ""}
+onClick={() => {
+const st = getState();
+update({ conf: {...st.conf, effort: e.id}});
+}}
+>
+{e.label}
+</button>
+))}
+</div>
+</div>
+</div>
+</div>
+);
+}
+
+import { useStore as useStoreLocal} from "../lib/store";
+
+/* ---------- GitHubシート ---------- */
+
+function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskConfirm }) {
+  const p = props;
+  const connected = githubConnected();
+  const [viewer, setViewer] = useState<string>("");
+  const [repos, setRepos] = useState<GhRepo[]>([]);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [selRepo, setSelRepo] = useState<string>("");
+  const [selBranch, setSelBranch] = useState<string>("");
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newRepoPrivate, setNewRepoPrivate] = useState(true);
+  const [commitMsg, setCommitMsg] = useState("");
+  const [prTitle, setPrTitle] = useState("");
+  const [prBody, setPrBody] = useState("");
+  const [prBase, setPrBase] = useState("main");
+  const [busy, setBusy] = useState("");
+  const [info, setInfo] = useState("");
+  const [error, setError] = useState("");
+
+  const project = p.project;
+  const link = project?.github;
+  const changed = project ? ghChangedFiles(project) : [];
+
+  useEffect(() => {
+    if (!connected) return;
+    let alive = true;
+    (async () => {
+      try {
+        const v = await ghViewer();
+        if (alive) setViewer(v.login);
+        const rs = await ghListRepos();
+        if (alive) setRepos(rs);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [connected]);
+
+  useEffect(() => {
+    if (!selRepo) return;
+    const [owner, repo] = selRepo.split("/");
+    let alive = true;
+    (async () => {
+      try {
+        const bs = await ghListBranches(owner, repo);
+        if (!alive) return;
+        setBranches(bs);
+        const r = repos.find((x) => x.fullName === selRepo);
+        setSelBranch(r?.defaultBranch || bs[0] || "main");
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [selRepo, repos]);
+
+  const run = async (label: string, fn: () => Promise<string>) => {
+    setBusy(label);
+    setError("");
+    setInfo("");
+    try {
+      const msg = await fn();
+      setInfo(msg);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    setBusy("");
+  };
+
+  const openRepo = () =>
+    run("open", async () => {
+      const [owner, repo] = selRepo.split("/");
+      const res = await ghOpenRepo(owner, repo, selBranch);
+      const pr = createProject(repo, "empty");
+      pr.name = repo;
+      pr.files = res.files;
+      pr.github = { owner, repo, branch: res.branch, headSha: res.headSha, baseFiles: { ...res.files } };
+      pr.changeLog = [
+        { at: Date.now(), path: "", kind: "create", source: "github", detail: `${selRepo}@${res.branch} を開きました` },
+      ];
+      p.commitProjects([pr, ...p.projects]);
+      p.setActiveId(pr.id);
+      return `${selRepo}（${res.branch}）を開きました。${Object.keys(res.files).length}ファイルを取得${
+        res.skipped.length ? `、${res.skipped.length}件はサイズ・形式のため未取得: ${res.skipped.slice(0, 5).join(", ")}${res.skipped.length > 5 ? " ほか" : ""}` : ""
+      }`;
+    });
+
+  const createRepo = () =>
+    run("create", async () => {
+      if (!project) throw new Error("先にプロジェクトを選択してください");
+      const name = newRepoName.trim();
+      if (!name) throw new Error("リポジトリ名を入力してください");
+      const r = await ghCreateRepo(name, newRepoPrivate);
+      const headSha = await ghHeadSha(r.owner, r.name, r.defaultBranch);
+      p.updateProject(project.id, (pr) => ({
+        ...pr,
+        github: { owner: r.owner, repo: r.name, branch: r.defaultBranch, headSha, baseFiles: {} },
+      }));
+      return `リポジトリ ${r.fullName} を作成し、このプロジェクトと紐付けました。「コミット＆プッシュ」でファイルを追加できます。`;
+    });
+
+  const push = () =>
+    run("push", async () => {
+      if (!project || !link) throw new Error("プロジェクトがGitHubと紐付いていません");
+      const msg = commitMsg.trim() || "Update from Eluntra Developer";
+      const sha = await ghPush(project, link, msg);
+      p.updateProject(project.id, (pr) => ({
+        ...pr,
+        github: pr.github ? { ...pr.github, headSha: sha, baseFiles: { ...pr.files } } : pr.github,
+        changeLog: [
+          { at: Date.now(), path: "", kind: "edit" as const, source: "github" as const, detail: `コミット＆プッシュ: ${msg}` },
+          ...(pr.changeLog || []),
+        ].slice(0, 100),
+      }));
+      setCommitMsg("");
+      return `プッシュしました（コミット ${sha.slice(0, 7)}）`;
+    });
+
+  const pull = () =>
+    run("pull", async () => {
+      if (!project || !link) throw new Error("プロジェクトがGitHubと紐付いていません");
+      if (changed.length > 0) {
+        const ok = await props.askConfirm(
+          `未プッシュの変更が ${changed.length} 件あります。再取得すると上書きされます。続行しますか？`,
+        );
+        if (!ok) return "再取得を中止しました";
+      }
+      const res = await ghOpenRepo(link.owner, link.repo, link.branch);
+      p.updateProject(project.id, (pr) => ({
+        ...pr,
+        files: res.files,
+        github: { ...link, headSha: res.headSha, baseFiles: { ...res.files } },
+        changeLog: [
+          { at: Date.now(), path: "", kind: "edit" as const, source: "github" as const, detail: "GitHubから再取得（Pull）" },
+          ...(pr.changeLog || []),
+        ].slice(0, 100),
+      }));
+      p.baselineRef.current = { ...res.files };
+      return `再取得しました（${Object.keys(res.files).length}ファイル）`;
+    });
+
+  const createPR = () =>
+    run("pr", async () => {
+      if (!link) throw new Error("プロジェクトがGitHubと紐付いていません");
+      if (link.branch === prBase) throw new Error("headブランチとbaseブランチが同じです。PRには別ブランチが必要です（ブランチ作成は今後の対応です）");
+      const pr = await ghCreatePR(link.owner, link.repo, prTitle.trim() || "Eluntra Developer からの変更", prBody, link.branch, prBase);
+      return `Pull Request #${pr.number} を作成しました: ${pr.url}`;
+    });
+
+  return (
+    <div className="dev-sheet-back" onClick={props.onClose}>
+      <div className="dev-sheet wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="GitHub連携">
+        <div className="dev-sheet-head">
+          <span>
+            <img src="./logos/conn-github.svg" alt="" width={18} height={18} /> GitHub連携
+          </span>
+          <button type="button" className="btn sm" onClick={props.onClose}>
+            <Icon name="x" className="ic sm" />
+          </button>
+        </div>
+
+        {!connected && (
+          <div className="dev-gh-note">
+            GitHubコネクタが未接続です。本体（Eluntra）の「設定 → コネクタ」でGitHubを接続すると、ここでリポジトリの読み込み・作成・プッシュ・Pull
+            Requestが使えます。
+            <a className="btn primary sm" href="./index.html">
+              本体を開く
+            </a>
+          </div>
+        )}
+        {connected && !p.loggedIn && (
+          <div className="dev-gh-note">GitHub連携の操作には本体でのログインが必要です。上の案内からログインしてください。</div>
+        )}
+        {connected && p.loggedIn && (
+          <>
+            <div className="dev-gh-viewer">{viewer ? `@${viewer} として接続中` : "接続を確認中…"}</div>
+            {error && <div className="dev-gh-error">{error}</div>}
+            {info && <div className="dev-gh-info">{info}</div>}
+
+            <div className="dev-field">
+              <span>リポジトリを開く（新しいローカルプロジェクトとして取得）</span>
+              <div className="dev-gh-row">
+                <select value={selRepo} onChange={(e) => setSelRepo(e.target.value)} aria-label="リポジトリ">
+                  <option value="">選択してください</option>
+                  {repos.map((r) => (
+                    <option key={r.fullName} value={r.fullName}>
+                      {r.fullName}
+                      {r.private ? "（private）" : ""}
+                    </option>
+                  ))}
+                </select>
+                <select value={selBranch} onChange={(e) => setSelBranch(e.target.value)} aria-label="ブランチ">
+                  {branches.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="btn primary sm" disabled={!selRepo || !!busy} onClick={() => void openRepo()}>
+                  {busy === "open" ? "取得中…" : "開く"}
+                </button>
+              </div>
+            </div>
+
+            <div className="dev-field">
+              <span>新規リポジトリ作成（現在のプロジェクトと紐付け）</span>
+              <div className="dev-gh-row">
+                <input value={newRepoName} onChange={(e) => setNewRepoName(e.target.value)} placeholder="リポジトリ名" />
+                <label className="dev-gh-priv">
+                  <input type="checkbox" checked={newRepoPrivate} onChange={(e) => setNewRepoPrivate(e.target.checked)} /> Private
+                </label>
+                <button type="button" className="btn sm" disabled={!!busy || !project} onClick={() => void createRepo()}>
+                  {busy === "create" ? "作成中…" : "作成"}
+                </button>
+              </div>
+            </div>
+
+            {project && link && (
+              <>
+                <div className="dev-field">
+                  <span>
+                    紐付け中: {link.owner}/{link.repo} @ {link.branch}（HEAD {link.headSha.slice(0, 7)}）
+                  </span>
+                  <div className="dev-gh-changed">
+                    {changed.length === 0 && <span>変更はありません</span>}
+                    {changed.slice(0, 30).map((c) => (
+                      <div key={c.path} className="dev-gh-changed-row">
+                        <span className={`k ${c.kind}`}>{c.kind === "added" ? "追加" : c.kind === "deleted" ? "削除" : "変更"}</span>
+                        <span>{c.path}</span>
+                      </div>
+                    ))}
+                    {changed.length > 30 && <span>ほか {changed.length - 30} 件</span>}
+                  </div>
+                  <div className="dev-gh-row">
+                    <input value={commitMsg} onChange={(e) => setCommitMsg(e.target.value)} placeholder="コミットメッセージ" />
+                    <button type="button" className="btn primary sm" disabled={!!busy || changed.length === 0} onClick={() => void push()}>
+                      {busy === "push" ? "プッシュ中…" : "コミット＆プッシュ"}
+                    </button>
+                    <button type="button" className="btn sm" disabled={!!busy} onClick={() => void pull()}>
+                      {busy === "pull" ? "取得中…" : "再取得（Pull）"}
+                    </button>
+                  </div>
+                </div>
+                <div className="dev-field">
+                  <span>Pull Request作成（head: {link.branch}）</span>
+                  <div className="dev-gh-row">
+                    <input value={prBase} onChange={(e) => setPrBase(e.target.value)} placeholder="baseブランチ" aria-label="baseブランチ" />
+                    <input value={prTitle} onChange={(e) => setPrTitle(e.target.value)} placeholder="タイトル" aria-label="PRタイトル" />
+                  </div>
+                  <textarea value={prBody} onChange={(e) => setPrBody(e.target.value)} placeholder="本文" rows={2} aria-label="PR本文" />
+                  <button type="button" className="btn sm" disabled={!!busy} onClick={() => void createPR()}>
+                    {busy === "pr" ? "作成中…" : "Pull Requestを作成"}
+                  </button>
+                  <span className="dev-gh-note-inline">※ ブランチの新規作成・切替はこのバージョンでは未対応です（現在のブランチ表示とPR作成のみ）。</span>
+                </div>
+              </>
+            )}
+            {project && !link && <div className="dev-gh-note">現在のプロジェクトはGitHubと紐付いていません。「開く」か「作成」で紐付けできます。</div>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
