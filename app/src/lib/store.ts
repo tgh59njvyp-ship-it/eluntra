@@ -66,7 +66,7 @@ export interface AppState {
   connectors: Record<string, string>;
   connectorAccounts: Record<string, string>;
   codes: Record<string, string>;
-  /** 自分で作るカスタムプロバイダー（端末内のみ・同期対象外） */
+  /** 自分で作るカスタムプロバイダー（キーを含む。ログイン中はアカウント同期の対象） */
   customs: CustomEntry[];
   currentId: string | null;
   theme: "light" | "dark";
@@ -169,6 +169,33 @@ function emit(): void {
   listeners.forEach((fn) => fn());
 }
 
+/* アカウント同期の対象スライス（auth.ts が購読し、ログイン中は自動で push する） */
+const SYNCED_SLICES: Array<keyof AppState> = [
+  "keys",
+  "fetchedModels",
+  "modelFlags",
+  "favorites",
+  "conf",
+  "sessions",
+  "notes",
+  "connectors",
+  "connectorAccounts",
+  "codes",
+  "customs",
+  "theme",
+];
+const dataListeners = new Set<() => void>();
+
+/** 同期対象データが変わったら呼ばれるリスナーを登録する（auth.ts の自動 push 用） */
+export function onDataChanged(fn: () => void): () => void {
+  dataListeners.add(fn);
+  return () => dataListeners.delete(fn);
+}
+
+function notifyDataChanged(): void {
+  dataListeners.forEach((fn) => fn());
+}
+
 /** 状態を部分更新し、関係する localStorage へ保存する */
 export function update(patch: Partial<AppState>): void {
   state = { ...state, ...patch };
@@ -188,6 +215,7 @@ export function update(patch: Partial<AppState>): void {
   if (patch.customs) writeJSON(LS.customs, state.customs);
   if (patch.theme) writeJSON(LS.theme, state.theme);
   emit();
+  if (SYNCED_SLICES.some((k) => patch[k] !== undefined)) notifyDataChanged();
 }
 
 export function getState(): AppState {

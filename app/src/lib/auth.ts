@@ -1,10 +1,16 @@
-import { getState, readJSON, update, writeJSON } from "./store";
-import type { ChatSession, Note } from "./types";
+import { getState, onDataChanged, readJSON, update, writeJSON, type ModelFlag } from "./store";
+import type { ChatSession, CustomEntry, Note } from "./types";
 
 /**
- * Supabase Auth（共用プロジェクト）によるログインとクラウド同期（新規実装）。
- * 同期対象は会話・設定・メモ・コードのみ。APIキーは端末外に出さない。
- * 取り込みは「置き換え」ではなく会話IDで統合する（片方だけにある会話を消さない）。
+ * Supabase Auth（共用プロジェクト）によるログインとクラウド同期。
+ * 同期対象は会話・設定・メモ・コードに加え、v6.8 から APIキー・カスタムプロバイダー・
+ * コネクタ接続情報・モデル一覧（取得済み/分類/お気に入り）・テーマまで含める
+ * （ユーザーの明示指示による方針変更）。キーは本人の Supabase アカウントの専用行
+ * （eluntra_sync、RLS で自分の行だけ読み書き可能）に保存され、ログインした端末へ引き継がれる。
+ * 取り込みは「置き換え」ではなく統合（会話はID単位、キー類は項目単位でクラウド優先・
+ * ローカルだけにある項目は保持）で行い、片方だけにあるデータを消さない。
+ * 同期しないもの：認証セッション自体（eluntra_auth）、OAuth の pending、最終同期時刻、
+ * sessionStorage の内容（エージェントのブラウザセッション等）。
  */
 
 const SUPABASE_URL = "https://rzgldbedsjocmvqrfdhf.supabase.co";
@@ -235,16 +241,25 @@ export async function logout(): Promise<void> {
 
 /* ---------- クラウド同期 ---------- */
 
-interface SyncData {
+export interface SyncData {
   version: 1;
   sessions: ChatSession[];
   conf: { provider: string; models: Record<string, string>; system: string; temp: number; agent?: boolean };
   notes?: Note[];
   code?: string;
   codes?: Record<string, string>;
+  /* v6.8 で追加したアカウント引き継ぎ対象（旧ペイロードには無いため全て任意） */
+  keys?: Record<string, string>;
+  customs?: CustomEntry[];
+  connectors?: Record<string, string>;
+  connectorAccounts?: Record<string, string>;
+  fetchedModels?: Record<string, string[]>;
+  modelFlags?: Record<string, Record<string, ModelFlag>>;
+  favorites?: Record<string, string[]>;
+  theme?: "light" | "dark";
 }
 
-function collect(): SyncData {
+export function collect(): SyncData {
   const st = getState();
   const codes = readJSON<Record<string, string>>("eluntra_codes", {});
   return {
@@ -260,10 +275,24 @@ function collect(): SyncData {
     notes: st.notes,
     code: codes.html || readJSON<string>("eluntra_code", ""),
     codes,
+    keys: st.keys,
+    customs: st.customs,
+    connectors: st.connectors,
+    connectorAccounts: st.connectorAccounts,
+    fetchedModels: st.fetchedModels,
+    modelFlags: st.modelFlags,
+    favorites: st.favorites,
+    theme: st.theme,
   };
 }
 
-function apply(data: SyncData): void {
+/** レコード型フィールドの統合：クラウドにある項目はクラウド優先、ローカルだけの項目は保持する */
+function mergeRecord<T>(local: Record<string, T>, cloud: unknown): Record<string, T> | null {
+  if (!cloud || typeof cloud !== "object" || Array.isArray(cloud)) return null;
+  return { ...local, ...(cloud as Record<string, T>) };
+}
+
+export function apply(data: SyncData): void {
   const st = getState();
   if (Array.isArray(data.sessions)) {
     const byId = new Map<string, ChatSession>();
@@ -306,6 +335,36 @@ function apply(data: SyncData): void {
     update({ codes: data.codes });
   } else if (typeof data.code === "string" && data.code) {
     writeJSON("eluntra_code", data.code);
+  }
+  /* v6.8：キー・接続情報・モデル情報の統合。クラウドに無いフィールドは一切触らない
+     （旧ペイロードでログインしてもローカルのキーが消えないための要） */
+  const cur = getState();
+  const mergedKeys = mergeRecord(cur.keys, data.keys);
+  if (mergedKeys) update({ keys: mergedKeys });
+  const mergedConnectors = mergeRecord(cur.connectors, data.connectors);
+  if (mergedConnectors) update({ connectors: mergedConnectors });
+  const mergedAccounts = mergeRecord(cur.connectorAccounts, data.connectorAccounts);
+  if (mergedAccounts) update({ connectorAccounts: mergedAccounts });
+  const mergedModels = mergeRecord(cur.fetchedModels, data.fetchedModels);
+  if (mergedModels) update({ fetchedModels: mergedModels });
+  const mergedFlags = mergeRecord(cur.modelFlags, data.modelFlags);
+  if (mergedFlags) update({ modelFlags: mergedFlags });
+  const mergedFavorites = mergeRecord(cur.favorites, data.favorites);
+  if (mergedFavorites) update({ favorites: mergedFavorites });
+  if (Array.isArray(data.customs)) {
+    const local = getState().customs;
+    const cloudById = new Map<string, CustomEntry>();
+    data.customs.forEach((c) => {
+      if (c?.id) cloudById.set(c.id, c);
+    });
+    const merged = local.map((c) => cloudById.get(c.id) ?? c);
+    data.customs.forEach((c) => {
+      if (c?.id && !local.some((l) => l.id === c.id)) merged.push(c);
+    });
+    update({ customs: merged });
+  }
+  if (data.theme === "light" || data.theme === "dark") {
+    update({ theme: data.theme });
   }
 }
 
@@ -353,3 +412,33 @@ export async function pullSync(): Promise<"applied" | "exists" | "none"> {
     return "none";
   }
 }
+
+/* ログイン中のデータ変更を、少し待ってから自動でクラウドへ push する（デバウンス）。
+   キー・カスタム・コネクタ等の変更もこれで同期される。pushSync 自体は update() を
+   呼ばないためループしない。pull の apply が update() を呼ぶと、マージ済み状態の
+   push が予約され、両端末の内容が和集合へ収束する。 */
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+let pushRunning = false;
+let pushPending = false;
+
+function schedulePush(): void {
+  if (!isLoggedIn()) return;
+  if (pushRunning) {
+    pushPending = true;
+    return;
+  }
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    pushRunning = true;
+    void pushSync().finally(() => {
+      pushRunning = false;
+      if (pushPending) {
+        pushPending = false;
+        schedulePush();
+      }
+    });
+  }, 2500);
+}
+
+onDataChanged(schedulePush);

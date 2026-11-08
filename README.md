@@ -1,4 +1,4 @@
-# Eluntra（v6.7・作り直し版）
+# Eluntra（v6.8・作り直し版）
 
 30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。さらに、OpenAI互換のカスタム接続を自分で何件でも作れます。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
@@ -9,7 +9,7 @@ v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScr
 
 ## 引き継ぎ互換
 - localStorage のキーと形式は旧版と同一（eluntra_keys / eluntra_tested / eluntra_models / eluntra_conf / eluntra_sessions / eluntra_notes / eluntra_theme など）。旧版で保存したキー・会話・設定はそのまま読み込めます
-- Supabase（共用プロジェクト）のログイン（GitHub / Google / Apple、PKCE）と同期（eluntra_sync、会話IDで統合）も互換。APIキーは同期対象外で、端末内にのみ保存されます
+- Supabase（共用プロジェクト）のログイン（GitHub / Google / Apple、PKCE）と同期（eluntra_sync、会話IDで統合）も互換。v6.8 からは APIキー・カスタム接続・コネクタの接続情報も同期対象になり、ログインした端末へ引き継がれる（下記 v6.8 の変更）
 
 ## 対応プロバイダー（30社＋カスタム）
 OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / Cloudflare Workers AI / SambaNova / DeepSeek / xAI / Together AI / Fireworks AI / Cerebras / Perplexity / NVIDIA NIM / Hugging Face / Replicate / Amazon Bedrock / Azure AI Foundry / Google Vertex AI / GitHub Models / AI21 Labs / Aleph Alpha / Novita AI / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp ＋ カスタム（任意のOpenAI互換エンドポイントを複数・名前つきで追加可能）
@@ -72,6 +72,21 @@ npm run build   # tsc strict + vite build
   - **データがサーバーを経由することは一切ない**（同一端末・同一ブラウザ内での postMessage のみ）。引き継ぎは利用者本人が自分のスマホで実行する必要がある
   - ローカル二オリジン検証済み：別ポート同士で、送信側に仕込んだキー2件・会話1件・カスタム1件が受信側へ移ることを実ブラウザ（CDP駆動）で確認
 - **モデル選択シートの「最近使用」セクションを削除した**（ユーザーの指示）。store の recents 自体は互換のため残置し、UIとシート内の描画コードのみ撤去
+
+## v6.8の変更（ログインでAPIキーとデータを引き継ぎ）
+
+- **アカウント同期の対象を拡張した**（ユーザーの明示指示「ログインしたらAPIとかデータを引き継げるようにして」による方針変更。v6.7 までは APIキーを同期対象外としていた）
+  - 同期ペイロード（`lib/auth.ts` の `collect`/`SyncData`）に `keys`（プロバイダーAPIキー）・`customs`（カスタムプロバイダー、キー含む）・`connectors` / `connectorAccounts`（コネクタ接続情報）・`fetchedModels`（取得済みモデル一覧）・`modelFlags`（無料/通常の分類）・`favorites`・`theme` を追加。従来の sessions / conf / notes / codes と合わせて、ログインすれば新規ブラウザ・別端末でも設定一式が復元される
+  - ペイロードの新フィールドはすべて任意。旧ペイロード（キー類なし）を取り込んでも既存の適用処理がそのまま動き、ローカルのキーは消えない
+- **取り込みは統合（マージ）で統一し、データを消さない**
+  - レコード型（keys / connectors / connectorAccounts / fetchedModels / modelFlags / favorites）は項目単位で統合：クラウドにある項目はクラウド優先、ローカルだけにある項目は保持する
+  - customs は ID 単位で統合（同 ID はクラウド優先、ローカルだけの ID は保持、クラウドだけの ID は追加）。sessions は従来どおり会話 ID で統合
+  - theme はクラウドにあればその値を適用する
+  - pull の適用後にマージ済み状態が push され、端末間の内容は和集合へ収束する
+- **push の自動化**：`store.update()` が同期対象スライスの変更を `onDataChanged` で通知し、`auth.ts` がログイン中のみ 2.5 秒デバウンスで `pushSync()` を予約するようにした。キー・カスタム・コネクタの変更も、従来の明示 push（送信後・「今すぐ同期」・エージェント実行後）に加えて自動で同期される。pushSync 自体は update() を呼ばないためループしない
+- **同期しないもの（従来どおり）**：認証セッション自体（`eluntra_auth`）、OAuth の pending（`eluntra_oauth_pending`）、最終同期時刻（`eluntra_last_sync`）、sessionStorage の内容（エージェントのブラウザセッション等）、移行ヘルパーの状態
+- **保存先と権限**：キーは本人の Supabase アカウントの専用行（`eluntra_sync`、RLS で自分の行だけ読み書き可能）に保存される。ログイン中はサーバー側にキーが保存されることを設定・Welcome の文言で明示した。ログアウトしてもクラウド側のデータは消えず、次回ログインで戻る（設定の「データ管理」は端末内データの削除のみで、クラウド側は対象外のまま）
+- **検証**：実コードの `collect`/`apply` を esbuild でバンドルし、localStorage シム上で3シナリオ（旧ペイロード×ローカルキーあり→保持／空ローカル×クラウドキーあり→復元／両方あり→和集合・競合はクラウド優先）を実行し全21件のアサーションが合格。実アカウントでの二端末ログイン往復は未検証（利用者本人のアカウントが必要なため）
 
 ## v6.6の変更
 

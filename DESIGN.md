@@ -87,3 +87,11 @@ v6.0は旧コードを流用せず、React + TypeScript で1から設計し直�
 - Supabase の接続は2方式：ログイン式（Management API OAuth、`OAUTH_SERVICES.supabase`。アプリ登録が済むまで「準備中」）とトークン式（プロジェクトURL＋サービスロールキー＋任意で sbp_、接続情報を JSON で端末内保存・同期対象外）
 - エージェントの Supabase ツール（tables/select/insert/update/delete/sql/auth_users）はコネクタ接続時のみ実働し、未接続時は接続を促すメッセージを返す。update/delete はフィルタ必須で全件書き込みを拒否する
 - エージェントに「ブラウザ」ツールを追加。実ブラウザではなく Vercel Node Function `/api/browser`（サーバー側の軽量ブラウザ：取得・リンク/フォーム抽出・送信、Cookie はクライアント側 sessionStorage で保持）。制限（JS描画不可・ログイン必須ページ不可）はツール説明と README に明記する
+
+## v6.8（2026-11-08）アカウント同期の拡張（キー引き継ぎ）
+
+- 方針変更（ユーザー明示指示）：v6.7 までは「APIキーは端末外に出さない」が設計原則だったが、「ログインしたらAPIとかデータを引き継げるようにして」という指示を受け、同期対象を拡張した
+- 同期範囲：sessions / conf / notes / codes（従来）＋ keys / customs / connectors / connectorAccounts / fetchedModels / modelFlags / favorites / theme（追加）。保存先は従来どおり本人の `eluntra_sync` 行（RLS で自分の行のみ読み書き可能）
+- 統合規則：置き換えは禁止。レコード型は項目単位（クラウド優先・ローカルのみの項目は保持）、配列型（customs・sessions・notes）は ID 単位で統合する。旧ペイロード（新フィールドなし）の取り込みでローカルデータが消えることはない
+- push 経路：明示呼び出し（送信後・手動同期・エージェント後）に加え、`store.onDataChanged` 購読によるデバウンス自動 push（ログイン中のみ）。push 側は store を更新しないためループしない
+- 除外：認証セッション・OAuth pending・最終同期時刻・sessionStorage 内容は同期しない。ログアウトでクラウド側データは消さない（次回ログインで復元されるのが本機能の目的）

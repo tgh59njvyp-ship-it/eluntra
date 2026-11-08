@@ -563,7 +563,7 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
                 接続すると、エージェントがテーブル操作（読み書き）・認証ユーザーの管理を行えます。
               </p>
               <p className="set-desc">
-                サービスロールキーはデータベースへのフルアクセス権限を持つ重要なキーです。この端末内にのみ保存され、クラウド同期はされません。
+                サービスロールキーはデータベースへのフルアクセス権限を持つ重要なキーです。この端末に保存され、ログイン中は他の接続情報と同様に、あなたのSupabaseアカウントの専用領域（自分の行だけ読み書き可能）にも同期されます。
                 アクセストークン（sbp_）も入れると、エージェントが SQL も実行できます（URL＋サービスロールキーだけでも接続できます）。
               </p>
               <div className="field">
@@ -658,7 +658,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.7</span>
+          <span className="pill-state">現在の版：v6.8</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -668,7 +668,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
           {loggedIn && user ? (
             <>
               <p className="set-desc">
-                {user.name || user.email || "ログイン中"}（{user.provider}）でログインしています。会話と設定はクラウド同期されます（APIキーは同期されません）。
+                {user.name || user.email || "ログイン中"}（{user.provider}）でログインしています。会話・設定に加えて、APIキー・カスタム接続・コネクタの接続情報もあなたのSupabaseアカウントの専用領域（自分の行だけ読み書き可能）に同期され、ログインした端末へ引き継がれます。ログアウトしてもクラウド側のデータは消えず、次回ログインで戻ります。
               </p>
               <div className="rowbtns">
                 <button
@@ -697,7 +697,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             </>
           ) : (
             <>
-              <p className="set-desc">ログインすると会話と設定が端末間で同期されます。APIキーは端末内にのみ保存され、同期されません。</p>
+              <p className="set-desc">ログインすると、会話・設定・APIキー・カスタム接続・コネクタの接続情報があなたのSupabaseアカウントの専用領域（自分の行だけ読み書き可能）に保存され、別の端末でもログインするだけで引き継げます。未ログインの間は、この端末内にのみ保存されます。</p>
               <div className="rowbtns">
                 {(["github", "google"] as OAuthProvider[]).map((pr) => (
                   <button key={pr} type="button" className="btn secondary sm" onClick={() => void loginWith(pr)}>
@@ -765,13 +765,13 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
           </div>
 
           <div className="set-sec">APIプロバイダー（30社）</div>
-          <p className="set-desc">キーは端末内にのみ保存されます。複数社のキーを入れておくと、Eluntra Autoや自動フォールバックで使い分けられます。</p>
+          <p className="set-desc">キーはこの端末に保存され、ログイン中はあなたのSupabaseアカウントの専用領域にも同期され、ログインした端末へ引き継がれます。複数社のキーを入れておくと、Eluntra Autoや自動フォールバックで使い分けられます。</p>
           {PROVIDERS.map((p) => (
             <ProviderItem key={`${open}-${p.id}`} p={p} toast={toast} />
           ))}
 
           <div className="set-sec">カスタムプロバイダー</div>
-          <p className="set-desc">OpenAI互換の接続先を、何件でも自分で追加できます。名前は自由に付けられます。通信はEluntraのサーバー経由で中継するため、CORSを許可していない接続先でも使えます。URLとキーは端末内にのみ保存されます。</p>
+          <p className="set-desc">OpenAI互換の接続先を、何件でも自分で追加できます。名前は自由に付けられます。通信はEluntraのサーバー経由で中継するため、CORSを許可していない接続先でも使えます。URLとキーはこの端末に保存され、ログイン中はアカウントにも同期されます。</p>
           {customs.length === 0 && (
             <p className="set-desc">まだありません。「追加」から自分の接続先を作れます。</p>
           )}
@@ -790,7 +790,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
           </div>
 
           <div className="set-sec">コネクタ（17種）</div>
-          <p className="set-desc">「接続」を押すとログイン画面でつなぐ方式が基本です。GitHubはデバイスフローに対応していますが、GitHubアプリ側で有効化が必要です。その他のサービスは各サービスの開発者画面でのアプリ登録（1回限り）が済むまで「準備中」と表示します。トークンで接続できるもの（GitHub / YouTube / Notion / Slack / Discord の5種と Supabase）は、各行の「トークンで接続（上級者向け）」から従来どおり使えます。Supabaseを接続すると、エージェントがデータベース操作や認証ユーザー管理を行えます。接続情報は端末内にのみ保存されます。</p>
+          <p className="set-desc">「接続」を押すとログイン画面でつなぐ方式が基本です。GitHubはデバイスフローに対応していますが、GitHubアプリ側で有効化が必要です。その他のサービスは各サービスの開発者画面でのアプリ登録（1回限り）が済むまで「準備中」と表示します。トークンで接続できるもの（GitHub / YouTube / Notion / Slack / Discord の5種と Supabase）は、各行の「トークンで接続（上級者向け）」から従来どおり使えます。Supabaseを接続すると、エージェントがデータベース操作や認証ユーザー管理を行えます。接続情報はこの端末に保存され、ログイン中はアカウントにも同期されます。</p>
           {CONNECTORS.map((c) => (
             <ConnectorItem key={`${open}-${c.id}`} {...c} toast={toast} />
           ))}

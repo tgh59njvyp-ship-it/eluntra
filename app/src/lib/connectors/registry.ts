@@ -9,7 +9,8 @@ import { getState } from "../store";
  * （トークン方式＝プロジェクトURL＋サービスロールキー等。ログイン式はアプリ登録待ち）。
  * その他のサービスは OAuth アプリ登録（1回限り）が済むまで「準備中」と明示し、
  * 接続済みには見せない。
- * トークンは APIキーとは別枠（eluntra_connectors）で端末内にのみ保存する。
+ * トークンは APIキーとは別枠（eluntra_connectors）で端末に保存し、ログイン中は
+ * APIキーと同様に本人のアカウント（eluntra_sync）へ同期される（v6.8〜）。
  * ロゴは全種とも公式ブランドマーク（public/logos/conn-<id>.svg、出典は DESIGN.md）。
  */
 

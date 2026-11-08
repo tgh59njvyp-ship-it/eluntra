@@ -62,8 +62,8 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
           <span className="attach-chip" style={{ margin: 0 }}>ほか18社</span>
         </div>
         <div className="feat">
-          <h3>キーは端末の中だけ</h3>
-          <p>APIキーはこの端末のブラウザ内にのみ保存され、クラウド同期の対象にもなりません。</p>
+          <h3>キーは端末とアカウントに</h3>
+          <p>APIキーはこの端末のブラウザ内に保存されます。ログイン中は、あなたのSupabaseアカウントの専用領域（自分だけ読み書き可能）にも同期され、別の端末でもログインするだけで引き継げます。</p>
         </div>
         <div className="feat">
           <h3>モデルは実物だけ</h3>
@@ -71,7 +71,7 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
         </div>
         <div className="feat">
           <h3>ログインで同期</h3>
-          <p>会話と設定は、ログインすると端末間で同期されます。</p>
+          <p>会話・設定・APIキー・接続情報は、ログインするとあなたのSupabaseアカウントに同期され、端末を変えても引き継げます。</p>
         </div>
         <p style={{ color: "var(--text-3)", fontSize: 12.5, marginTop: 24 }}>
           Googleログインはテスト中のため、当面は許可されたアカウントのみ使えます。Appleログインはサーバー側で未有効化のため準備中です。

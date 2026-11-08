@@ -118,7 +118,7 @@ export interface ModelMeta {
   note?: string;
 }
 
-/** ユーザーが自分で作るカスタムプロバイダー（端末内のみ保存・同期対象外） */
+/** ユーザーが自分で作るカスタムプロバイダー（キーを含む。ログイン中はアカウント同期の対象） */
 export interface CustomEntry {
   id: string;
   name: string;
