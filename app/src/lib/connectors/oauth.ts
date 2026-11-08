@@ -203,7 +203,9 @@ export async function startOAuth(id: string): Promise<void> {
   const challenge = await sha256Base64Url(verifier);
   const pending: PendingOAuth = { service: id, state, verifier };
   try {
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+    // sessionStorage だとタブやブラウザ文脈が変わると失われ、戻ってきた時に
+    // state 不一致になるため localStorage に保存する（v6.5.2 の修正）
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
   } catch { /* ignore */ }
   const params = new URLSearchParams({
     client_id: clientId,
@@ -226,7 +228,7 @@ export async function handleOAuthCallback(): Promise<{ service: string; ok: bool
   if (!code || !stateParam) return null;
   let pending: PendingOAuth | null = null;
   try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
+    const raw = localStorage.getItem(PENDING_KEY) || sessionStorage.getItem(PENDING_KEY);
     if (raw) pending = JSON.parse(raw) as PendingOAuth;
   } catch { pending = null; }
   // URLからは常に除去する
@@ -234,9 +236,21 @@ export async function handleOAuthCallback(): Promise<{ service: string; ok: bool
   url.searchParams.delete("state");
   window.history.replaceState(null, "", url.toString());
   if (!pending || pending.state !== stateParam) {
-    return { service: "", ok: false, msg: "接続の確認情報（state）が一致しませんでした。もう一度お試しください" };
+    // 従来URL（SUS）側で接続を始めた場合、コールバックは固定で Vercel 側に届くため
+    // このオリジンには確認情報が無い。その場合はコードと state をそのまま従来URL側の
+    // アプリへ引き継ぎ、始めた側でトークン交換を完了させる（確認情報は始めた側にだけある）。
+    const fwd = new URL(window.location.href).searchParams.get("oauth_fwd");
+    if (!fwd && window.location.origin === "https://eluntra.vercel.app") {
+      const to = new URL("https://simple-url-server.lovable.app/s/eluntra/");
+      to.searchParams.set("code", code);
+      to.searchParams.set("state", stateParam);
+      to.searchParams.set("oauth_fwd", "1");
+      window.location.replace(to.toString());
+      return { service: "", ok: false, msg: "接続の続きを、接続を始めたページで完了しています…" };
+    }
+    return { service: "", ok: false, msg: "接続の確認情報（state）が一致しませんでした。対処：接続ボタンを押したのと同じページ・同じブラウザで、もう一度「接続」からやり直してください" };
   }
-  try { sessionStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(PENDING_KEY); sessionStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
   try {
     const res = await fetch(`${API_BASE}/api/oauth/exchange`, {
       method: "POST",
