@@ -2,9 +2,14 @@ import { getState } from "../store";
 
 /**
  * コネクタレジストリ（16種）。
- * 実働はトークン方式で本当に動く5種だけ。残りは OAuth アプリ登録が必要なため
- * 「未対応」と明示し、接続済みには見せない。
+ * 接続体験は「押すとログイン画面に飛ぶ」ChatGPT式を主役にする（lib/connectors/oauth.ts）。
+ * 現時点で実際に接続できるのは、トークン方式で本当に動く5種（GitHub／YouTube／Notion／
+ * Slack／Discord、設定の折りたたみ「トークンで接続」から）と、GitHubのデバイスフロー
+ * （ただしGitHubアプリ側でデバイスフローの有効化が済んだ場合のみ）だけ。
+ * その他のサービスは OAuth アプリ登録（1回限り）が済むまで「準備中」と明示し、
+ * 接続済みには見せない。
  * トークンは APIキーとは別枠（eluntra_connectors）で端末内にのみ保存する。
+ * ロゴは全種とも公式ブランドマーク（public/logos/conn-<id>.svg、出典は DESIGN.md）。
  */
 
 export interface ConnectorDef {
@@ -12,29 +17,31 @@ export interface ConnectorDef {
   name: string;
   mono: string;
   color: string;
+  /** トークン方式（折りたたみ）が使えるか */
   supported: boolean;
+  desc: string;
   fieldLabel?: string;
   fieldPlaceholder?: string;
   help?: string;
 }
 
 export const CONNECTORS: ConnectorDef[] = [
-  { id: "github", name: "GitHub", mono: "GH", color: "#24292F", supported: true, fieldLabel: "Personal Access Token", fieldPlaceholder: "ghp_… / github_pat_…", help: "リポジトリ一覧をエージェントが参照できます" },
-  { id: "youtube", name: "YouTube", mono: "YT", color: "#B3261E", supported: true, fieldLabel: "Data API v3 キー", fieldPlaceholder: "AIza…", help: "動画検索をエージェントが使えます" },
-  { id: "notion", name: "Notion", mono: "No", color: "#111111", supported: true, fieldLabel: "インテグレーショントークン", fieldPlaceholder: "ntn_… / secret_…", help: "ページ・データベース検索をエージェントが使えます" },
-  { id: "slack", name: "Slack", mono: "Sl", color: "#4A154B", supported: true, fieldLabel: "Bot トークン", fieldPlaceholder: "xoxb-…", help: "接続確認のみ（読み取りは権限に依存します）" },
-  { id: "discord", name: "Discord", mono: "Di", color: "#4752C4", supported: true, fieldLabel: "Bot トークン", fieldPlaceholder: "Botトークン", help: "接続確認のみ" },
-  { id: "gdrive", name: "Google Drive", mono: "GD", color: "#8A6D00", supported: false },
-  { id: "gcal", name: "Google Calendar", mono: "GC", color: "#1A56DB", supported: false },
-  { id: "gmail", name: "Gmail", mono: "Gm", color: "#B3261E", supported: false },
-  { id: "gdocs", name: "Google Docs", mono: "Do", color: "#1A56DB", supported: false },
-  { id: "gsheets", name: "Google Sheets", mono: "Sh", color: "#137333", supported: false },
-  { id: "onedrive", name: "Microsoft OneDrive", mono: "OD", color: "#0F5FA8", supported: false },
-  { id: "outlook", name: "Microsoft Outlook", mono: "Ou", color: "#0F5FA8", supported: false },
-  { id: "dropbox", name: "Dropbox", mono: "Db", color: "#0F5FA8", supported: false },
-  { id: "linear", name: "Linear", mono: "Li", color: "#5E6AD2", supported: false },
-  { id: "trello", name: "Trello", mono: "Tr", color: "#0F5FA8", supported: false },
-  { id: "jira", name: "Jira", mono: "Ji", color: "#0F5FA8", supported: false },
+  { id: "github", name: "GitHub", mono: "GH", color: "#24292F", supported: true, desc: "リポジトリ一覧をエージェントが参照できます", fieldLabel: "Personal Access Token", fieldPlaceholder: "ghp_… / github_pat_…", help: "リポジトリ一覧をエージェントが参照できます" },
+  { id: "youtube", name: "YouTube", mono: "YT", color: "#B3261E", supported: true, desc: "動画検索をエージェントが使えます", fieldLabel: "Data API v3 キー", fieldPlaceholder: "AIza…", help: "動画検索をエージェントが使えます" },
+  { id: "notion", name: "Notion", mono: "No", color: "#111111", supported: true, desc: "ページ・データベース検索をエージェントが使えます", fieldLabel: "インテグレーショントークン", fieldPlaceholder: "ntn_… / secret_…", help: "ページ・データベース検索をエージェントが使えます" },
+  { id: "slack", name: "Slack", mono: "Sl", color: "#4A154B", supported: true, desc: "接続確認（読み取りは権限に依存します）", fieldLabel: "Bot トークン", fieldPlaceholder: "xoxb-…", help: "接続確認のみ（読み取りは権限に依存します）" },
+  { id: "discord", name: "Discord", mono: "Di", color: "#4752C4", supported: true, desc: "接続確認", fieldLabel: "Bot トークン", fieldPlaceholder: "Botトークン", help: "接続確認のみ" },
+  { id: "gdrive", name: "Google Drive", mono: "GD", color: "#8A6D00", supported: false, desc: "ファイルの検索・参照" },
+  { id: "gcal", name: "Google Calendar", mono: "GC", color: "#1A56DB", supported: false, desc: "予定の確認" },
+  { id: "gmail", name: "Gmail", mono: "Gm", color: "#B3261E", supported: false, desc: "メールの検索・要約" },
+  { id: "gdocs", name: "Google Docs", mono: "Do", color: "#1A56DB", supported: false, desc: "ドキュメントの参照" },
+  { id: "gsheets", name: "Google Sheets", mono: "Sh", color: "#137333", supported: false, desc: "表データの参照" },
+  { id: "onedrive", name: "Microsoft OneDrive", mono: "OD", color: "#0F5FA8", supported: false, desc: "ファイルの検索・参照" },
+  { id: "outlook", name: "Microsoft Outlook", mono: "Ou", color: "#0F5FA8", supported: false, desc: "メール・予定の確認" },
+  { id: "dropbox", name: "Dropbox", mono: "Db", color: "#0F5FA8", supported: false, desc: "ファイルの検索・参照" },
+  { id: "linear", name: "Linear", mono: "Li", color: "#5E6AD2", supported: false, desc: "課題の検索" },
+  { id: "trello", name: "Trello", mono: "Tr", color: "#0F5FA8", supported: false, desc: "ボード・カードの参照" },
+  { id: "jira", name: "Jira", mono: "Ji", color: "#0F5FA8", supported: false, desc: "課題の検索" },
 ];
 
 export function connectorToken(id: string): string {

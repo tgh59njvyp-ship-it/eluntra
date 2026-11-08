@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>接続を完了しています… — Eluntra</title>
+</head>
+<body>
+<p style="font-family: sans-serif; color: #333; padding: 24px;">接続を完了しています…</p>
+<script>
+// 認可コードを受け取り、アプリ本体へ渡す（本体側で state を検証してトークン交換する）
+(function () {
+  var q = window.location.search || "";
+  var target = "/?oauth_callback=1" + (q ? "&" + q.slice(1) : "");
+  window.location.replace(target);
+})();
+</script>
+</body>
+</html>

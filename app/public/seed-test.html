@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>seed</title></head>
+<body>
+<script>
+localStorage.setItem("eluntra_guest", "1");
+localStorage.setItem("eluntra_keys", JSON.stringify({ gemini: "TESTKEY-OLD-FORMAT-1234", groq: "gsk_test_old_format" }));
+localStorage.setItem("eluntra_tested", JSON.stringify({ gemini: true }));
+localStorage.setItem("eluntra_models", JSON.stringify({ gemini: ["gemini-3.5-flash-lite", "gemini-2.5-flash"] }));
+localStorage.setItem("eluntra_conf", JSON.stringify({ provider: "gemini", models: { gemini: "gemini-3.5-flash-lite" }, system: "", temp: 0.7, agent: false, mode: "chat", effort: "high", proxyOn: true }));
+localStorage.setItem("eluntra_sessions", JSON.stringify([{ id: "seed-session-1", title: "旧版からの引き継ぎテスト会話", provider: "gemini", model: "gemini-3.5-flash-lite", created: 1794000000000, messages: [ { role: "user", content: "旧バージョンで保存した質問です" }, { role: "assistant", content: "旧バージョンで保存した回答です。新しい画面でも読めるはずです。", model: "gemini-3.5-flash-lite" } ] }]));
+localStorage.setItem("eluntra_notes", JSON.stringify([{ id: "seed-note-1", title: "引き継ぎメモ", content: "旧版のメモ内容", created: 1794000000000 }]));
+location.replace("./");
+</script>
+</body></html>

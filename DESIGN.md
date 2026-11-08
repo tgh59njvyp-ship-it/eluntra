@@ -69,3 +69,14 @@ v6.0は旧コードを流用せず、React + TypeScript で1から設計し直�
   - Simple Icons：OpenAI（simple-icons v14系。現行版では削除されていたため当該バージョンから取得）／Google Gemini／Anthropic／Mistral AI／OpenRouter／Cloudflare／DeepSeek／Perplexity／NVIDIA／Hugging Face／Replicate／GitHub Models／Ollama／LM Studio
   - Lobe Icons（@lobehub/icons-static-svg）：Groq／Cohere／SambaNova／xAI／Together AI／Fireworks AI／Cerebras／Amazon Bedrock／Azure／Google Vertex AI／AI21 Labs／Aleph Alpha／Novita AI／Hyperbolic／SiliconFlow（Lobeでは「SiliconCloud」表記）
   - ロゴなし：llama.cpp（両ライブラリに公式マークが実在しないため、捏造せずモノグラムのまま）
+
+## v6.2（2026-11-08）コネクタ公式ロゴとログイン式接続
+
+- コネクタ16種の表示も公式ブランドロゴに変更（SVGを `app/public/logos/conn-<id>.svg` に同梱し、実行時に外部へ取りに行かない。白地タイルで統一）
+- ロゴ出典：全16種とも Simple Icons。GitHub／YouTube／Notion／Discord／Slack／Google Drive／Google Calendar／Gmail／Google Docs／Google Sheets／Dropbox／Linear／Trello／Jira は simple-icons v13、Microsoft OneDrive／Microsoft Outlook は現行版で削除されていたため v11 から取得。入れられなかったコネクタは無し
+- 接続体験は「押すとログイン画面に飛んで、ログインしたら繋がる」ChatGPT式を主役にした：
+  - GitHub：デバイスフローを実装（アプリ内コード表示→GitHubの画面でログイン＋コード入力→ポーリングで自動接続、アカウント名表示・切断可）。GitHubのデバイス系エンドポイントはCORSヘッダーを返さないため、Vercel中継 `/api/oauth/github-device`（転送先は該当2エンドポイントのみ）経由。ただし 2026-11-08 の実測で、ログイン用GitHubアプリ側のデバイスフローが未有効化（`device_flow_disabled`）のため現時点では開始できない。アプリ内では有効化手順（GitHubアプリ設定で Allow device flow をオン）を表示し、有効化後はそのまま動く
+  - その他：認可コード＋PKCEの汎用エンジンとサービス別設定テーブル（認可URL／トークンURL／スコープ／ユーザー情報URL）を実装。戻り先は `https://eluntra.vercel.app/connectors/callback`、トークン交換は Vercel `/api/oauth/exchange` が client_secret（環境変数 `OAUTH_<SERVICE>_CLIENT_ID/_CLIENT_SECRET`、現時点では未登録）で行う。未登録のサービスは認可画面へ飛ばす前にアプリ内で「アプリ登録が必要」という説明を表示し、「準備中」と明示する
+  - Google系：client_id は Supabase ログイン用アプリのものが取得できたが、リダイレクトURIが Supabase コールバック専用のため、コネクタ用には REDIRECT_URI の追加登録とシークレットの環境変数登録が別途必要
+  - Trello：認可コード方式ではなく独自方式のため汎用エンジンの対象外と明記
+  - トークン貼り付けは主UIから撤去し、実働5種（GitHub／YouTube／Notion／Slack／Discord）の行末に「トークンで接続（上級者向け）」の折りたたみとしてのみ残した。トークン接続済みのサービスは従来どおり「接続中」と表示される

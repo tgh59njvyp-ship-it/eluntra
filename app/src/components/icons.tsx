@@ -46,6 +46,33 @@ export function hasLogo(id: string): boolean {
   return LOGO_IDS.has(id);
 }
 
+/* コネクタの公式ロゴ（public/logos/conn-<id>.svg に同梱。出典は DESIGN.md に記録）。
+   16種すべて Simple Icons に実在するブランドマークを取得済み。 */
+const CONNECTOR_LOGO_IDS = new Set([
+  "github", "youtube", "notion", "discord", "slack",
+  "gdrive", "gcal", "gmail", "gdocs", "gsheets",
+  "onedrive", "outlook", "dropbox", "linear", "trello", "jira",
+]);
+
+export function hasConnectorLogo(id: string): boolean {
+  return CONNECTOR_LOGO_IDS.has(id);
+}
+
+export function ConnectorTile({ cid, mono, color, lg = false }: { cid?: string; mono: string; color: string; lg?: boolean }) {
+  if (cid && CONNECTOR_LOGO_IDS.has(cid)) {
+    return (
+      <span className={`tile logo${lg ? " lg" : ""}`}>
+        <img src={`${import.meta.env.BASE_URL}logos/conn-${cid}.svg`} alt="" loading="lazy" />
+      </span>
+    );
+  }
+  return (
+    <span className={`tile${lg ? " lg" : ""}`} style={{ color }}>
+      {mono}
+    </span>
+  );
+}
+
 export function ProviderTile({ pid, mono, color, lg = false }: { pid?: string; mono: string; color: string; lg?: boolean }) {
   if (pid && LOGO_IDS.has(pid)) {
     return (

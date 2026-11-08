@@ -15,6 +15,7 @@ export const LS = {
   favorites: "eluntra_favorites",
   recents: "eluntra_recents",
   connectors: "eluntra_connectors",
+  connectorAccounts: "eluntra_connector_accounts",
   codes: "eluntra_codes",
 } as const;
 
@@ -50,6 +51,7 @@ export interface AppState {
   sessions: ChatSession[];
   notes: Note[];
   connectors: Record<string, string>;
+  connectorAccounts: Record<string, string>;
   codes: Record<string, string>;
   currentId: string | null;
   theme: "light" | "dark";
@@ -91,6 +93,7 @@ function initialState(): AppState {
     sessions: readJSON(LS.sessions, []),
     notes: readJSON(LS.notes, []),
     connectors: readJSON(LS.connectors, {}),
+    connectorAccounts: readJSON(LS.connectorAccounts, {}),
     codes: readJSON(LS.codes, {}),
     currentId: null,
     theme,
@@ -117,6 +120,7 @@ export function update(patch: Partial<AppState>): void {
   if (patch.sessions) writeJSON(LS.sessions, state.sessions);
   if (patch.notes) writeJSON(LS.notes, state.notes);
   if (patch.connectors) writeJSON(LS.connectors, state.connectors);
+  if (patch.connectorAccounts) writeJSON(LS.connectorAccounts, state.connectorAccounts);
   if (patch.codes) writeJSON(LS.codes, state.codes);
   if (patch.theme) writeJSON(LS.theme, state.theme);
   emit();

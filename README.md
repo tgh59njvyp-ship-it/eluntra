@@ -1,4 +1,4 @@
-# Eluntra（v6.1・作り直し版）
+# Eluntra（v6.2・作り直し版）
 
 30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
@@ -28,7 +28,7 @@ OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / C
 - Eluntra Auto（質問分類でスコアリングし、選択理由を表示。失敗時は次候補へ自動切替）
 - 思考レベル Low / Medium / High / Super high（対応範囲で実リクエストへ反映）
 - Agent Mode（Web検索・ページ取得・JS実行・日時・メモ・コネクタツール、最大8手順、出典表示）
-- コネクタ16種（実働は GitHub / YouTube / Notion / Slack / Discord の5種。残りはOAuth登録が必要なため未対応と明示）
+- コネクタ16種（公式ロゴ表示。接続はログイン式が基本で、実働はトークン方式の GitHub / YouTube / Notion / Slack / Discord の5種。GitHubはデバイスフロー実装済みだがアプリ側の有効化待ち。その他はOAuthアプリ登録が必要なため「準備中」と明示。詳細は下記 v6.2 の変更）
 - ファイル添付（テキスト系と画像。PDF・DOCX・XLSXは未対応と明示）
 - コードモード（端末幅プレビュー 390/430/768/1280/全幅、コード表示、Zip保存）
 - チャット（ストリーミング、Markdown、履歴の検索・削除、再生成、編集、コピー）
@@ -49,3 +49,12 @@ npm run build   # tsc strict + vite build
 
 - モデル選択のプロバイダー部分を、タップで縦スクロールリストが開く「選択ボックス」式に変更（先頭に Eluntra Auto、選択中はチェック表示）
 - プロバイダー表示を各社の公式ブランドロゴに全面変更（29社分を SVG で同梱。出典の内訳は DESIGN.md の v6.1 節を参照）。llama.cpp のみ公式マークが両ライブラリに無いためモノグラムのまま
+
+## v6.2の変更
+
+- コネクタ16種の表示を各社の公式ブランドロゴに変更（全種 Simple Icons から取得し SVG 同梱。内訳は DESIGN.md の v6.2 節を参照）
+- コネクタの接続を「押すとログイン画面に飛ぶ」方式を主役に作り替え：
+  - GitHub：デバイスフローを実装。中継は Vercel の `/api/oauth/github-device`。ただし 2026-11-08 実測で、ログイン用GitHubアプリのデバイスフローが未有効化（device_flow_disabled）のため未接続。有効化手順はアプリ内と DESIGN.md に記載。有効化されれば追加実装なしで接続できる
+  - その他のサービス：認可コード＋PKCE の汎用エンジン＋設定テーブル、戻り先ページ（/connectors/callback）、トークン交換エンドポイント（/api/oauth/exchange、シークレットは Vercel 環境変数・未登録）まで基盤を実装。実際に繋げるには各サービスの開発者画面でのアプリ登録（リダイレクト先 https://eluntra.vercel.app/connectors/callback とクライアント情報）＋シークレットの環境変数登録が必要で、未登録の間はアプリ内で説明を表示して「準備中」とする
+  - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
+  - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置

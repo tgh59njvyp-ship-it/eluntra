@@ -10,6 +10,7 @@ import { Welcome } from "./components/Welcome";
 import { clearAutoSkip, resolveAuto, skipAutoProviders } from "./lib/auto";
 import { runAgent } from "./lib/agent/engine";
 import { handleAuthCallback, isLoggedIn, onAuthChange, pullSync, pushSync } from "./lib/auth";
+import { handleOAuthCallback } from "./lib/connectors/oauth";
 import { streamWithFallback } from "./lib/providers/chat";
 import { findProvider } from "./lib/providers/registry";
 import { UserError } from "./lib/providers/transport";
@@ -59,6 +60,8 @@ export default function App() {
   useEffect(() => {
     const off = onAuthChange(() => setAuthTick((t) => t + 1));
     void (async () => {
+      const oc = await handleOAuthCallback();
+      if (oc) toast(oc.msg);
       const r = await handleAuthCallback();
       if (r.handled) {
         if (r.error) toast(r.error);
