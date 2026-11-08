@@ -201,7 +201,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.1 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         {p.project ? (
@@ -767,6 +767,8 @@ label: string;
 detail?: string;
 output?: string;
 change?: ChangeRecord;
+step?: number;
+max?: number;
 at: number;
 }
 
@@ -997,7 +999,7 @@ output: e.output || undefined,
 at: Date.now(),
 });
 } else if (e.kind === "step") {
-pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, at: Date.now()});
+pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, step: e.step, max: e.max, at: Date.now()});
 }
 },
 },
@@ -1123,7 +1125,8 @@ return (
 }
 return (
 <div key={s.id} className="dev-step">
-<span className="time">{fmtTime(it.at)}</span> {it.label}
+<span className="time">{fmtTime(it.at)}</span>
+{it.step? <span className="time">{it.step}/{it.max?? ""}</span>: null} {it.label}
 </div>
 );
 })}

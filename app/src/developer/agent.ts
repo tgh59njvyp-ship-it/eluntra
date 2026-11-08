@@ -4,7 +4,7 @@
 
 import { completeChat} from "../lib/providers/chat";
 import type { ChatMessage, ProviderDef} from "../lib/types";
-import { devUid, listPaths, runFsTool, type FsChange} from "./fs";
+import { devUid, listPaths, normalizePath, runFsTool, type FsChange} from "./fs";
 import { isReadOnlySql } from "./db";
 
 export type DevMode = "plan" | "build" | "debug" | "review" | "ask" | "auto";
@@ -26,7 +26,7 @@ at: number;
 }
 
 export type AgentEvent =
-| { kind: "step"; label: string}
+| { kind: "step"; label: string; step?: number; max?: number}
 | { kind: "tool"; tool: string; detail: string; output: string}
 | { kind: "change"; change: ChangeRecord}
 | { kind: "note"; label: string};
@@ -59,13 +59,22 @@ const WRITE_TOOLS = new Set(["fs_write", "fs_edit", "fs_delete"]);
 const MAX_STEPS = 25;
 export const MAX_TOOL_STEPS = MAX_STEPS;
 
+/* 探索ループ対策: 読み取り専用ツールの連続使用に上限を設け、
+   変化のない手順が続いたら正直に停止する（v7.2.1） */
+const READONLY_TOOLS: ReadonlySet<string> = new Set(["fs_list", "fs_read", "code_search", "preview_info", "db_list", "db_schema"]);
+/** 書き込み/ターミナル等の「前進」が無いまま許す読み取り回数（読み取り専用モードは調査が本業なので広め） */
+export const EXPLORE_BUDGET = 5;
+export const EXPLORE_BUDGET_READONLY_MODE = 10;
+/** ファイル変更・ターミナル実行・最終回答のいずれも無い手順がこの回数続いたら停止する */
+export const STALL_LIMIT = 6;
+
 const TOOL_GUIDE = [
 "あなたは Eluntra Developer のAIソフトウェアエンジニアです。ユーザーのプロジェクト内で、実際にファイルを読み書きし、ターミナルで確認しながら開発を進めてください。",
 "各回の応答は、次のどちらか一方だけにしてください。",
 "1) ツールを使う場合: ```json ブロックで {\"tool\":\"ツール名\",\"args\":{...}} を1つだけ返す",
 "2) 最終回答の場合: 普通の文章で結果を報告する（JSONにしない）",
 "使えるツール:",
-"- fs_list {}: プロジェクトのファイル一覧",
+"- fs_list {}: プロジェクトのファイル一覧（ファイルツリーはこの指示の末尾にすでに含まれています。特定のサブフォルダを再確認したいときだけ使ってください）",
 "- fs_read {path}: ファイルを読む",
 "- fs_write {path, content}: ファイルを新規作成または全体を上書きする（content はファイル全体）",
 "- fs_edit {path, old, new, replaceAll?}: 正確に一致する部分文字列を置換する（old は一意に特定できる長さにする）",
@@ -77,7 +86,9 @@ const TOOL_GUIDE = [
 "- db_query {db, sql}: SQLを実行する（結果は最大100行）。書き込みSQLは読み取り専用モードでは実行できない",
 "- preview_info {}: プレビューの状態を確認する",
 "ルール:",
-"- 存在を確かめていないファイルは、まず fs_list / fs_read で確認してから編集する",
+"- プロジェクトのファイルツリーと package.json は、この指示の末尾にすでに含まれています。存在確認のために fs_list を繰り返す必要はありません",
+"- 編集対象ファイルの現在の内容が必要な場合だけ fs_read で確認してから編集する",
+"- BUILD / AUTO / DEBUG では、調査は必要最小限にし、最初の数手順以内にファイルの作成・編集またはターミナル実行を始めること。確認だけを繰り返さない",
 "- 変更は小さく確実に。大きな新規ファイルは fs_write、小さな修正は fs_edit を使う",
 "- term_exec が使えない環境では、実行確認ができない旨を最終報告に明記する（実行したことにしない）",
 "- 秘密情報（APIキー等）をコードに直書きしない。環境変数や設定ファイルの参照にする",
@@ -118,8 +129,9 @@ const tree = paths.map((p) => `- ${p}`).join("\n") || "（ファイルなし）"
 const pkg = files["package.json"];
 return [
 "",
+"プロジェクトのファイル一覧（このツリーは提示済みです。確認のために fs_list を呼ぶ必要はありません）:",
 tree,
-pkg? `\n${pkg.slice(0, 2000)}`: "",
+pkg? `\npackage.json:\n${pkg.slice(0, 2000)}`: "",
 ]
 .filter(Boolean)
 .join("\n");
@@ -231,19 +243,55 @@ const convo: ChatMessage[] = [
 
 const errorCounts = new Map<string, number>();
 const callCounts = new Map<string, number>();
+const toolUseCounts = new Map<string, number>();
+const readCache = new Map<string, string>();
+const exploreBudget = READONLY_MODES.has(mode)? EXPLORE_BUDGET_READONLY_MODE: EXPLORE_BUDGET;
+let exploreStreak = 0;
+let stallSteps = 0;
+let budgetWarned = false;
 let finalText = "";
+
+// ファイル変更を数えるラッパー（execTool の進捗判定用）
+let changeCount = 0;
+const trackingCtx: AgentContext = {
+...ctx,
+onEvent: (e) => {
+if (e.kind === "change") changeCount++;
+ctx.onEvent(e);
+},
+};
+
+const stallMessage = (atStep: number): string => {
+const top = [...toolUseCounts.entries()]
+.sort((a, b) => b[1] - a[1])
+.slice(0, 3)
+.map(([t, n]) => `${t} を${n}回`)
+.join("、");
+const bullets = ["・そのまま「もう一度送る」"];
+if (mode !== "build" && mode !== "auto") {
+bullets.push("・BUILD または AUTO モードに切り替えて送り直す（現在のモードではファイルを変更しません）");
+}
+bullets.push("・指示を具体的にする（例:「src/App.tsx に〇〇の機能を追加して」）");
+return [
+"作業が前に進まなくなったため、ループを避けて停止しました。",
+`この実行では ${top || "同じ確認"} 繰り返しましたが、ファイルの作成・変更やターミナル実行には進みませんでした（変化のない手順が${STALL_LIMIT}回続き、全体の${atStep}手順目で停止）。`,
+"次のいずれかで再試行してください。",
+...bullets,
+].join("\n");
+};
 
 for (let step = 0; step < MAX_STEPS; step++) {
 if (ctx.signal?.aborted) throw new DOMException("aborted", "AbortError");
-ctx.onEvent({ kind: "step", label: step === 0? "タスクを分析中": "次の作業を検討中"});
+ctx.onEvent({ kind: "step", label: step === 0? "タスクを分析中": "次の作業を検討中", step: step + 1, max: MAX_STEPS});
 const r = await completeChat(provider, model, convo, ctx.signal);
 const call = parseToolCall(r.text);
 if (!call) {
 finalText = r.text;
 break;
 }
+toolUseCounts.set(call.tool, (toolUseCounts.get(call.tool) || 0) + 1);
 
-// 同一呼び出しの繰り返し検出
+// 同一呼び出しの繰り返し検出（完全一致。引数を変えた繰り返しは後段の重複判定・探索上限・停滞検出で止める）
 const callKey = `${call.tool}:${JSON.stringify(call.args)}`;
 const cc = (callCounts.get(callKey) || 0) + 1;
 callCounts.set(callKey, cc);
@@ -254,14 +302,70 @@ stopped: `同じツール呼び出し（${call.tool}）が繰り返されたた�
 };
 }
 
-ctx.onEvent({ kind: "step", label: TOOL_LABEL[call.tool] || "作業中"});
+const detail = (call.args.path || call.args.query || call.args.command || call.args.db || "").slice(0, 80);
+ctx.onEvent({ kind: "step", label: `${TOOL_LABEL[call.tool] || "作業中"}${detail? ` — ${detail}`: ""}`, step: step + 1, max: MAX_STEPS});
+
+const changesAtStart = changeCount;
 let result = "";
 let isError = false;
+let progressed = false;
+let acted = false;
+let freeWarning = false;
+let executedRead = false;
+
+const readKey = normalizedReadKey(call);
+if (readKey !== null && readCache.has(readKey)) {
+// 重複した読み取り: 全文を返さず、取得済みの要約だけを返す
+result = `（この結果は取得済みです）${call.tool} の結果はこの実行で既に取得しています。要約: ${readCache.get(readKey)}\n同じ確認を繰り返しても新しい情報は得られません。次はファイルの作成・編集に進むか、最終回答を書いてください。`;
+ctx.onEvent({ kind: "tool", tool: call.tool, detail, output: result.slice(0, 2000)});
+} else if (readKey !== null && exploreStreak >= exploreBudget) {
+// 探索の上限: ツール層で実行を拒否する
+result = READONLY_MODES.has(mode)
+? `これ以上の探索はできません（読み取りだけのツール呼び出しが上限の${exploreBudget}回に達しました）。プロジェクトのファイルツリーと package.json は、最初の指示（システムプロンプト）にすでに含まれています。集めた情報で最終回答（計画・調査結果・レビュー）をまとめてください。`
+: `これ以上プロジェクトを探索できません（読み取りだけのツール呼び出しが上限の${exploreBudget}回に達しました）。プロジェクトのファイルツリーと package.json は、最初の指示（システムプロンプト）にすでに含まれています。新しい情報は得られないので、次は fs_write / fs_edit でファイルの作成・編集に進むか、最終回答を書いてください。`;
+ctx.onEvent({ kind: "tool", tool: call.tool, detail, output: result.slice(0, 2000)});
+// 上限の拒否は、まず1回だけ「警告」としてモデルに届ける（停滞カウンタを進めない）。
+// 警告のあとも探索を続ける場合は通常どおり数え、停滞検出で止める
+if (!budgetWarned) {
+budgetWarned = true;
+freeWarning = true;
+}
+} else {
 try {
-result = await execTool(call, mode, ctx);
+result = await execTool(call, mode, trackingCtx);
 } catch (e) {
 isError = true;
 result = `エラー: ${e instanceof Error? e.message: String(e)}`;
+}
+if (!isError && readKey !== null) {
+readCache.set(readKey, summarizeResult(result));
+exploreStreak++;
+executedRead = true;
+}
+}
+
+if (changeCount > changesAtStart) {
+// ファイルが変わった = 前進。読み取りキャッシュは古くなるので破棄する
+acted = true;
+progressed = true;
+readCache.clear();
+} else if (call.tool === "term_exec" || (call.tool === "db_query" &&!READONLY_MODES.has(mode))) {
+// ターミナル実行・DB操作は実行そのものが前進
+acted =!isError || call.tool === "term_exec";
+progressed = acted;
+} else if (executedRead && READONLY_MODES.has(mode)) {
+// 読み取り専用モードでは「新しい情報を読む」こと自体が仕事の前進（停滞とは数えない）。
+// ただし探索ストリークは進めたままにし、上限（予算）で必ず止める
+progressed = true;
+}
+if (acted) exploreStreak = 0;
+if (progressed) {
+stallSteps = 0;
+} else if (!freeWarning) {
+stallSteps++;
+if (stallSteps >= STALL_LIMIT) {
+return { text: finalText, stopped: stallMessage(step + 1)};
+}
 }
 
 if (isError) {
@@ -293,4 +397,28 @@ finalText = last.text;
 }
 }
 return { text: finalText};
+}
+
+/** 読み取りツールの「同じ結果になる呼び出し」を判定するキー。対象外ツールは null。
+    fs_list は実装側が引数を無視して常に全一覧を返すため、引数が違っても同一結果として扱う */
+function normalizedReadKey(call: ToolCall): string | null {
+if (!READONLY_TOOLS.has(call.tool)) return null;
+switch (call.tool) {
+case "fs_list":
+return "fs_list";
+case "fs_read":
+return `fs_read:${normalizePath(call.args.path || "")}`;
+case "code_search":
+return `code_search:${(call.args.query || "").trim().replace(/\s+/g, " ")}`;
+case "db_schema":
+return `db_schema:${(call.args.db || "").trim()}`;
+default:
+return call.tool;
+}
+}
+
+/** キャッシュ用にツール結果を短い要約へ圧縮する */
+function summarizeResult(output: string): string {
+const oneLine = output.replace(/\s+/g, " ").trim();
+return oneLine.length > 160? oneLine.slice(0, 160) + "…": oneLine;
 }
