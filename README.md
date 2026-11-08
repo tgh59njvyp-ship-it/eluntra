@@ -1,6 +1,6 @@
-# Eluntra（v6.3・作り直し版）
+# Eluntra（v6.4・作り直し版）
 
-31社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。
+30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。さらに、OpenAI互換のカスタム接続を自分で何件でも作れます。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
 
 - 公開URL: https://eluntra.vercel.app ／ https://simple-url-server.lovable.app/s/eluntra/
@@ -11,8 +11,8 @@ v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScr
 - localStorage のキーと形式は旧版と同一（eluntra_keys / eluntra_tested / eluntra_models / eluntra_conf / eluntra_sessions / eluntra_notes / eluntra_theme など）。旧版で保存したキー・会話・設定はそのまま読み込めます
 - Supabase（共用プロジェクト）のログイン（GitHub / Google / Apple、PKCE）と同期（eluntra_sync、会話IDで統合）も互換。APIキーは同期対象外で、端末内にのみ保存されます
 
-## 対応プロバイダー（31社）
-OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / Cloudflare Workers AI / SambaNova / DeepSeek / xAI / Together AI / Fireworks AI / Cerebras / Perplexity / NVIDIA NIM / Hugging Face / Replicate / Amazon Bedrock / Azure AI Foundry / Google Vertex AI / GitHub Models / AI21 Labs / Aleph Alpha / Novita AI / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp / カスタム（任意のOpenAI互換エンドポイント）
+## 対応プロバイダー（30社＋カスタム）
+OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / Cloudflare Workers AI / SambaNova / DeepSeek / xAI / Together AI / Fireworks AI / Cerebras / Perplexity / NVIDIA NIM / Hugging Face / Replicate / Amazon Bedrock / Azure AI Foundry / Google Vertex AI / GitHub Models / AI21 Labs / Aleph Alpha / Novita AI / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp ＋ カスタム（任意のOpenAI互換エンドポイントを複数・名前つきで追加可能）
 
 方式差（正直な注記）:
 - Perplexity：モデル一覧APIがありません。公式モデルを初期値として表示します
@@ -59,6 +59,21 @@ npm run build   # tsc strict + vite build
   - その他のサービス：認可コード＋PKCE の汎用エンジン＋設定テーブル、戻り先ページ（/connectors/callback）、トークン交換エンドポイント（/api/oauth/exchange、シークレットは Vercel 環境変数・未登録）まで基盤を実装。実際に繋げるには各サービスの開発者画面でのアプリ登録（リダイレクト先 https://eluntra.vercel.app/connectors/callback とクライアント情報）＋シークレットの環境変数登録が必要で、未登録の間はアプリ内で説明を表示して「準備中」とする
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
+
+## v6.4の変更
+
+- **カスタムプロバイダーを複数作成・名前変更可能に**（v6.3 は単一の静的エントリだった）
+  - 保存形式：新 localStorage キー `eluntra_customs` に `CustomEntry[]`（`{ id, name, base, key }`）として保存。ID は `custom-<base36時刻>-<連番+乱数>` で作成後に不変。キーを含むため APIキー同様に端末内のみ保存し、Supabase 同期（collect の対象は sessions/conf/notes/code のみ）には含めない
+  - 静的レジストリの `custom` エントリは廃止。実行時は store の `customDef(entry)` で ProviderDef を合成し、`allProviders()` / `providerDefOf(id)` / `isCustomId(id)` で組み込み30社と統一的に解決する（Auto の候補にも入り、PRIORITY に無い id は最下位ランクとして扱い -1 バグを回避）
+  - 設定画面に専用セクション「カスタムプロバイダー」を新設：名前（編集可）・ベースURL・APIキー（任意）の行を何件でも追加でき、保存／接続テスト／一覧を取得／削除（確認ダイアログつき）が各行で可能
+  - 移行：v6.3 の `keys["custom"]`（"base::key"）が残っていれば、初回起動時に名前「カスタム」のエントリへ自動移行し、取得済みモデル・分類・テスト状態・選択中モデル・現在のプロバイダー指定も新しい id へ引き継ぐ（旧キーは削除）
+- **CORS対策：カスタムの通信を Vercel バックエンド経由に変更**（v6.3 のブラウザ直接接続を廃止）
+  - 新ルート `deploy/api/custom-proxy.js`（Vercel Node Function）。契約は既存中継と同じ `x-target-url` ヘッダー方式で、GET/POST、Authorization / Content-Type / Accept のみ転送し、応答はステータスと Content-Type を保ってストリーミングで返す（SSE 通過）。リダイレクトは追従せずそのまま返す
+  - SSRFガード：https のみ／localhost・*.local・*.internal を拒否／リテラルIPと **DNS解決後の全アドレス** について、プライベート・ループバック・リンクローカル帯（10/8、127/8、172.16/12、192.168/16、169.254/16、0/8、::1、fc00::/7、fe80::/10、IPv4射影IPv6含む）を拒否。不合格は 400/403 の JSON エラー。Authorization とボディは記録しない。リクエストボディ上限 10MB
+  - Node ランタイムにした理由：Edge では node:dns が使えず、DNS解決結果まで検証できないため。本番検証済み（公開ドメイン名で 127.0.0.1 を返す localtest.me も 403 で遮断）
+  - クライアント側は ProviderDef の `backendProxy` フラグ（v6.3 の `direct` を置き換え）で transport を切り替え、カスタムは常にこの中継のみを使う（直接接続へのフォールバックなし）
+  - 組み込み30社の /api/proxy（許可リスト方式）は変更なし
+- 表記を「31社」→「30社」に戻し、カスタムは別建てで案内（タイトル・OG・各画面）。版表示は v6.4
 
 ## v6.3の変更
 
