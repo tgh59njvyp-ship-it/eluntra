@@ -3,6 +3,7 @@ import { readPickedFiles } from "../lib/files";
 import { getState, providerDefOf, update, useStore } from "../lib/store";
 import type { Attachment, ChatMessage, ChatSession, Effort } from "../lib/types";
 import { Icon, ProviderTile } from "./icons";
+import { Logo } from "./Logo";
 import { CodePreviewSheet } from "./CodePreviewSheet";
 import { Markdown } from "./Markdown";
 
@@ -11,6 +12,7 @@ interface Props {
   generating: boolean;
   targetLabel: { providerId: string; ok: boolean };
   onSend: (text: string, attachments: Attachment[]) => void;
+  onImageGenerate: (prompt: string) => void;
   onStop: () => void;
   onRegenerate: () => void;
   onEditUser: (index: number) => void;
@@ -28,6 +30,50 @@ const EFFORTS: Array<{ id: Effort; label: string }> = [
   { id: "high", label: "High" },
   { id: "super", label: "Super high" },
 ];
+
+/** ヒーローの背景：淡いブルーの波（下部）と右上の淡い光 */
+function HeroBackground() {
+  return (
+    <div className="hero-bg" aria-hidden="true">
+      <div className="hero-blob" />
+      <svg className="hero-waves" viewBox="0 0 1440 620" preserveAspectRatio="none" focusable="false">
+        <path
+          style={{ fill: "var(--wave-1)" }}
+          d="M0,350 C240,290 430,420 720,398 C1010,376 1200,290 1440,345 L1440,620 L0,620 Z"
+        />
+        <path
+          style={{ fill: "var(--wave-2)", opacity: 0.55 }}
+          d="M0,455 C260,398 520,508 820,478 C1100,450 1280,392 1440,438 L1440,620 L0,620 Z"
+        />
+        <path
+          style={{ fill: "var(--wave-3)", opacity: 0.32 }}
+          d="M0,540 C300,492 560,580 900,550 C1150,528 1330,492 1440,522 L1440,620 L0,620 Z"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/** 提案カード1枚目の吹き出しアイコン（青→紫グラデーション＋白い3点） */
+function BubbleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+      <defs>
+        <linearGradient id="sugg-bubble" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#38BDF8" />
+          <stop offset="1" stopColor="#A855F7" />
+        </linearGradient>
+      </defs>
+      <path
+        fill="url(#sugg-bubble)"
+        d="M12 3.5C6.2 3.5 1.8 7.3 1.8 11.9c0 2.6 1.4 4.9 3.7 6.4-.2 1.1-.8 2.3-1.6 3.2 0 .1 3 .1 5.2-1.3.9.2 1.9.3 2.9.3 5.8 0 10.2-3.8 10.2-8.6S17.8 3.5 12 3.5Z"
+      />
+      <circle cx="7.8" cy="11.9" r="1.35" fill="#fff" />
+      <circle cx="12" cy="11.9" r="1.35" fill="#fff" />
+      <circle cx="16.2" cy="11.9" r="1.35" fill="#fff" />
+    </svg>
+  );
+}
 
 function MessageItem({
   m, isLast, onRegenerate, onEdit, toast, onPreview,
@@ -67,8 +113,6 @@ function MessageItem({
       </div>
     );
   }
-  const prov = m.model ? undefined : undefined;
-  void prov;
   return (
     <div className="msg">
       <div className="msg-head">
@@ -84,9 +128,18 @@ function MessageItem({
           ))}
         </div>
       )}
-      {(m.attachments || []).map((a, i) => (
-        <span key={i} className="attach-chip"><Icon name="pin" className="ic sm" />{a.name}</span>
-      ))}
+      {(m.attachments || []).map((a, i) =>
+        a.kind === "image" && a.dataUrl ? (
+          <figure key={i} className="gen-img">
+            <img className="attach-img big" src={a.dataUrl} alt={a.name || "生成画像"} />
+            <a className="gen-dl" href={a.dataUrl} download={a.name || "eluntra-image.png"}>
+              <Icon name="download" className="ic sm" />ダウンロード
+            </a>
+          </figure>
+        ) : (
+          <span key={i} className="attach-chip"><Icon name="pin" className="ic sm" />{a.name}</span>
+        ),
+      )}
       {m.pending && !m.content ? (
         <div className="typing">考え中…</div>
       ) : (
@@ -134,12 +187,15 @@ function MessageItem({
 }
 
 export function ChatPane({
-  session, generating, targetLabel, onSend, onStop, onRegenerate, onEditUser, onOpenSettings, toast, placeholder, draft,
+  session, generating, targetLabel, onSend, onImageGenerate, onStop, onRegenerate, onEditUser, onOpenSettings, toast, placeholder, draft,
 }: Props) {
   const conf = useStore((s) => s.conf);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const [preview, setPreview] = useState<{ code: string; lang: string } | null>(null);
+  const [imageMode, setImageMode] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const analyzeAfterPick = useRef(false);
 
   useEffect(() => {
     if (draft) {
@@ -170,7 +226,16 @@ export function ChatPane({
 
   const submit = () => {
     const text = input.trim();
-    if ((!text && !files.length) || generating) return;
+    if (generating) return;
+    if (imageMode) {
+      if (!text) return;
+      onImageGenerate(text);
+      setInput("");
+      setImageMode(false);
+      requestAnimationFrame(grow);
+      return;
+    }
+    if (!text && !files.length) return;
     onSend(text, files);
     setInput("");
     setFiles([]);
@@ -183,35 +248,89 @@ export function ChatPane({
     warnings.forEach((w) => toast(w));
     setFiles((prev) => [...prev, ...attachments]);
     if (fileRef.current) fileRef.current.value = "";
+    /* 「この画像を分析して」カード経由：画像が付いたら文面を入れてフォーカスする */
+    if (analyzeAfterPick.current) {
+      analyzeAfterPick.current = false;
+      if (attachments.some((a) => a.kind === "image")) {
+        setInput("この画像を分析して");
+        requestAnimationFrame(() => taRef.current?.focus());
+      }
+    }
   };
 
   const provider = providerDefOf(targetLabel.providerId) ?? null;
+  const isHero = messages.length === 0 && conf.mode === "chat";
+  const moreActive = conf.agent || conf.mode === "code" || conf.effort !== "medium";
 
   return (
     <>
+      {isHero && <HeroBackground />}
       <div className="chat-scroll" ref={scrollRef}>
         <div className={`chat-col${conf.mode === "code" ? " wide" : ""}`}>
           {messages.length === 0 ? (
-            <div className="empty">
-              <h1>{conf.mode === "code" ? "作りたいものを、言葉で。" : "何でも聞いてください"}</h1>
-              <p>
-                {conf.mode === "code"
-                  ? "完成コードを受け取って、その場でプレビューできます。"
-                  : "30社のAIを、自分のAPIキーで使うチャットです。カスタム接続も自分で作れます。"}
-              </p>
-              <div className="steps-hint">
-                <span>1 会社を選ぶ</span>
-                <span>2 キーを設定する</span>
-                <span>3 質問する</span>
+            conf.mode === "code" ? (
+              <div className="empty">
+                <h1>作りたいものを、言葉で。</h1>
+                <p>完成コードを受け取って、その場でプレビューできます。</p>
+                <div className="steps-hint">
+                  <span>1 会社を選ぶ</span>
+                  <span>2 キーを設定する</span>
+                  <span>3 質問する</span>
+                </div>
+                <div className="chips">
+                  {SUGGESTIONS.map((s) => (
+                    <button key={s} type="button" className="chip" onClick={() => onSend(s, [])}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="chips">
-                {SUGGESTIONS.map((s) => (
-                  <button key={s} type="button" className="chip" onClick={() => onSend(s, [])}>
-                    {s}
+            ) : (
+              <div className="hero">
+                <Logo size={172} className="hero-logo" />
+                <div className="hero-name">Eluntra</div>
+                <div className="hero-tag">
+                  あなたの想像を、もっと<b>先へ</b>――
+                </div>
+                <div className="hero-sub">最高のAIと、無限の可能性を。</div>
+                <div className="sugg-grid">
+                  <button type="button" className="sugg-card" onClick={() => onSend("今日のおすすめを教えて", [])}>
+                    <span className="sugg-ic"><BubbleIcon /></span>
+                    <span className="sugg-tx">今日のおすすめを教えて</span>
+                    <Icon name="chevR" className="sugg-chev" />
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    className="sugg-card"
+                    onClick={() => {
+                      setInput("このコードを解説して：");
+                      requestAnimationFrame(() => taRef.current?.focus());
+                    }}
+                  >
+                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="codeB" /></span>
+                    <span className="sugg-tx">このコードを解説して</span>
+                    <Icon name="chevR" className="sugg-chev" />
+                  </button>
+                  <button
+                    type="button"
+                    className="sugg-card"
+                    onClick={() => {
+                      analyzeAfterPick.current = true;
+                      fileRef.current?.click();
+                    }}
+                  >
+                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="img" /></span>
+                    <span className="sugg-tx">この画像を分析して</span>
+                    <Icon name="chevR" className="sugg-chev" />
+                  </button>
+                  <button type="button" className="sugg-card" onClick={() => onSend("勉強のコツを教えて", [])}>
+                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="bulb" /></span>
+                    <span className="sugg-tx">勉強のコツを教えて</span>
+                    <Icon name="chevR" className="sugg-chev" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )
           ) : (
             messages.map((m, i) => (
               <MessageItem
@@ -238,34 +357,6 @@ export function ChatPane({
               </span>
             </button>
           )}
-          <div className="composer-tools">
-            <button
-              type="button"
-              className={`tool-toggle${conf.agent ? " on" : ""}`}
-              onClick={() => update({ conf: { ...getState().conf, agent: !conf.agent } })}
-              aria-pressed={conf.agent}
-            >
-              <Icon name="bot" className="ic sm" /> Agent Mode
-            </button>
-            <span className="effort-group" role="group" aria-label="思考レベル">
-              {EFFORTS.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  className={conf.effort === e.id ? "on" : ""}
-                  onClick={() => update({ conf: { ...getState().conf, effort: e.id } })}
-                >
-                  {e.label}
-                </button>
-              ))}
-            </span>
-            {provider && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-3)" }}>
-                <ProviderTile pid={provider.id} mono={provider.mono} color={provider.color} />
-                {provider.name}
-              </span>
-            )}
-          </div>
           {files.length > 0 && (
             <div className="pending-files">
               {files.map((f, i) => (
@@ -285,7 +376,7 @@ export function ChatPane({
             </div>
           )}
           <div className="box">
-            <button type="button" className="iconbtn" aria-label="ファイルを添付" onClick={() => fileRef.current?.click()}>
+            <button type="button" className="iconbtn clipbtn" aria-label="ファイルを添付" onClick={() => fileRef.current?.click()}>
               <Icon name="pin" />
             </button>
             <input
@@ -299,7 +390,7 @@ export function ChatPane({
               ref={taRef}
               value={input}
               rows={1}
-              placeholder={placeholder || "メッセージを入力"}
+              placeholder={imageMode ? "画像の説明を入力..." : placeholder || "メッセージを入力..."}
               onChange={(e) => {
                 setInput(e.target.value);
                 grow();
@@ -316,10 +407,38 @@ export function ChatPane({
               type="button"
               className={`sendbtn${generating ? " stop" : ""}`}
               aria-label={generating ? "停止" : "送信"}
-              disabled={!generating && !input.trim() && !files.length}
+              disabled={!generating && (imageMode ? !input.trim() : !input.trim() && !files.length)}
               onClick={generating ? onStop : submit}
             >
-              <Icon name={generating ? "stop" : "send"} />
+              <Icon name={generating ? "stop" : "plane"} />
+            </button>
+          </div>
+          <div className="pillrow">
+            <button
+              type="button"
+              className={`act-pill${conf.webSearch ? " on" : ""}`}
+              aria-pressed={!!conf.webSearch}
+              onClick={() => update({ conf: { ...getState().conf, webSearch: !conf.webSearch } })}
+            >
+              <Icon name="globe" className="ic sm" />検索
+            </button>
+            <button type="button" className="act-pill" onClick={() => fileRef.current?.click()}>
+              <Icon name="doc" className="ic sm" />ファイルを添付
+            </button>
+            <button
+              type="button"
+              className={`act-pill${imageMode ? " on" : ""}`}
+              aria-pressed={imageMode}
+              onClick={() => {
+                setImageMode((v) => !v);
+                requestAnimationFrame(() => taRef.current?.focus());
+              }}
+            >
+              <Icon name="img" className="ic sm" />画像を生成
+            </button>
+            <button type="button" className="act-pill more" aria-label="その他の機能" onClick={() => setMoreOpen(true)}>
+              <Icon name="dots" className="ic sm" />
+              {moreActive && <span className="dot" aria-hidden="true" />}
             </button>
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-3)", textAlign: "center", paddingTop: 6 }}>
@@ -327,6 +446,75 @@ export function ChatPane({
           </div>
         </div>
       </div>
+
+      <div className={`sheet-back${moreOpen ? " on" : ""}`} onClick={() => setMoreOpen(false)} />
+      <section className={`sheet${moreOpen ? " on" : ""}`} aria-hidden={!moreOpen} aria-label="その他の機能">
+        <div className="sheet-head">
+          <h2>その他の機能</h2>
+          <button type="button" className="iconbtn" aria-label="閉じる" onClick={() => setMoreOpen(false)}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="sheet-body">
+          <div className="switch-row">
+            <div className="grow">
+              <div className="ttl">Agent Mode</div>
+              <div className="dsc">Web検索・ページ取得・Supabaseなどのツールを使いながら回答します</div>
+            </div>
+            <button
+              type="button"
+              className={`tool-toggle${conf.agent ? " on" : ""}`}
+              aria-pressed={conf.agent}
+              onClick={() => update({ conf: { ...getState().conf, agent: !conf.agent } })}
+            >
+              {conf.agent ? "ON" : "OFF"}
+            </button>
+          </div>
+          <div className="switch-row">
+            <div className="grow">
+              <div className="ttl">コードモード</div>
+              <div className="dsc">完成コードとプレビューで作業します</div>
+            </div>
+            <button
+              type="button"
+              className={`tool-toggle${conf.mode === "code" ? " on" : ""}`}
+              aria-pressed={conf.mode === "code"}
+              onClick={() => {
+                update({ conf: { ...getState().conf, mode: conf.mode === "code" ? "chat" : "code" } });
+                setMoreOpen(false);
+              }}
+            >
+              {conf.mode === "code" ? "ON" : "OFF"}
+            </button>
+          </div>
+          <div className="switch-row col">
+            <div className="grow">
+              <div className="ttl">思考レベル</div>
+              <div className="dsc">モデルの思考量（予算）にそのまま反映されます</div>
+            </div>
+            <span className="effort-group" role="group" aria-label="思考レベル">
+              {EFFORTS.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  className={conf.effort === e.id ? "on" : ""}
+                  onClick={() => update({ conf: { ...getState().conf, effort: e.id } })}
+                >
+                  {e.label}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div className="switch-row" style={{ borderBottom: "none" }}>
+            <div className="grow">
+              <div className="ttl">現在のモデル</div>
+              <div className="dsc">{provider ? provider.name : "未選択"}</div>
+            </div>
+            {provider && <ProviderTile pid={provider.id} mono={provider.mono} color={provider.color} />}
+          </div>
+        </div>
+      </section>
+
       <CodePreviewSheet target={preview} onClose={() => setPreview(null)} toast={toast} />
     </>
   );

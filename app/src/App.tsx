@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPane } from "./components/ChatPane";
 import { CodePreview } from "./components/CodeMode";
-import { Icon, ProviderTile } from "./components/icons";
+import { Icon } from "./components/icons";
+import { Logo } from "./components/Logo";
 import { extractHtml } from "./components/Markdown";
 import { ModelSheet } from "./components/ModelSheet";
+import { SearchSheet } from "./components/SearchSheet";
 import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { Welcome } from "./components/Welcome";
@@ -12,6 +14,7 @@ import { runAgent } from "./lib/agent/engine";
 import { handleAuthCallback, isLoggedIn, onAuthChange, pullSync, pushSync } from "./lib/auth";
 import { handleOAuthCallback } from "./lib/connectors/oauth";
 import { consumeMigratedFlag } from "./lib/migrate";
+import { generateImage } from "./lib/imagegen";
 import { streamWithFallback } from "./lib/providers/chat";
 import { UserError } from "./lib/providers/transport";
 import {
@@ -41,6 +44,7 @@ export default function App() {
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sheet, setSheet] = useState<"none" | "model" | "settings">("none");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [generating, setGenerating] = useState(false);
   const [codeShow, setCodeShow] = useState(false);
@@ -195,13 +199,15 @@ export default function App() {
           }
           setAi((m) => ({ ...m, model: `${provider!.name} / ${model}` }));
           try {
-            if (getState().conf.agent) {
+            const stConf = getState().conf;
+            if (stConf.agent || stConf.webSearch) {
               const r = await runAgent(
                 provider,
                 model,
                 history,
                 (prog) => setAi((m) => ({ ...m, steps: prog.steps, sources: prog.sources })),
                 ctl.signal,
+                { webSearchFirst: stConf.webSearch },
               );
               setAi((m) => ({
                 ...m,
@@ -275,6 +281,58 @@ export default function App() {
     [conf.provider],
   );
 
+  /** 「画像を生成」ピルからの送信：Gemini画像モデル→OpenAIの順で生成し、画像つきメッセージにする */
+  const sendImage = useCallback(async (prompt: string) => {
+    if (runtime.generating) return;
+    const s = ensureSession();
+    const userMsg: ChatMessage = { role: "user", content: prompt };
+    const aiMsg: ChatMessage = { role: "assistant", content: "", model: "画像生成", pending: true };
+    patchSession(s.id, (x) => ({
+      ...x,
+      title: x.messages.length === 0 ? prompt.slice(0, 28) : x.title,
+      messages: [...x.messages, userMsg, aiMsg],
+    }));
+    const ctl = new AbortController();
+    runtime.abortCtl = ctl;
+    runtime.generating = true;
+    setGenerating(true);
+    const setAi = (fn: (m: ChatMessage) => ChatMessage) => {
+      patchSession(s.id, (x) => {
+        const msgs = [...x.messages];
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === "assistant") msgs[msgs.length - 1] = fn(last);
+        return { ...x, messages: msgs };
+      });
+    };
+    try {
+      const r = await generateImage(prompt, ctl.signal);
+      setAi((m) => ({
+        ...m,
+        pending: false,
+        model: r.via,
+        content: r.caption || "画像を生成しました",
+        attachments: [{ name: "eluntra-image.png", kind: "image", dataUrl: r.dataUrl, mime: "image/png" }],
+      }));
+      void pushSync();
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        setAi((m) => ({ ...m, pending: false, content: "（停止しました）" }));
+      } else if (e instanceof UserError) {
+        setAi((m) => ({ ...m, pending: false, content: e.message }));
+      } else {
+        setAi((m) => ({
+          ...m,
+          pending: false,
+          content: "画像の生成に失敗しました。少し時間をおいて、もう一度送ってください。",
+        }));
+      }
+    } finally {
+      runtime.generating = false;
+      runtime.abortCtl = null;
+      setGenerating(false);
+    }
+  }, []);
+
   const regenerate = useCallback(() => {
     const s = currentSession();
     if (!s || runtime.generating) return;
@@ -332,24 +390,31 @@ export default function App() {
           <button type="button" className="iconbtn only-sp" aria-label="メニュー" onClick={() => setSidebarOpen(true)}>
             <Icon name="menu" />
           </button>
-          <button type="button" className="modelpill" onClick={() => setSheet("model")} aria-label="モデルを選ぶ">
-            {pillProvider ? (
-              <ProviderTile pid={pillProvider.id} mono={pillProvider.mono} color={pillProvider.color} />
-            ) : (
-              <ProviderTile mono="Au" color="#2563eb" />
-            )}
-            <span className="mp-name">{conf.provider === "auto" ? "Eluntra Auto" : pillProvider?.name}</span>
-            <span className="mp-model">{conf.provider === "auto" ? "自動選択" : target.model}</span>
-            <Icon name="chevron" className="ic sm" />
-          </button>
+          <span className="brand">
+            <Logo size={34} />
+            <span className="brand-name">Eluntra</span>
+          </span>
           <span className="spacer" />
           {conf.mode === "code" && (
             <button type="button" className="btn secondary sm only-sp" onClick={() => setCodeShow(true)}>
               プレビュー
             </button>
           )}
-          <button type="button" className="iconbtn" aria-label="設定" onClick={() => setSheet("settings")}>
-            <Icon name="gear" />
+          <button
+            type="button"
+            className="modelpill"
+            onClick={() => setSheet("model")}
+            aria-label="モデルを選ぶ"
+            title={conf.provider === "auto" ? "Eluntra Auto（自動選択）" : `${pillProvider?.name ?? ""} / ${target.model}`}
+          >
+            <span className="mp-model">{conf.provider === "auto" ? "Eluntra Auto" : target.model || pillProvider?.name || "モデル"}</span>
+            <Icon name="chevron" className="ic sm" />
+          </button>
+          <button type="button" className="iconbtn" aria-label="会話を検索" onClick={() => setSearchOpen(true)}>
+            <Icon name="search" />
+          </button>
+          <button type="button" className="accountbtn" aria-label="アカウントと設定" onClick={() => setSheet("settings")}>
+            <Icon name="user" />
           </button>
         </header>
 
@@ -362,6 +427,7 @@ export default function App() {
                   generating={generating}
                   targetLabel={{ providerId: target.providerId, ok: target.ok }}
                   onSend={(t, a) => void send(t, a)}
+                  onImageGenerate={(t) => void sendImage(t)}
                   onStop={stop}
                   onRegenerate={regenerate}
                   onEditUser={editUser}
@@ -380,6 +446,7 @@ export default function App() {
             generating={generating}
             targetLabel={{ providerId: target.providerId, ok: target.ok }}
             onSend={(t, a) => void send(t, a)}
+            onImageGenerate={(t) => void sendImage(t)}
             onStop={stop}
             onRegenerate={regenerate}
             onEditUser={editUser}
@@ -391,6 +458,7 @@ export default function App() {
       </div>
 
       <ModelSheet open={sheet === "model"} onClose={() => setSheet("none")} toast={toast} />
+      <SearchSheet open={searchOpen} onClose={() => setSearchOpen(false)} />
       <Settings
         open={sheet === "settings"}
         onClose={() => setSheet("none")}

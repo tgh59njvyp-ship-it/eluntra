@@ -79,6 +79,7 @@ function defaultConf(): AppConfig {
     system: "",
     temp: 0.7,
     agent: false,
+    webSearch: false,
     mode: "chat",
     effort: "medium",
     proxyOn: true,

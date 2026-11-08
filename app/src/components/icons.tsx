@@ -17,11 +17,20 @@ const PATHS: Record<string, React.ReactNode> = {
   chevron: <><path d="m6 9 6 6 6-6" /></>,
   bot: <><rect x="4" y="8" width="16" height="11" rx="2" /><path d="M12 8V4m0 0h4m-4 0H8" /><circle cx="9" cy="13.5" r="0.6" fill="currentColor" /><circle cx="15" cy="13.5" r="0.6" fill="currentColor" /></>,
   code: <><path d="m8 8-5 4 5 4m8-8 5 4-5 4" /></>,
+  codeB: <><path d="m8 7-5 5 5 5m8-10 5 5-5 5M13.5 4l-3 16" /></>,
   download: <><path d="M12 4v11m0 0 4-4m-4 4-4-4M4 19h16" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
   moon: <><path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5Z" /></>,
   alert: <><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></>,
   ext: <><path d="M14 4h6v6m0-6L10.5 13.5M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" /></>,
+  chevR: <><path d="m9 5 7 7-7 7" /></>,
+  globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.6 4 5.6 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.6-4-9s1.3-6.4 4-9Z" /></>,
+  doc: <><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7Z" /><path d="M14 3v4h4M9.5 13h5M9.5 17h5" /></>,
+  img: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5" /></>,
+  bulb: <><path d="M9.5 18h5M10.5 21h3M12 3a6 6 0 0 1 3.4 10.9c-.7.6-1.1 1.1-1.3 1.9l-.2.7H10l-.2-.7c-.2-.8-.6-1.3-1.3-1.9A6 6 0 0 1 12 3Z" /></>,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5c1.4-3.4 4.2-5 7.5-5s6.1 1.6 7.5 5" /></>,
+  dots: <><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" /></>,
+  plane: <><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4Z" /></>,
 };
 
 export function Icon({ name, className = "ic" }: { name: string; className?: string }) {

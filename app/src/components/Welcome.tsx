@@ -1,6 +1,7 @@
 import { loginWith, type OAuthProvider } from "../lib/auth";
 import { PROVIDERS } from "../lib/providers/registry";
 import { ProviderTile } from "./icons";
+import { Logo } from "./Logo";
 
 const BRAND: Record<OAuthProvider, { label: string; path: string }> = {
   github: {
@@ -21,7 +22,10 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
   return (
     <div className="welcome">
       <div className="welcome-inner">
-        <span className="logo" style={{ fontSize: 26 }}>Eluntra</span>
+        <div className="welcome-hero">
+          <Logo size={92} />
+          <div className="welcome-brand">Eluntra</div>
+        </div>
         <h1>30社のAIを、<br />自分のキーで。</h1>
         <p className="lead">
           OpenAI・Gemini・Claudeなど30社のAIを、自分のAPIキー（BYOK）で使うチャットです。

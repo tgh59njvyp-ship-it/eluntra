@@ -108,6 +108,8 @@ export interface AppConfig {
   system: string;
   temp: number;
   agent: boolean;
+  /** 検索ピル：ONのとき送信はエージェント経由で、まずWeb検索してから回答する */
+  webSearch: boolean;
   mode: "chat" | "code";
   effort: Effort;
   proxyOn: boolean;

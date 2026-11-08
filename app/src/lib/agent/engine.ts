@@ -203,19 +203,31 @@ const STEP_LABEL: Record<string, string> = {
   browser: "ブラウザで確認中",
 };
 
-/** エージェントループを実行する。onProgress で手順表示を随時更新する */
+/** エージェントループを実行する。onProgress で手順表示を随時更新する。
+    opts.webSearchFirst: コンポーザーの「検索」ピル用。最初に必ず web_search するよう指示を足す */
 export async function runAgent(
   provider: ProviderDef,
   model: string,
   history: ChatMessage[],
   onProgress: (progress: AgentProgress) => void,
   signal?: AbortSignal,
+  opts?: { webSearchFirst?: boolean },
 ): Promise<{ text: string; sources: SourceLink[]; steps: string[] }> {
   const progress: AgentProgress = { steps: ["タスクを分析中"], sources: [] };
   onProgress(progress);
   const convo: ChatMessage[] = [
     { role: "user", content: TOOL_GUIDE },
     { role: "assistant", content: "了解しました。必要に応じてツールを使います。" },
+    ...(opts?.webSearchFirst
+      ? [
+          {
+            role: "user" as const,
+            content:
+              "【追加指示】この質問については、まず web_search ツールで最新の情報を検索し、出典に基づいて回答してください。検索せずに回答を始めないでください。",
+          },
+          { role: "assistant" as const, content: "了解しました。まず検索します。" },
+        ]
+      : []),
     ...history,
   ];
   let finalText = "";

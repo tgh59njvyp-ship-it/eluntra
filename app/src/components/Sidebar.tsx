@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { isLoggedIn, currentUser } from "../lib/auth";
 import { getState, sessionKindOf, update, useStore } from "../lib/store";
 import { Icon } from "./icons";
+import { Logo } from "./Logo";
 
 interface Props {
   open: boolean;
@@ -42,8 +43,9 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
       <div className={`drawer-back${open ? " on" : ""}`} onClick={onClose} />
       <aside className={`sidebar${open ? " open" : ""}`}>
         <div className="side-head">
+          <Logo size={32} />
           <span className="logo">Eluntra</span>
-          <span className="pill-state">v6.8</span>
+          <span className="pill-state">v7.0</span>
         </div>
         <div className="logo-sub">30社のAIを、自分のキーで使うチャット</div>
         <div style={{ display: "flex", gap: 6, padding: "0 12px 10px" }}>
