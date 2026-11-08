@@ -33,7 +33,7 @@ const GOOGLE_CLIENT_ID = "743031984555-f4b1v8tsqkp7o2jqopiifgkgfblg88c5.apps.goo
    clientIdKnown を true にするとログイン式接続が有効になる。
    あわせて Vercel 環境変数 OAUTH_SUPABASE_CLIENT_ID / OAUTH_SUPABASE_CLIENT_SECRET
    の登録が必要（トークン交換は /api/oauth/exchange が行う）。 */
-const SUPABASE_CLIENT_ID = "";
+const SUPABASE_CLIENT_ID = "46db16e8-735d-4e1d-92b2-10f37f8396af";
 
 const API_BASE =
   typeof window !== "undefined" && window.location.hostname.endsWith("vercel.app")
@@ -162,15 +162,15 @@ export const OAUTH_SERVICES: Record<string, OAuthService> = {
   supabase: {
     id: "supabase", authorizeUrl: "https://api.supabase.com/v1/oauth/authorize",
     tokenUrl: "https://api.supabase.com/v1/oauth/token",
-    scopes: "projects:read projects:write", clientIdKnown: false, clientId: SUPABASE_CLIENT_ID,
-    note: "Supabase 側で OAuth アプリの登録（リダイレクトURIの登録）と、クライアント情報の Vercel 環境変数への登録が必要です。登録が完了するとログインだけで繋がり、Management API（SQL実行など）が使えるようになります。それまでは「トークンで接続（上級者向け）」からプロジェクトURL＋サービスロールキーで接続できます。",
+    scopes: "projects:read projects:write", clientIdKnown: true, clientId: SUPABASE_CLIENT_ID,
+    note: "「接続」を押すと Supabase のログイン画面に進み、承認すると繋がります。繋ぐと Management API（SQL実行・プロジェクト操作）がエージェントから使えるようになります。",
   },
 };
 
-/** 現時点で実際にOAuth接続まで進めるサービスか（サーバー側シークレット登録が前提のため、現在は全て false） */
+/** 現時点で実際にOAuth接続まで進めるサービスか（サーバー側シークレット登録が前提。
+    supabase は 2026-11-08 に OAuth アプリ登録と Vercel 環境変数登録が完了したため有効） */
 export function oauthReady(id: string): boolean {
-  void id;
-  return false;
+  return id === "supabase";
 }
 
 /* ---------- PKCE ---------- */

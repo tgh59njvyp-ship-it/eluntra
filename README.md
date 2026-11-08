@@ -60,6 +60,15 @@ npm run build   # tsc strict + vite build
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
 
+## v6.5.1の変更（Supabaseログイン式の有効化）
+
+- **Supabase のログイン式接続（OAuth）を有効化した**（v6.5 節の「未有効化（準備中）」状態を置き換える）。2026-11-08 に実施・確認した内容：
+  - Supabase 側に OAuth アプリ「Eluntra」を登録（所属組織：tgh59njvyp-ship-it's Org）。リダイレクトURI は `https://eluntra.vercel.app/connectors/callback`、スコープは Projects RW ＋ Database RW
+  - Vercel プロジェクト eluntra の環境変数 `OAUTH_SUPABASE_CLIENT_ID` / `OAUTH_SUPABASE_CLIENT_SECRET` を登録済み（値はこのリポジトリにも記録しない）
+  - `lib/connectors/oauth.ts` に発行された client_id（公開値）を設定し、`oauthReady("supabase")` が true になる状態にした
+  - 実測：認可エンドポイントが PKCE パラメータつきで Supabase の同意画面へリダイレクトすること、トークン交換エンドポイント `/api/oauth/exchange` が Supabase へ到達すること（ダミーの認可コードでは `exchange_failed` を返し、`not_configured` ではない）を確認済み
+  - ユーザー本人の実接続（同意→トークン取得）の往復は未検証
+
 ## v6.5の変更
 
 - **コネクタに Supabase を追加（17種目）**。ロゴは Simple Icons（現行版）から取得し `app/public/logos/conn-supabase.svg` に同梱
