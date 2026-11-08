@@ -10,7 +10,7 @@ const PRIORITY = [
   "anthropic", "cohere", "cloudflare", "sambanova", "xai", "together", "fireworks",
   "nvidia", "novita", "hyperbolic", "siliconflow", "perplexity", "huggingface",
   "githubmodels", "ai21", "replicate", "bedrock", "azure", "vertex", "alephalpha",
-  "ollama", "lmstudio", "llamacpp",
+  "ollama", "lmstudio", "llamacpp", "custom",
 ];
 
 export type QuestionKind = "code" | "math" | "image" | "long" | "simple" | "general";

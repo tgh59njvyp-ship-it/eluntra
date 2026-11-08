@@ -12,6 +12,7 @@ export const LS = {
   notes: "eluntra_notes",
   theme: "eluntra_theme",
   modelMeta: "eluntra_model_meta",
+  modelFlags: "eluntra_model_flags",
   favorites: "eluntra_favorites",
   recents: "eluntra_recents",
   connectors: "eluntra_connectors",
@@ -40,11 +41,15 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+export type ModelFlag = "free" | "paid";
+
 export interface AppState {
   keys: Record<string, string>;
   tested: Record<string, boolean>;
   fetchedModels: Record<string, string[]>;
   modelMeta: Record<string, ModelMeta>;
+  /** プロバイダーID → モデルID → 無料/通常の分類（一覧取得時に価格情報・IDから判定） */
+  modelFlags: Record<string, Record<string, ModelFlag>>;
   favorites: Record<string, string[]>;
   recents: string[];
   conf: AppConfig;
@@ -87,6 +92,7 @@ function initialState(): AppState {
     tested: readJSON(LS.tested, {}),
     fetchedModels: readJSON(LS.models, {}),
     modelMeta: readJSON(LS.modelMeta, {}),
+    modelFlags: readJSON(LS.modelFlags, {}),
     favorites: readJSON(LS.favorites, {}),
     recents: readJSON(LS.recents, []),
     conf,
@@ -114,6 +120,7 @@ export function update(patch: Partial<AppState>): void {
   if (patch.tested) writeJSON(LS.tested, state.tested);
   if (patch.fetchedModels) writeJSON(LS.models, state.fetchedModels);
   if (patch.modelMeta) writeJSON(LS.modelMeta, state.modelMeta);
+  if (patch.modelFlags) writeJSON(LS.modelFlags, state.modelFlags);
   if (patch.favorites) writeJSON(LS.favorites, state.favorites);
   if (patch.recents) writeJSON(LS.recents, state.recents);
   if (patch.conf) writeJSON(LS.conf, state.conf);
@@ -171,6 +178,7 @@ export function effectiveBase(pid: string): string {
   if (!p) return "";
   const vals = keyFieldsOf(pid, state.keys[pid] || "");
   if (pid === "cloudflare") return p.base.replace("{account}", vals.acct || "");
+  if (pid === "custom") return (vals.base || "").trim().replace(/\/+$/, "");
   if (p.local) return (vals.base || "").trim() || p.base;
   if (pid === "azure") return (vals.endpoint || "").trim().replace(/\/$/, "");
   return p.base;
@@ -184,6 +192,7 @@ export function effectiveToken(pid: string): string {
   if (!p.fields?.length) return raw;
   const vals = keyFieldsOf(pid, raw);
   if (pid === "cloudflare") return vals.token || "";
+  if (pid === "custom") return vals.key || "";
   if (pid === "azure") return vals.key || "";
   if (pid === "vertex") return vals.token || "";
   if (p.local) return vals.key || "";
@@ -197,7 +206,7 @@ export function hasCredentials(pid: string): boolean {
   if (p.noKey) return !!state.tested[pid];
   if (p.fields?.length) {
     const vals = keyFieldsOf(pid, state.keys[pid] || "");
-    return p.fields.every((f) => (vals[f.id] || "").trim().length > 0);
+    return p.fields.every((f) => f.optional || (vals[f.id] || "").trim().length > 0);
   }
   return !!(state.keys[pid] || "").trim();
 }

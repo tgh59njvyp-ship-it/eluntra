@@ -1,4 +1,4 @@
-import { effectiveBase, effectiveToken, getState, keyFieldsOf, update } from "../store";
+import { effectiveBase, effectiveToken, getState, keyFieldsOf, update, type ModelFlag } from "../store";
 import type { ChatMessage, Effort, ProviderDef, SourceLink, TestResult } from "../types";
 import { signRequest } from "./bedrock";
 import { apiFetch, fetchWithTimeout, friendlyError, proxyEnabled, readSse, setRouteOverride, UserError } from "./transport";
@@ -94,9 +94,17 @@ function openaiMessages(p: ProviderDef, history: ChatMessage[], effort: Effort) 
   return msgs;
 }
 
+/** カスタム等のベースURL必須プロバイダーで未入力のときの案内 */
+function missingBaseError(p: ProviderDef): UserError {
+  return new UserError(
+    `ベースURLが未入力です。対処：設定の「${p.name}」を開き、ベースURLを入力して保存してください。`,
+  );
+}
+
 async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[], onDelta: OnDelta, signal?: AbortSignal): Promise<ChatResult> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
+  if (p.direct && !base) throw missingBaseError(p);
   const effort = getState().conf.effort;
   const body: Record<string, unknown> = {
     model,
@@ -108,7 +116,7 @@ async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
-  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!p.local);
+  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!(p.local || p.direct));
   if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const text = await readSse(
     res,
@@ -121,6 +129,7 @@ async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[
 async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessage[], signal?: AbortSignal): Promise<ChatResult> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
+  if (p.direct && !base) throw missingBaseError(p);
   const effort = getState().conf.effort;
   const body: Record<string, unknown> = {
     model,
@@ -131,7 +140,7 @@ async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessag
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
-  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!p.local);
+  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!(p.local || p.direct));
   if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
@@ -439,7 +448,7 @@ export async function streamWithFallback(
     if (t) lastText = t;
     onDelta(t);
   };
-  const routes: Array<boolean | null> = p.local ? [null] : [null, getState().conf.proxyOn === false];
+  const routes: Array<boolean | null> = p.local || p.direct ? [null] : [null, getState().conf.proxyOn === false];
   let lastErr: unknown = null;
   for (const r of routes) {
     setRouteOverride(r);
@@ -468,6 +477,7 @@ export async function streamWithFallback(
 function modelsRequest(p: ProviderDef): Promise<Response> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
+  if (p.direct && !base) return Promise.reject(missingBaseError(p));
   if (p.kind === "gemini") return apiFetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
   if (p.kind === "anthropic") {
     return apiFetch(`${p.base}/models`, {
@@ -486,12 +496,15 @@ function modelsRequest(p: ProviderDef): Promise<Response> {
   }
   const headers: Record<string, string> = {};
   if (key) headers.Authorization = `Bearer ${key}`;
-  return apiFetch(`${base}/models`, { headers }, !!p.local);
+  return apiFetch(`${base}/models`, { headers }, !!(p.local || p.direct));
 }
 
 export async function testConnection(p: ProviderDef): Promise<TestResult> {
   const st = getState();
   const raw = (st.keys[p.id] || "").trim();
+  if (p.direct && !effectiveBase(p.id)) {
+    return { ok: false, msg: "ベースURLが未入力です。対処：上の「ベースURL」欄に接続先URLを入力して保存してください。" };
+  }
   if (!p.noKey && !raw) return { ok: false, msg: "キーが未入力です。上の欄にキーを貼ってください。" };
   if (p.id === "sambanova" && !proxyEnabled()) return { ok: false, msg: SAMBA_MSG };
   try {
@@ -582,6 +595,7 @@ async function bedrockFoundationModels(p: ProviderDef): Promise<string[]> {
 export async function fetchModels(p: ProviderDef): Promise<string[]> {
   const st = getState();
   const raw = (st.keys[p.id] || "").trim();
+  if (p.direct && !effectiveBase(p.id)) throw missingBaseError(p);
   if (!p.noKey && !raw) throw new UserError(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
   if (p.id === "sambanova" && !proxyEnabled()) throw new Error(SAMBA_MSG);
   if (p.modelsMode === "none") {
@@ -589,6 +603,7 @@ export async function fetchModels(p: ProviderDef): Promise<string[]> {
     return p.models;
   }
   let ids: string[] = [];
+  let rawFlags: Record<string, ModelFlag> = {};
   if (p.kind === "bedrock") {
     ids = await bedrockFoundationModels(p);
   } else if (p.kind === "azure") {
@@ -611,15 +626,26 @@ export async function fetchModels(p: ProviderDef): Promise<string[]> {
     const res = await modelsRequest(p);
     if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
     const j = (await res.json()) as unknown;
-    ids = parseModelList(p, j);
+    const parsed = parseModelListWithFlags(p, j);
+    ids = parsed.ids;
+    rawFlags = parsed.flags;
   }
   ids = [...new Set(ids)].sort();
   if (!ids.length) throw new Error("モデル一覧が空でした。初期モデルのまま使ってください。");
   const cur = getState();
-  update({
+  const patch: Parameters<typeof update>[0] = {
     fetchedModels: { ...cur.fetchedModels, [p.id]: ids },
     tested: { ...cur.tested, [p.id]: true },
-  });
+  };
+  // 無料／通常の分類は、価格情報を持つ会社（カスタム・OpenRouter）だけ保存する
+  if (p.id === "custom" || p.id === "openrouter") {
+    const flags: Record<string, ModelFlag> = {};
+    ids.forEach((id) => {
+      flags[id] = rawFlags[id] ?? "paid";
+    });
+    patch.modelFlags = { ...cur.modelFlags, [p.id]: flags };
+  }
+  update(patch);
   saveModelMeta(p);
   return ids;
 }
@@ -634,7 +660,52 @@ function saveModelMeta(p: ProviderDef, note?: string): void {
   });
 }
 
-function parseModelList(p: ProviderDef, j: unknown): string[] {
+/** 価格が 0 かどうか（"0" / "0.000000" / 0 をすべて 0 とみなす） */
+function isZeroPrice(v: unknown): boolean {
+  if (v === null || v === undefined || v === "") return false;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) && n === 0;
+}
+
+interface RawModelItem {
+  id?: string;
+  name?: string;
+  pricing?: { prompt?: unknown; completion?: unknown };
+  price?: unknown;
+  cost?: unknown;
+}
+
+/**
+ * 1モデルの無料／通常を判定する。
+ * 根拠：価格情報がすべて0（OpenRouter形式の pricing、または price/cost が数値0）、
+ * またはモデルIDが :free で終わる・"free" を区切り文字つきで含む。
+ */
+export function classifyModel(item: RawModelItem): ModelFlag {
+  const id = item.id || item.name || "";
+  const pricing = item.pricing;
+  if (pricing && isZeroPrice(pricing.prompt) && isZeroPrice(pricing.completion)) return "free";
+  const flat = item.price ?? item.cost;
+  if (typeof flat === "number" && flat === 0) return "free";
+  if (id.endsWith(":free")) return "free";
+  if (/(^|[/_-])free([/_-]|$)/i.test(id)) return "free";
+  return "paid";
+}
+
+function parseModelListWithFlags(p: ProviderDef, j: unknown): { ids: string[]; flags: Record<string, ModelFlag> } {
+  const flags: Record<string, ModelFlag> = {};
+  const collect = (items: RawModelItem[]): void => {
+    items.forEach((m) => {
+      const id = m.id || m.name || "";
+      if (id) flags[id] = classifyModel(m);
+    });
+  };
+  const obj = j as { models?: Array<RawModelItem | string>; data?: Array<RawModelItem | string> };
+  if (Array.isArray(j)) collect(j as RawModelItem[]);
+  else collect([...(obj.data || []), ...(obj.models || [])].filter((m) => typeof m !== "string") as RawModelItem[]);
+  return { ids: parseModelListRaw(p, j), flags };
+}
+
+function parseModelListRaw(p: ProviderDef, j: unknown): string[] {
   const obj = j as {
     models?: Array<{ id?: string; name?: string } | string>;
     data?: Array<{ id?: string; name?: string } | string>;

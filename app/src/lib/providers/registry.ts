@@ -1,7 +1,7 @@
 import type { ProviderDef } from "../types";
 
 /**
- * プロバイダーレジストリ（30社）。
+ * プロバイダーレジストリ（31社）。
  * 新しい会社はここに1エントリ足し、必要ならアダプターを1つ追加するだけで増やせる。
  * 初期モデルは実在が確認できるIDのみ。能力（vision等）は確認できる範囲だけ付ける。
  */
@@ -256,6 +256,18 @@ export const PROVIDERS: ProviderDef[] = [
     ],
     models: [], defaultModel: "", noKey: true, local: true,
     modelsNote: "モデル一覧は接続先から取得します。",
+  },
+  {
+    id: "custom", name: "カスタム", mono: "Cu", color: "#5B7C99", kind: "openai",
+    base: "", keyUrl: "", keyHint: "キー不要のエンドポイントでは空欄でOK",
+    direct: true,
+    fields: [
+      { id: "base", label: "ベースURL", placeholder: "https://example.com/v1", hint: "OpenAI互換エンドポイントのURL（末尾の /v1 まで）" },
+      { id: "key", label: "APIキー", secret: true, optional: true, placeholder: "キー不要の場合は空欄でOK" },
+    ],
+    models: [], defaultModel: "", vision: true, reasoning: true,
+    note: "任意のOpenAI互換エンドポイントに接続します。モデル一覧はベースURLの /models から自動取得します。接続は中継サーバーを介さずブラウザから直接行うため、接続先がブラウザからのアクセス（CORS）を許可している必要があります。許可していない接続先にはつながりません。",
+    modelsNote: "モデルはベースURLの /models から自動取得します。無料／通常の分類は、接続先が価格情報を返す場合と、モデルIDに :free が付く場合に判定します（判定材料がないモデルは「通常モデル」に入ります）。",
   },
 ];
 

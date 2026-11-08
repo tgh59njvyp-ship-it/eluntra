@@ -19,6 +19,8 @@ export interface KeyFieldDef {
   id: string;
   label: string;
   secret?: boolean;
+  /** true なら空欄でも入力完了とみなす（カスタムのAPIキーなど） */
+  optional?: boolean;
   placeholder: string;
   hint?: string;
 }
@@ -45,6 +47,8 @@ export interface ProviderDef {
   modelsMode?: "standard" | "none" | "catalog" | "deployments" | "foundation" | "tags";
   modelsUrl?: string;
   local?: boolean;
+  /** 中継サーバーを介さずブラウザから直接つなぐ（カスタム：中継の許可リスト外ホスト用） */
+  direct?: boolean;
   noKey?: boolean;
   vision?: boolean;
   reasoning?: boolean;

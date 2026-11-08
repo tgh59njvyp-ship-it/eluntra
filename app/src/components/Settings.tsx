@@ -109,9 +109,11 @@ function ProviderItem({ p, toast }: { p: ProviderDef; toast: (m: string) => void
             </div>
           ))}
           <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
-            <a href={p.keyUrl} target="_blank" rel="noopener noreferrer">
-              キーを取得する <Icon name="ext" className="ic sm" />
-            </a>
+            {p.keyUrl && (
+              <a href={p.keyUrl} target="_blank" rel="noopener noreferrer">
+                キーを取得する <Icon name="ext" className="ic sm" />
+              </a>
+            )}
             <button type="button" className="btn ghost sm" onClick={() => setShowSecret(!showSecret)} style={{ height: "auto", padding: 0 }}>
               {showSecret ? "隠す" : "キーを表示"}
             </button>
@@ -370,7 +372,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.2</span>
+          <span className="pill-state">現在の版：v6.3</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -473,7 +475,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             <div className="hint">Eluntra Autoは、質問の種類・思考レベル・接続テストの状態から自動で選びます。選択理由は回答に表示されます。</div>
           </div>
 
-          <div className="set-sec">APIプロバイダー（30社）</div>
+          <div className="set-sec">APIプロバイダー（31社）</div>
           <p className="set-desc">キーは端末内にのみ保存されます。複数社のキーを入れておくと、Eluntra Autoや自動フォールバックで使い分けられます。</p>
           {PROVIDERS.map((p) => (
             <ProviderItem key={`${open}-${p.id}`} p={p} toast={toast} />

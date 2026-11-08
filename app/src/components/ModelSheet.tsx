@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveAuto } from "../lib/auto";
 import { fetchModels } from "../lib/providers/chat";
 import { PROVIDERS, findProvider } from "../lib/providers/registry";
 import { UserError } from "../lib/providers/transport";
 import {
-  getState, keyStateLabel, keyStateOf, modelListOf, pushRecent, toggleFavorite, update, useStore,
+  getState, hasCredentials, keyStateLabel, keyStateOf, modelListOf, pushRecent, toggleFavorite, update, useStore,
 } from "../lib/store";
 import { Icon, ProviderTile } from "./icons";
 
@@ -18,6 +18,7 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   const conf = useStore((s) => s.conf);
   const fetchedModels = useStore((s) => s.fetchedModels);
   const modelMeta = useStore((s) => s.modelMeta);
+  const modelFlags = useStore((s) => s.modelFlags);
   const favorites = useStore((s) => s.favorites);
   const recents = useStore((s) => s.recents);
   void fetchedModels;
@@ -36,6 +37,25 @@ export function ModelSheet({ open, onClose, toast }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open ]);
+
+  /* カスタムは開くたびに最新の一覧を自動取得する（失敗時は静かに失敗し、手動ボタンで再試行できる） */
+  const autoFetching = useRef(false);
+  useEffect(() => {
+    if (!open || providerId !== "custom" || autoFetching.current) return;
+    if (!hasCredentials("custom")) return;
+    autoFetching.current = true;
+    setBusy(true);
+    void (async () => {
+      try {
+        await fetchModels(findProvider("custom"));
+      } catch {
+        /* 自動取得の失敗は画面に出さない。「一覧を取得」ボタンで理由を確認できる */
+      } finally {
+        autoFetching.current = false;
+        setBusy(false);
+      }
+    })();
+  }, [open, providerId]);
 
   const isAuto = conf.provider === "auto";
   const provider = findProvider(providerId);
@@ -96,6 +116,37 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   };
 
   const meta = modelMeta[providerId];
+  const flags = modelFlags[providerId] || {};
+  const freeModels = filtered.filter((m) => flags[m] === "free");
+  const grouped = freeModels.length > 0;
+  const paidModels = grouped ? filtered.filter((m) => flags[m] !== "free") : filtered;
+
+  const renderModelRow = (m: string) => {
+    const selected = !isAuto && conf.provider === providerId && conf.models[providerId] === m;
+    const fav = (favorites[providerId] || []).includes(m);
+    return (
+      <div key={m} className="model-row" style={{ cursor: "pointer" }} onClick={() => choose(providerId, m)}>
+        <span className="mid">{m}</span>
+        {flags[m] === "free" && <span className="free-badge">無料</span>}
+        <button
+          type="button"
+          className={`star${fav ? " on" : ""}`}
+          aria-label="お気に入り"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFavorite(providerId, m);
+          }}
+        >
+          <Icon name="star" className="ic sm" />
+        </button>
+        {selected && (
+          <span className="chk">
+            <Icon name="check" className="ic sm" />
+          </span>
+        )}
+      </div>
+    );
+  };
   const visibleProviders = PROVIDERS.filter((p) => !onlyReady || keyStateOf(p.id) !== "none");
 
   return (
@@ -215,31 +266,17 @@ export function ModelSheet({ open, onClose, toast }: Props) {
           )}
 
           <div>
-            {filtered.map((m) => {
-              const selected = !isAuto && conf.provider === providerId && conf.models[providerId] === m;
-              const fav = (favorites[providerId] || []).includes(m);
-              return (
-                <div key={m} className="model-row" style={{ cursor: "pointer" }} onClick={() => choose(providerId, m)}>
-                  <span className="mid">{m}</span>
-                  <button
-                    type="button"
-                    className={`star${fav ? " on" : ""}`}
-                    aria-label="お気に入り"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(providerId, m);
-                    }}
-                  >
-                    <Icon name="star" className="ic sm" />
-                  </button>
-                  {selected && (
-                    <span className="chk">
-                      <Icon name="check" className="ic sm" />
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {grouped ? (
+              <>
+                <div className="set-sec">無料モデル</div>
+                {freeModels.map(renderModelRow)}
+                <div className="set-sec">通常モデル</div>
+                {paidModels.map(renderModelRow)}
+                {paidModels.length === 0 && <p className="set-desc">通常モデルはありません。</p>}
+              </>
+            ) : (
+              filtered.map(renderModelRow)
+            )}
             {filtered.length === 0 && (
               <p className="set-desc">
                 モデルがありません。「一覧を取得」であなたのキーで使えるモデルを読み取るか、下の欄にモデルID（Azureはデプロイ名）を直接入力してください。

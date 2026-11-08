@@ -39,7 +39,7 @@ const LOGO_IDS = new Set([
   "cloudflare", "sambanova", "deepseek", "xai", "together", "fireworks",
   "cerebras", "perplexity", "nvidia", "huggingface", "replicate", "bedrock",
   "azure", "vertex", "githubmodels", "ai21", "alephalpha", "novita",
-  "hyperbolic", "siliconflow", "ollama", "lmstudio",
+  "hyperbolic", "siliconflow", "ollama", "lmstudio", "custom",
 ]);
 
 export function hasLogo(id: string): boolean {

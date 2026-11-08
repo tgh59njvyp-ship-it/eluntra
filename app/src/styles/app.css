@@ -231,6 +231,7 @@ a { color: var(--accent); }
 .model-row:hover { background: var(--bg-sub); }
 .model-row .mid { flex: 1; font-family: var(--font-mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-row .chk { color: var(--accent); }
+.free-badge { flex: none; font-size: 11px; color: var(--success); border: 1px solid var(--success); border-radius: 999px; padding: 1px 7px; }
 .star { border: none; background: transparent; color: var(--text-3); padding: 6px; display: inline-flex; }
 .star.on { color: #b8860b; }
 .search-input, .text-input, .key-input {

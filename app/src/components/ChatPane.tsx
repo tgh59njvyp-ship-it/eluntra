@@ -194,7 +194,7 @@ export function ChatPane({
               <p>
                 {conf.mode === "code"
                   ? "完成コードを受け取って、その場でプレビューできます。"
-                  : "30社のAIを、自分のAPIキーで使うチャットです。"}
+                  : "31社のAIを、自分のAPIキーで使うチャットです。"}
               </p>
               <div className="steps-hint">
                 <span>1 会社を選ぶ</span>

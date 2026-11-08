@@ -1,6 +1,6 @@
-# Eluntra（v6.2・作り直し版）
+# Eluntra（v6.3・作り直し版）
 
-30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。
+31社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
 
 - 公開URL: https://eluntra.vercel.app ／ https://simple-url-server.lovable.app/s/eluntra/
@@ -11,8 +11,8 @@ v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScr
 - localStorage のキーと形式は旧版と同一（eluntra_keys / eluntra_tested / eluntra_models / eluntra_conf / eluntra_sessions / eluntra_notes / eluntra_theme など）。旧版で保存したキー・会話・設定はそのまま読み込めます
 - Supabase（共用プロジェクト）のログイン（GitHub / Google / Apple、PKCE）と同期（eluntra_sync、会話IDで統合）も互換。APIキーは同期対象外で、端末内にのみ保存されます
 
-## 対応プロバイダー（30社）
-OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / Cloudflare Workers AI / SambaNova / DeepSeek / xAI / Together AI / Fireworks AI / Cerebras / Perplexity / NVIDIA NIM / Hugging Face / Replicate / Amazon Bedrock / Azure AI Foundry / Google Vertex AI / GitHub Models / AI21 Labs / Aleph Alpha / Novita AI / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp
+## 対応プロバイダー（31社）
+OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / Cloudflare Workers AI / SambaNova / DeepSeek / xAI / Together AI / Fireworks AI / Cerebras / Perplexity / NVIDIA NIM / Hugging Face / Replicate / Amazon Bedrock / Azure AI Foundry / Google Vertex AI / GitHub Models / AI21 Labs / Aleph Alpha / Novita AI / Hyperbolic / SiliconFlow / Ollama / LM Studio / llama.cpp / カスタム（任意のOpenAI互換エンドポイント）
 
 方式差（正直な注記）:
 - Perplexity：モデル一覧APIがありません。公式モデルを初期値として表示します
@@ -22,6 +22,7 @@ OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / C
 - Replicate：Predictions API方式でストリーミングしません。モデルごとに入力形式が異なり動かない場合があります
 - Aleph Alpha：独自形式のため互換方式での送信を試みる実装で、実キー未検証です
 - ローカルAI（Ollama等）：スマホからは自宅PCの localhost に届きません
+- カスタム：接続は中継サーバーを介さずブラウザから直接行います（中継の許可リスト外のホストでも使えるようにするため）。そのため接続先がブラウザからのアクセス（CORS）を許可していない場合はつながりません
 
 ## 機能
 - BYOK（複数欄キー対応・マスキング・接続テスト・モデル一覧の自動/手動取得・取得日時・お気に入り・最近使用）
@@ -58,3 +59,12 @@ npm run build   # tsc strict + vite build
   - その他のサービス：認可コード＋PKCE の汎用エンジン＋設定テーブル、戻り先ページ（/connectors/callback）、トークン交換エンドポイント（/api/oauth/exchange、シークレットは Vercel 環境変数・未登録）まで基盤を実装。実際に繋げるには各サービスの開発者画面でのアプリ登録（リダイレクト先 https://eluntra.vercel.app/connectors/callback とクライアント情報）＋シークレットの環境変数登録が必要で、未登録の間はアプリ内で説明を表示して「準備中」とする
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
+
+## v6.3の変更
+
+- プロバイダー「カスタム」を追加（31社目）。ベースURL（必須）とAPIキー（任意・キー不要の接続先では空欄可）を入力すると、任意のOpenAI互換エンドポイントに接続できる
+  - モデル一覧は {ベースURL}/models から取得。モデル選択シートを開くたびに自動で最新化する（失敗時は静かに失敗し、手動の「一覧を取得」で理由を確認できる）
+  - 無料／通常の分類：接続先が価格情報を返す場合は「prompt・completion の価格が両方0」のモデルを無料と判定（OpenRouter形式の pricing に対応）。モデルIDが `:free` で終わる、または区切り文字つきで `free` を含む場合も無料。判定材料がないモデルは「通常モデル」に入る。分類はカスタムと OpenRouter で保存され、モデル選択シートで「無料モデル」「通常モデル」の見出し＋「無料」バッジで表示する
+  - 接続方式：中継サーバー（/api/proxy）のホスト許可リストに無い任意ホストへ送るため、カスタムはブラウザから直接接続する（ProviderDef の `direct` フラグ）。このため接続先の CORS 設定が前提になる。Auto の候補には入る（local ではないため）
+  - 表示ロゴは線描きスライダーの自作 SVG（public/logos/custom.svg）
+- 表記を「30社」→「31社」に更新（タイトル・OG・各画面）

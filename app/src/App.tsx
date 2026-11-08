@@ -85,7 +85,7 @@ export default function App() {
 
   const target = useMemo(() => {
     if (conf.provider === "auto") {
-      const any = ["gemini", "groq", "openai", "openrouter", "mistral", "deepseek", "anthropic", "cohere", "cerebras"].some(
+      const any = ["gemini", "groq", "openai", "openrouter", "mistral", "deepseek", "anthropic", "cohere", "cerebras", "custom"].some(
         (id) => hasCredentials(id),
       );
       return { providerId: "gemini", ok: any || Object.keys(getState().keys).length > 0, label: "Eluntra Auto", model: "" };
