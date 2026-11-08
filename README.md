@@ -60,6 +60,23 @@ npm run build   # tsc strict + vite build
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
 
+## v6.6の変更
+
+- **通常ログインでアカウントを選べるようにした**（Fix A）
+  - 症状：GitHub（Google側の身份に紐づくアカウント）でログインした後、別のGitHubアカウント（Apple側）でログインしようとしても、プロバイダ側に残っているセッションが黙って再利用され、常に戻されてしまう
+  - 対応：`lib/auth.ts` の `loginWith` で、github / google の認可URLに `prompt=select_account` を付与した。GoTrue はこのパラメータをプロバイダの認可URLへそのまま転送することを実測で確認済み（リダイレクト先 Location に `prompt=select_account` が含まれる）。GitHub / Google はアカウント選択画面を出すため、ブラウザに残ったセッションと違うアカウントでも入り直せる。Apple には付けていない
+  - ログアウトの後始末も強化：`logout()` で保存セッション（`eluntra_auth`）に加えて、未完了ログインの PKCE 検証子（sessionStorage）と同期の最終時刻 `eluntra_last_sync` も消す。後者は別アカウントのクラウドデータ取り込み判定に使うため、残すとアカウント切替時に取り込みが抑制され得た
+  - **Apple ログインボタンの扱い**：共用 Supabase プロジェクトの Apple プロバイダは 2026-11-04 時点で未有効化だったため再実測した。`GET /auth/v1/authorize?provider=apple&redirect_to=...` は **400 を返し appleid.apple.com へリダイレクトしない＝現在も未有効化**。押せるとエラー画面に落ちて「Googleに戻された」ように見えるため、Welcome（ログイン画面）と設定のアカウント欄の両方で Apple ボタンを **無効＋「（準備中）」表示** に変更した。有効化するには Supabase 側で Apple プロバイダの設定（Services ID 等）が必要
+- **コードのプレビュー機能を追加**（Feature B）
+  - チャット（通常モード／コードモード共通の `ChatPane`＋`Markdown`）のコードブロックで、言語が html / xml / svg / css / js / javascript の場合に「プレビュー」ボタンを表示する（従来の完成コード用パネル `CodePreview` はそのまま）
+  - 表示は全画面シート（`components/CodePreviewSheet.tsx`）。中身は `<iframe sandbox="allow-scripts" srcDoc>` で、**allow-same-origin は付けない**（アプリ本体のオリジンから隔離）。組み立ては `lib/preview.ts`：
+    - 完全なHTML文書（`<!DOCTYPE` / `<html` で始まる）はそのまま
+    - HTML断片は最小テンプレート（viewport・基本スタイル）で包む旨をシート内に注記
+    - CSS単体は `<style>` として見本要素（見出し・段落・ボタン・フォーム・表）に適用し、その旨を注記
+    - JS単体は console.log 等の出力をページ内に集める仕掛けと一緒に実行し、結果エリアに表示する旨を注記。埋め込み時に `</script>` / `</style>` の閉じタグ文字列はエスケープする
+  - ツールバー：再読み込み／コードをコピー／ダウンロード（組み立て後のHTMLを `preview.html` で保存）／新しいタブで開く（Blob URL）
+  - 制限：プレビューは隔離された iframe 内の表示のみで、外部ファイルの相対参照（別ファイルの CSS/JS/画像）は読み込まれない。生成コードが完結した単一HTMLの場合に最も正確
+
 ## v6.5.1の変更（Supabaseログイン式の有効化）
 
 - **Supabase のログイン式接続（OAuth）を有効化した**（v6.5 節の「未有効化（準備中）」状態を置き換える）。2026-11-08 に実施・確認した内容：

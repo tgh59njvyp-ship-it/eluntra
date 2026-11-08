@@ -3,6 +3,7 @@ import { readPickedFiles } from "../lib/files";
 import { getState, providerDefOf, update, useStore } from "../lib/store";
 import type { Attachment, ChatMessage, ChatSession, Effort } from "../lib/types";
 import { Icon, ProviderTile } from "./icons";
+import { CodePreviewSheet } from "./CodePreviewSheet";
 import { Markdown } from "./Markdown";
 
 interface Props {
@@ -29,13 +30,14 @@ const EFFORTS: Array<{ id: Effort; label: string }> = [
 ];
 
 function MessageItem({
-  m, isLast, onRegenerate, onEdit, toast,
+  m, isLast, onRegenerate, onEdit, toast, onPreview,
 }: {
   m: ChatMessage;
   isLast: boolean;
   onRegenerate: () => void;
   onEdit: () => void;
   toast: (msg: string) => void;
+  onPreview: (code: string, lang: string) => void;
 }) {
   const copy = async (text: string) => {
     try {
@@ -91,6 +93,13 @@ function MessageItem({
         <div
           className="msg-body"
           onClick={(e) => {
+            const pv = (e.target as HTMLElement).closest("[data-preview]");
+            if (pv) {
+              const block = pv.closest(".codeblock");
+              const code = block?.querySelector("code");
+              if (code) onPreview(code.textContent || "", pv.getAttribute("data-lang") || "html");
+              return;
+            }
             const btn = (e.target as HTMLElement).closest("[data-copy]");
             if (btn) {
               const pre = btn.closest(".codeblock")?.querySelector("code");
@@ -130,6 +139,7 @@ export function ChatPane({
   const conf = useStore((s) => s.conf);
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
+  const [preview, setPreview] = useState<{ code: string; lang: string } | null>(null);
 
   useEffect(() => {
     if (draft) {
@@ -211,6 +221,7 @@ export function ChatPane({
                 onRegenerate={onRegenerate}
                 onEdit={() => onEditUser(i)}
                 toast={toast}
+                onPreview={(code, lang) => setPreview({ code, lang })}
               />
             ))
           )}
@@ -316,6 +327,7 @@ export function ChatPane({
           </div>
         </div>
       </div>
+      <CodePreviewSheet target={preview} onClose={() => setPreview(null)} toast={toast} />
     </>
   );
 }

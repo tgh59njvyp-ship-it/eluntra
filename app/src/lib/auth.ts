@@ -94,6 +94,11 @@ function b64url(bytes: Uint8Array): string {
 export async function loginWith(provider: OAuthProvider): Promise<void> {
   const redirectTo = location.href.split("#")[0].split("?")[0];
   let url = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectTo)}`;
+  // ブラウザに残っているプロバイダ側セッションを黙って再利用させず、アカウント選択を出す。
+  // GoTrue は prompt をプロバイダの認可URLへそのまま転送する（github / google で実測済み）。
+  if (provider === "github" || provider === "google") {
+    url += `&prompt=select_account`;
+  }
   try {
     const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -218,6 +223,14 @@ export async function logout(): Promise<void> {
     }
   }
   storeSession(null);
+  // アカウント切替時に前のアカウントの痕跡を残さない：
+  // PKCE検証子（未完了ログイン）と同期の最終時刻（別アカウントの取り込み判定に使う）も消す。
+  try {
+    sessionStorage.removeItem(PKCE_LS);
+    localStorage.removeItem(SYNC_LS);
+  } catch {
+    /* ignore */
+  }
 }
 
 /* ---------- クラウド同期 ---------- */

@@ -29,14 +29,25 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
           キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。
         </p>
         <div className="login-col">
-          {(Object.keys(BRAND) as OAuthProvider[]).map((pr) => (
-            <button key={pr} type="button" className="loginbtn" onClick={() => void loginWith(pr)}>
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d={BRAND[pr].path} />
-              </svg>
-              {BRAND[pr].label}
-            </button>
-          ))}
+          {(Object.keys(BRAND) as OAuthProvider[]).map((pr) =>
+            pr === "apple" ? (
+              // Apple プロバイダは Supabase 側で未有効化（authorize が 400 を返すことを実測）。
+              // 押せてしまうと Google に落ちたように見えるエラーを踏むため、無効＋準備中として出す。
+              <button key={pr} type="button" className="loginbtn" disabled aria-disabled="true" style={{ opacity: 0.55 }}>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d={BRAND[pr].path} />
+                </svg>
+                Appleでログイン（準備中）
+              </button>
+            ) : (
+              <button key={pr} type="button" className="loginbtn" onClick={() => void loginWith(pr)}>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d={BRAND[pr].path} />
+                </svg>
+                {BRAND[pr].label}
+              </button>
+            ),
+          )}
         </div>
         <button type="button" className="btn ghost" onClick={onGuest} style={{ paddingLeft: 4 }}>
           ログインせずに使う →
@@ -63,7 +74,7 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
           <p>会話と設定は、ログインすると端末間で同期されます。</p>
         </div>
         <p style={{ color: "var(--text-3)", fontSize: 12.5, marginTop: 24 }}>
-          Googleログインはテスト中のため、当面は許可されたアカウントのみ使えます。Appleログインは未有効化の場合があります。
+          Googleログインはテスト中のため、当面は許可されたアカウントのみ使えます。Appleログインはサーバー側で未有効化のため準備中です。
         </p>
       </div>
     </div>

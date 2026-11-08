@@ -43,7 +43,7 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
       <aside className={`sidebar${open ? " open" : ""}`}>
         <div className="side-head">
           <span className="logo">Eluntra</span>
-          <span className="pill-state">v6.5.2</span>
+          <span className="pill-state">v6.6</span>
         </div>
         <div className="logo-sub">30社のAIを、自分のキーで使うチャット</div>
         <div style={{ display: "flex", gap: 6, padding: "0 12px 10px" }}>

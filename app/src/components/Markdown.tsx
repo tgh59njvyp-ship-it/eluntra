@@ -1,9 +1,11 @@
 import DOMPurify from "dompurify";
 import { Marked } from "marked";
 import { memo, useMemo } from "react";
+import { isPreviewableLang } from "../lib/preview";
 
 /* 軽量Markdown描画：markedで変換し、DOMPurifyで無害化してから表示する。
-   コードブロックには言語名とコピーボタンの置き場を付け、クリック処理は親側の委譲で受ける。 */
+   コードブロックには言語名とコピーボタンの置き場を付け、クリック処理は親側の委譲で受ける。
+   プレビュー可能な言語（html/xml/svg/css/js）にはプレビューボタンも付ける。 */
 
 const marked = new Marked({ breaks: true, gfm: true });
 
@@ -12,7 +14,10 @@ marked.use({
     code({ text, lang }: { text: string; lang?: string }) {
       const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const langEsc = (lang || "").replace(/"/g, "&quot;");
-      return `<div class="codeblock"><div class="codeblock-head"><span>${langEsc || "code"}</span><button type="button" class="codecopy" data-copy="1">コピー</button></div><pre><code>${esc}</code></pre></div>`;
+      const previewBtn = isPreviewableLang(lang)
+        ? `<button type="button" class="codecopy" data-preview="1" data-lang="${langEsc}">プレビュー</button>`
+        : "";
+      return `<div class="codeblock"><div class="codeblock-head"><span>${langEsc || "code"}</span><span class="codeblock-actions">${previewBtn}<button type="button" class="codecopy" data-copy="1">コピー</button></span></div><pre><code>${esc}</code></pre></div>`;
     },
   },
 });
@@ -20,7 +25,7 @@ marked.use({
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
   const html = useMemo(() => {
     const raw = marked.parse(text || "", { async: false }) as string;
-    return DOMPurify.sanitize(raw, { ADD_ATTR: ["data-copy"] });
+    return DOMPurify.sanitize(raw, { ADD_ATTR: ["data-copy", "data-preview", "data-lang"] });
   }, [text]);
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
 });

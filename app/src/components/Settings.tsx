@@ -657,7 +657,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.5.2</span>
+          <span className="pill-state">現在の版：v6.6</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -698,13 +698,16 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             <>
               <p className="set-desc">ログインすると会話と設定が端末間で同期されます。APIキーは端末内にのみ保存され、同期されません。</p>
               <div className="rowbtns">
-                {(["github", "google", "apple"] as OAuthProvider[]).map((pr) => (
+                {(["github", "google"] as OAuthProvider[]).map((pr) => (
                   <button key={pr} type="button" className="btn secondary sm" onClick={() => void loginWith(pr)}>
-                    {pr === "github" ? "GitHub" : pr === "google" ? "Google" : "Apple"}でログイン
+                    {pr === "github" ? "GitHub" : "Google"}でログイン
                   </button>
                 ))}
+                <button type="button" className="btn secondary sm" disabled aria-disabled="true" style={{ opacity: 0.55 }}>
+                  Appleでログイン（準備中）
+                </button>
               </div>
-              <p className="set-desc">Googleログインはテスト中のため、当面は許可されたアカウントのみ使えます。Appleは未有効化の場合があります。</p>
+              <p className="set-desc">Googleログインはテスト中のため、当面は許可されたアカウントのみ使えます。Appleログインはサーバー側で未有効化のため準備中です。</p>
             </>
           )}
 
