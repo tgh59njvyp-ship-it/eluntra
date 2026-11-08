@@ -43,9 +43,9 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
       <aside className={`sidebar${open ? " open" : ""}`}>
         <div className="side-head">
           <span className="logo">Eluntra</span>
-          <span className="pill-state">v6.3</span>
+          <span className="pill-state">v6.4</span>
         </div>
-        <div className="logo-sub">31社のAIを、自分のキーで使うチャット</div>
+        <div className="logo-sub">30社のAIを、自分のキーで使うチャット</div>
         <div style={{ display: "flex", gap: 6, padding: "0 12px 10px" }}>
           <button type="button" className={`tool-toggle${mode === "chat" ? " on" : ""}`} onClick={() => setMode("chat")}>
             チャット

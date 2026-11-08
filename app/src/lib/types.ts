@@ -47,8 +47,8 @@ export interface ProviderDef {
   modelsMode?: "standard" | "none" | "catalog" | "deployments" | "foundation" | "tags";
   modelsUrl?: string;
   local?: boolean;
-  /** 中継サーバーを介さずブラウザから直接つなぐ（カスタム：中継の許可リスト外ホスト用） */
-  direct?: boolean;
+  /** カスタムプロバイダー用：Vercelバックエンド（/api/custom-proxy）経由で通信し、CORS制限を回避する */
+  backendProxy?: boolean;
   noKey?: boolean;
   vision?: boolean;
   reasoning?: boolean;
@@ -116,6 +116,14 @@ export interface AppConfig {
 export interface ModelMeta {
   fetchedAt?: number;
   note?: string;
+}
+
+/** ユーザーが自分で作るカスタムプロバイダー（端末内のみ保存・同期対象外） */
+export interface CustomEntry {
+  id: string;
+  name: string;
+  base: string;
+  key: string;
 }
 
 export interface TestResult {

@@ -74,10 +74,12 @@ export function ConnectorTile({ cid, mono, color, lg = false }: { cid?: string; 
 }
 
 export function ProviderTile({ pid, mono, color, lg = false }: { pid?: string; mono: string; color: string; lg?: boolean }) {
-  if (pid && LOGO_IDS.has(pid)) {
+  /* カスタムプロバイダー（custom / custom-…）は共通のカスタムロゴを使う */
+  const logoId = pid ? (LOGO_IDS.has(pid) ? pid : pid.startsWith("custom") ? "custom" : null) : null;
+  if (logoId) {
     return (
       <span className={`tile logo${lg ? " lg" : ""}`}>
-        <img src={`${import.meta.env.BASE_URL}logos/${pid}.svg`} alt="" loading="lazy" />
+        <img src={`${import.meta.env.BASE_URL}logos/${logoId}.svg`} alt="" loading="lazy" />
       </span>
     );
   }

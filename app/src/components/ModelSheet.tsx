@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { resolveAuto } from "../lib/auto";
 import { fetchModels } from "../lib/providers/chat";
-import { PROVIDERS, findProvider } from "../lib/providers/registry";
 import { UserError } from "../lib/providers/transport";
 import {
-  getState, hasCredentials, keyStateLabel, keyStateOf, modelListOf, pushRecent, toggleFavorite, update, useStore,
+  allProviders, getState, hasCredentials, isCustomId, keyStateLabel, keyStateOf, modelListOf, providerDefOf, pushRecent, toggleFavorite, update, useStore,
 } from "../lib/store";
 import { Icon, ProviderTile } from "./icons";
 
@@ -16,6 +15,8 @@ interface Props {
 
 export function ModelSheet({ open, onClose, toast }: Props) {
   const conf = useStore((s) => s.conf);
+  const customs = useStore((s) => s.customs);
+  void customs;
   const fetchedModels = useStore((s) => s.fetchedModels);
   const modelMeta = useStore((s) => s.modelMeta);
   const modelFlags = useStore((s) => s.modelFlags);
@@ -41,13 +42,15 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   /* カスタムは開くたびに最新の一覧を自動取得する（失敗時は静かに失敗し、手動ボタンで再試行できる） */
   const autoFetching = useRef(false);
   useEffect(() => {
-    if (!open || providerId !== "custom" || autoFetching.current) return;
-    if (!hasCredentials("custom")) return;
+    if (!open || !isCustomId(providerId) || autoFetching.current) return;
+    if (!hasCredentials(providerId)) return;
+    const def = providerDefOf(providerId);
+    if (!def) return;
     autoFetching.current = true;
     setBusy(true);
     void (async () => {
       try {
-        await fetchModels(findProvider("custom"));
+        await fetchModels(def);
       } catch {
         /* 自動取得の失敗は画面に出さない。「一覧を取得」ボタンで理由を確認できる */
       } finally {
@@ -58,7 +61,7 @@ export function ModelSheet({ open, onClose, toast }: Props) {
   }, [open, providerId]);
 
   const isAuto = conf.provider === "auto";
-  const provider = findProvider(providerId);
+  const provider = providerDefOf(providerId) ?? providerDefOf("gemini")!;
   const models = modelListOf(providerId);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -73,7 +76,7 @@ export function ModelSheet({ open, onClose, toast }: Props) {
       const [pid, ...rest] = r.split(":");
       return { pid, model: rest.join(":") };
     })
-    .filter((r) => PROVIDERS.some((p) => p.id === r.pid));
+    .filter((r) => !!providerDefOf(r.pid));
 
   const choose = (pid: string, model: string) => {
     const st = getState();
@@ -147,7 +150,7 @@ export function ModelSheet({ open, onClose, toast }: Props) {
       </div>
     );
   };
-  const visibleProviders = PROVIDERS.filter((p) => !onlyReady || keyStateOf(p.id) !== "none");
+  const visibleProviders = allProviders().filter((p) => !onlyReady || keyStateOf(p.id) !== "none");
 
   return (
     <>
@@ -259,7 +262,7 @@ export function ModelSheet({ open, onClose, toast }: Props) {
               {recentPairs.slice(0, 4).map((r) => (
                 <button key={`${r.pid}:${r.model}`} type="button" className="model-row" onClick={() => choose(r.pid, r.model)}>
                   <span className="mid">{r.model}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-3)" }}>{findProvider(r.pid).name}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-3)" }}>{providerDefOf(r.pid)?.name ?? r.pid}</span>
                 </button>
               ))}
             </>

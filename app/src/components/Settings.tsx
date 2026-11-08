@@ -6,12 +6,12 @@ import {
 } from "../lib/connectors/oauth";
 import { CONNECTORS, testConnector } from "../lib/connectors/registry";
 import { fetchModels, testConnection } from "../lib/providers/chat";
-import { PROVIDERS, findProvider } from "../lib/providers/registry";
+import { PROVIDERS } from "../lib/providers/registry";
 
 import {
-  getState, joinKeyFields, keyFieldsOf, keyStateLabel, keyStateOf, resetAllData, update, useStore,
+  customDef, getState, joinKeyFields, keyFieldsOf, keyStateLabel, keyStateOf, newCustomId, providerDefOf, resetAllData, update, useStore,
 } from "../lib/store";
-import type { ProviderDef } from "../lib/types";
+import type { CustomEntry, ProviderDef } from "../lib/types";
 import { ConnectorTile, Icon, ProviderTile } from "./icons";
 
 interface Props {
@@ -140,6 +140,162 @@ function ProviderItem({ p, toast }: { p: ProviderDef; toast: (m: string) => void
                 setTestMsg(null);
               }}
             >
+              削除
+            </button>
+          </div>
+          {testMsg && <div className={`testmsg ${testMsg.ok ? "ok" : "ng"}`}>{testMsg.msg}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomItem({ entry, toast, defaultExpanded = false }: { entry: CustomEntry; toast: (m: string) => void; defaultExpanded?: boolean }) {
+  const stateKind = useStore((s) => keyStateOf(entry.id));
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [draft, setDraft] = useState({ name: entry.name, base: entry.base, key: entry.key });
+  const [showSecret, setShowSecret] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const save = (): CustomEntry => {
+    const st = getState();
+    const next: CustomEntry = {
+      id: entry.id,
+      name: draft.name.trim() || entry.name || "カスタム",
+      base: draft.base.trim(),
+      key: draft.key.trim(),
+    };
+    update({
+      customs: st.customs.map((c) => (c.id === entry.id ? next : c)),
+      tested: Object.fromEntries(Object.entries(st.tested).filter(([k]) => k !== entry.id)),
+    });
+    return next;
+  };
+
+  const doSave = () => {
+    save();
+    toast(`「${draft.name.trim() || entry.name}」を保存しました`);
+  };
+
+  const doTest = async () => {
+    const saved = save();
+    setTesting(true);
+    setTestMsg(null);
+    const r = await testConnection(customDef(saved));
+    setTestMsg(r);
+    setTesting(false);
+  };
+
+  const doFetch = async () => {
+    const saved = save();
+    setTesting(true);
+    try {
+      const ids = await fetchModels(customDef(saved));
+      setTestMsg({ ok: true, msg: `モデルを${ids.length}件取得しました` });
+    } catch (e) {
+      setTestMsg({ ok: false, msg: e instanceof Error ? e.message : "取得に失敗しました" });
+    }
+    setTesting(false);
+  };
+
+  const doDelete = () => {
+    if (!window.confirm(`「${entry.name}」を削除しますか？`)) return;
+    const st = getState();
+    const fetchedModels = { ...st.fetchedModels };
+    delete fetchedModels[entry.id];
+    const modelFlags = { ...st.modelFlags };
+    delete modelFlags[entry.id];
+    const tested = { ...st.tested };
+    delete tested[entry.id];
+    const models = { ...st.conf.models };
+    delete models[entry.id];
+    update({
+      customs: st.customs.filter((c) => c.id !== entry.id),
+      fetchedModels,
+      modelFlags,
+      tested,
+      conf: {
+        ...st.conf,
+        models,
+        provider: st.conf.provider === entry.id ? "gemini" : st.conf.provider,
+      },
+    });
+    toast(`「${entry.name}」を削除しました`);
+  };
+
+  const def = customDef(entry);
+
+  return (
+    <div className="prov-item">
+      <button type="button" className="prov-head" onClick={() => setExpanded(!expanded)}>
+        <ProviderTile pid="custom" mono={def.mono} color={def.color} />
+        <span style={{ flex: 1 }}>
+          <span className="nm">{entry.name}</span>
+          <br />
+          <span className="st" style={{ color: stateKind === "ok" ? "var(--success)" : "var(--text-3)" }}>
+            {keyStateLabel(entry.id)}
+            {entry.base ? ` ・ ${entry.base}` : ""}
+          </span>
+        </span>
+        <Icon name="chevron" className="ic sm" />
+      </button>
+      {expanded && (
+        <div className="prov-body">
+          <p className="set-desc">
+            OpenAI互換エンドポイントへの接続です。通信はEluntraのサーバー経由で中継するため、ブラウザからの直接アクセス（CORS）を許可していない接続先でも使えます。
+          </p>
+          <div className="field">
+            <label htmlFor={`custom-name-${entry.id}`}>名前</label>
+            <input
+              id={`custom-name-${entry.id}`}
+              className="key-input"
+              type="text"
+              placeholder="例：私のOpenRouter"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              autoComplete="off"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor={`custom-base-${entry.id}`}>ベースURL</label>
+            <input
+              id={`custom-base-${entry.id}`}
+              className="key-input"
+              type="text"
+              placeholder="https://example.com/v1"
+              value={draft.base}
+              onChange={(e) => setDraft({ ...draft, base: e.target.value })}
+              autoComplete="off"
+            />
+            <div className="hint">OpenAI互換エンドポイントのURL（末尾の /v1 まで）</div>
+          </div>
+          <div className="field">
+            <label htmlFor={`custom-key-${entry.id}`}>APIキー</label>
+            <input
+              id={`custom-key-${entry.id}`}
+              className="key-input"
+              type={showSecret ? "text" : "password"}
+              placeholder="キー不要の場合は空欄でOK"
+              value={draft.key}
+              onChange={(e) => setDraft({ ...draft, key: e.target.value })}
+              autoComplete="off"
+            />
+          </div>
+          <div style={{ display: "flex", gap: 14, fontSize: 13 }}>
+            <button type="button" className="btn ghost sm" onClick={() => setShowSecret(!showSecret)} style={{ height: "auto", padding: 0 }}>
+              {showSecret ? "隠す" : "キーを表示"}
+            </button>
+          </div>
+          <div className="rowbtns">
+            <button type="button" className="btn primary sm" onClick={doSave}>保存</button>
+            <button type="button" className="btn secondary sm" onClick={doTest} disabled={testing}>
+              {testing ? "確認中…" : "接続テスト"}
+            </button>
+            <button type="button" className="btn secondary sm" onClick={doFetch} disabled={testing}>
+              一覧を取得
+            </button>
+            <button type="button" className="btn ghost sm" onClick={doDelete}>
               削除
             </button>
           </div>
@@ -358,9 +514,21 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
   const conf = useStore((s) => s.conf);
   const theme = useStore((s) => s.theme);
   const notes = useStore((s) => s.notes);
+  const customs = useStore((s) => s.customs);
   const user = currentUser();
   const loggedIn = isLoggedIn();
   const [syncMsg, setSyncMsg] = useState("");
+  const [freshCustomId, setFreshCustomId] = useState<string | null>(null);
+
+  const addCustom = () => {
+    const st = getState();
+    let n = st.customs.length + 1;
+    const names = new Set(st.customs.map((c) => c.name));
+    while (names.has(`カスタム${n}`)) n += 1;
+    const entry: CustomEntry = { id: newCustomId(), name: `カスタム${n}`, base: "", key: "" };
+    update({ customs: [...st.customs, entry] });
+    setFreshCustomId(entry.id);
+  };
 
   const setConf = (patch: Partial<typeof conf>) => {
     update({ conf: { ...getState().conf, ...patch } });
@@ -372,7 +540,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.3</span>
+          <span className="pill-state">現在の版：v6.4</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -475,11 +643,30 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             <div className="hint">Eluntra Autoは、質問の種類・思考レベル・接続テストの状態から自動で選びます。選択理由は回答に表示されます。</div>
           </div>
 
-          <div className="set-sec">APIプロバイダー（31社）</div>
+          <div className="set-sec">APIプロバイダー（30社）</div>
           <p className="set-desc">キーは端末内にのみ保存されます。複数社のキーを入れておくと、Eluntra Autoや自動フォールバックで使い分けられます。</p>
           {PROVIDERS.map((p) => (
             <ProviderItem key={`${open}-${p.id}`} p={p} toast={toast} />
           ))}
+
+          <div className="set-sec">カスタムプロバイダー</div>
+          <p className="set-desc">OpenAI互換の接続先を、何件でも自分で追加できます。名前は自由に付けられます。通信はEluntraのサーバー経由で中継するため、CORSを許可していない接続先でも使えます。URLとキーは端末内にのみ保存されます。</p>
+          {customs.length === 0 && (
+            <p className="set-desc">まだありません。「追加」から自分の接続先を作れます。</p>
+          )}
+          {customs.map((entry) => (
+            <CustomItem
+              key={`${open}-${entry.id}`}
+              entry={entry}
+              toast={toast}
+              defaultExpanded={entry.id === freshCustomId}
+            />
+          ))}
+          <div className="rowbtns">
+            <button type="button" className="btn secondary sm" onClick={addCustom}>
+              ＋ カスタムを追加
+            </button>
+          </div>
 
           <div className="set-sec">コネクタ（16種）</div>
           <p className="set-desc">「接続」を押すとログイン画面でつなぐ方式が基本です。GitHubはデバイスフローに対応していますが、GitHubアプリ側で有効化が必要です。その他のサービスは各サービスの開発者画面でのアプリ登録（1回限り）が済むまで「準備中」と表示します。トークンで接続できる5種は、各行の「トークンで接続（上級者向け）」から従来どおり使えます。接続情報は端末内にのみ保存されます。</p>
@@ -519,7 +706,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             すべてのデータを削除
           </button>
           <p className="set-desc" style={{ marginTop: 18 }}>
-            現在のプロバイダーは {conf.provider === "auto" ? "Eluntra Auto" : findProvider(conf.provider).name} です。
+            現在のプロバイダーは {conf.provider === "auto" ? "Eluntra Auto" : providerDefOf(conf.provider)?.name ?? "（未設定）"} です。
           </p>
         </div>
       </section>

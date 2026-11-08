@@ -1,5 +1,4 @@
-import { PROVIDERS } from "./providers/registry";
-import { getState, hasCredentials, selectedModel } from "./store";
+import { allProviders, getState, hasCredentials, selectedModel } from "./store";
 import type { ProviderDef } from "./types";
 
 /* Eluntra Auto：質問を分類し、接続済みの会社・モデルをスコアリングして選ぶ。
@@ -10,7 +9,7 @@ const PRIORITY = [
   "anthropic", "cohere", "cloudflare", "sambanova", "xai", "together", "fireworks",
   "nvidia", "novita", "hyperbolic", "siliconflow", "perplexity", "huggingface",
   "githubmodels", "ai21", "replicate", "bedrock", "azure", "vertex", "alephalpha",
-  "ollama", "lmstudio", "llamacpp", "custom",
+  "ollama", "lmstudio", "llamacpp",
 ];
 
 export type QuestionKind = "code" | "math" | "image" | "long" | "simple" | "general";
@@ -46,14 +45,17 @@ export interface AutoChoice {
 export function resolveAuto(text = "", opts: { hasImage?: boolean } = {}): AutoChoice | null {
   const st = getState();
   const kind = classifyQuestion(text, !!opts.hasImage);
-  const cands = PROVIDERS.filter(
+  const cands = allProviders().filter(
     (p) => hasCredentials(p.id) && !skip.has(p.id) && !p.local && (p.id !== "sambanova" || st.conf.proxyOn !== false),
   );
   if (!cands.length) return null;
   const scored = cands
     .map((p) => {
       const model = selectedModel(p.id);
-      let score = 1000 - PRIORITY.indexOf(p.id) * 4;
+      /* PRIORITY に無い id（カスタム等）は最下位として扱う（indexOf の -1 で最高点になる事故防止） */
+      const pIdx = PRIORITY.indexOf(p.id);
+      const rank = pIdx < 0 ? PRIORITY.length : pIdx;
+      let score = 1000 - rank * 4;
       if (st.tested[p.id]) score += 120;
       if (kind === "image") score += p.vision ? 200 : -500;
       if (kind === "code") {

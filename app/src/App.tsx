@@ -12,10 +12,9 @@ import { runAgent } from "./lib/agent/engine";
 import { handleAuthCallback, isLoggedIn, onAuthChange, pullSync, pushSync } from "./lib/auth";
 import { handleOAuthCallback } from "./lib/connectors/oauth";
 import { streamWithFallback } from "./lib/providers/chat";
-import { findProvider } from "./lib/providers/registry";
 import { UserError } from "./lib/providers/transport";
 import {
-  createSession, currentSession, ensureSession, getState, hasCredentials, pushRecent, runtime,
+  createSession, currentSession, ensureSession, getState, hasCredentials, isCustomId, providerDefOf, pushRecent, runtime,
   selectedModel, update, useStore,
 } from "./lib/store";
 import type { Attachment, ChatMessage, ChatSession } from "./lib/types";
@@ -85,15 +84,15 @@ export default function App() {
 
   const target = useMemo(() => {
     if (conf.provider === "auto") {
-      const any = ["gemini", "groq", "openai", "openrouter", "mistral", "deepseek", "anthropic", "cohere", "cerebras", "custom"].some(
+      const any = ["gemini", "groq", "openai", "openrouter", "mistral", "deepseek", "anthropic", "cohere", "cerebras"].some(
         (id) => hasCredentials(id),
-      );
+      ) || getState().customs.some((c) => hasCredentials(c.id));
       return { providerId: "gemini", ok: any || Object.keys(getState().keys).length > 0, label: "Eluntra Auto", model: "" };
     }
     return {
       providerId: conf.provider,
       ok: hasCredentials(conf.provider) || !!getState().tested[conf.provider],
-      label: findProvider(conf.provider).name,
+      label: providerDefOf(conf.provider)?.name ?? "—",
       model: selectedModel(conf.provider),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,7 +118,7 @@ export default function App() {
 
       // 画像を送れない会社では事前に案内する
       const firstChoice = conf.provider === "auto" ? resolveAuto(text, { hasImage }) : null;
-      const firstProvider = firstChoice?.provider ?? (conf.provider === "auto" ? null : findProvider(conf.provider));
+      const firstProvider = firstChoice?.provider ?? (conf.provider === "auto" ? null : providerDefOf(conf.provider) ?? null);
       if (firstProvider && hasImage && !firstProvider.vision) {
         patchSession(s.id, (x) => ({
           ...x,
@@ -177,7 +176,8 @@ export default function App() {
           }
           if (!provider) throw new UserError("接続済みのプロバイダーがありません。対処：設定でキーを保存してください。");
           const key = (getState().keys[provider.id] || "").trim();
-          if (!key && !provider.noKey) {
+          /* カスタムはキーがエントリ側にあり任意（空欄可）なので、この一律チェックから外す */
+          if (!key && !provider.noKey && !isCustomId(provider.id)) {
             setAi((m) => ({
               ...m,
               pending: false,
@@ -307,7 +307,7 @@ export default function App() {
     );
   }
 
-  const pillProvider = conf.provider === "auto" ? null : findProvider(conf.provider);
+  const pillProvider = conf.provider === "auto" ? null : providerDefOf(conf.provider) ?? null;
 
   return (
     <div className="app">

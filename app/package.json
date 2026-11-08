@@ -1,7 +1,7 @@
 {
   "name": "eluntra-rebuild",
   "private": true,
-  "version": "6.3.0",
+  "version": "6.4.0",
   "type": "module",
   "description": "Eluntra v6.3 — 1から作り直したBYOK AIチャット（React + TypeScript）",
   "scripts": {

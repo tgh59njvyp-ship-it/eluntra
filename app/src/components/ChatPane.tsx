@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { readPickedFiles } from "../lib/files";
-import { findProvider } from "../lib/providers/registry";
-import { getState, update, useStore } from "../lib/store";
+import { getState, providerDefOf, update, useStore } from "../lib/store";
 import type { Attachment, ChatMessage, ChatSession, Effort } from "../lib/types";
 import { Icon, ProviderTile } from "./icons";
 import { Markdown } from "./Markdown";
@@ -176,13 +175,7 @@ export function ChatPane({
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const provider = (() => {
-    try {
-      return findProvider(targetLabel.providerId);
-    } catch {
-      return null;
-    }
-  })();
+  const provider = providerDefOf(targetLabel.providerId) ?? null;
 
   return (
     <>
@@ -194,7 +187,7 @@ export function ChatPane({
               <p>
                 {conf.mode === "code"
                   ? "完成コードを受け取って、その場でプレビューできます。"
-                  : "31社のAIを、自分のAPIキーで使うチャットです。"}
+                  : "30社のAIを、自分のAPIキーで使うチャットです。カスタム接続も自分で作れます。"}
               </p>
               <div className="steps-hint">
                 <span>1 会社を選ぶ</span>

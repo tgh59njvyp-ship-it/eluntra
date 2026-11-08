@@ -3,8 +3,24 @@ import type { ProviderDef } from "../types";
 
 /** 中継サーバー（Vercel Edge Function）。キーは保存・記録されず、そのまま各社へ渡るだけ */
 export const PROXY_URL = "https://eluntra.vercel.app/api/proxy";
+/** カスタムプロバイダー専用中継（Vercel Node Function）。任意ホスト宛てをSSRFガードつきで中継する */
+export const CUSTOM_PROXY_URL = "https://eluntra.vercel.app/api/custom-proxy";
 export const SEARCH_URL = "https://eluntra.vercel.app/api/search";
 export const FETCHPAGE_URL = "https://eluntra.vercel.app/api/fetchpage";
+
+/**
+ * 通信経路の指定。
+ * - "auto": 既定（中継オンなら /api/proxy、オフなら直接）
+ * - "direct": 常にブラウザから直接
+ * - "backend": 常に /api/custom-proxy 経由（カスタムプロバイダー用。フォールバックなし）
+ */
+export type RouteMode = "auto" | "direct" | "backend";
+
+function normalizeMode(mode: RouteMode | boolean | undefined): RouteMode {
+  if (mode === true) return "direct";
+  if (mode === false || mode === undefined) return "auto";
+  return mode;
+}
 
 /** ユーザー側の問題（キー違い・モデルなし・上限など）だけを表すエラー。それ以外は画面に出さない */
 export class UserError extends Error {}
@@ -17,9 +33,15 @@ export function proxyEnabled(): boolean {
   return routeOverride ?? getState().conf.proxyOn !== false;
 }
 
-/** 経由オンなら中継へ、オフ／ローカルなら直接つなぐ */
-export async function apiFetch(url: string, opts?: RequestInit, forceDirect = false): Promise<Response> {
-  if (forceDirect || !proxyEnabled()) return fetch(url, opts);
+/** 経由オンなら中継へ、オフ／ローカルなら直接つなぐ。backend は常にカスタム専用中継へ */
+export async function apiFetch(url: string, opts?: RequestInit, mode: RouteMode | boolean = "auto"): Promise<Response> {
+  const m = normalizeMode(mode);
+  if (m === "backend") {
+    const headers = new Headers(opts?.headers);
+    headers.set("x-target-url", url);
+    return fetch(CUSTOM_PROXY_URL, { ...opts, headers });
+  }
+  if (m === "direct" || !proxyEnabled()) return fetch(url, opts);
   const headers = new Headers(opts?.headers);
   headers.set("x-target-url", url);
   return fetch(PROXY_URL, { ...opts, headers });
@@ -50,12 +72,12 @@ export async function fetchWithTimeout(
   opts: RequestInit,
   ms = 90000,
   signal?: AbortSignal,
-  forceDirect = false,
+  mode: RouteMode | boolean = "auto",
 ): Promise<Response> {
   const ctl = new AbortController();
   const timer = window.setTimeout(() => ctl.abort("timeout"), ms);
   try {
-    return await apiFetch(url, { ...opts, signal: signal ?? ctl.signal }, forceDirect);
+    return await apiFetch(url, { ...opts, signal: signal ?? ctl.signal }, mode);
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new Error("通信できませんでした");

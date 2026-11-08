@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { PROVIDERS } from "./providers/registry";
-import type { AppConfig, ChatSession, ModelMeta, Note } from "./types";
+import type { AppConfig, ChatSession, CustomEntry, ModelMeta, Note, ProviderDef } from "./types";
 
 /* localStorage のキーと JSON 形式は旧版と同一（引き継ぎ互換のため） */
 export const LS = {
@@ -18,6 +18,7 @@ export const LS = {
   connectors: "eluntra_connectors",
   connectorAccounts: "eluntra_connector_accounts",
   codes: "eluntra_codes",
+  customs: "eluntra_customs",
 } as const;
 
 export function readJSON<T>(key: string, fallback: T): T {
@@ -41,6 +42,13 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+let customSeq = 0;
+/** カスタムプロバイダー用の安定ID（作成後は変わらない） */
+export function newCustomId(): string {
+  customSeq += 1;
+  return `custom-${Date.now().toString(36)}-${customSeq.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export type ModelFlag = "free" | "paid";
 
 export interface AppState {
@@ -58,6 +66,8 @@ export interface AppState {
   connectors: Record<string, string>;
   connectorAccounts: Record<string, string>;
   codes: Record<string, string>;
+  /** 自分で作るカスタムプロバイダー（端末内のみ・同期対象外） */
+  customs: CustomEntry[];
   currentId: string | null;
   theme: "light" | "dark";
 }
@@ -87,12 +97,57 @@ function initialState(): AppState {
   } catch {
     theme = "light";
   }
+  const keys = readJSON<Record<string, string>>(LS.keys, {});
+  const tested = readJSON<Record<string, boolean>>(LS.tested, {});
+  const fetchedModels = readJSON<Record<string, string[]>>(LS.models, {});
+  const modelFlags = readJSON<Record<string, Record<string, ModelFlag>>>(LS.modelFlags, {});
+  let customs = readJSON<CustomEntry[]>(LS.customs, []);
+  if (!Array.isArray(customs)) customs = [];
+  /* v6.3 の単一「カスタム」（keys["custom"] = "base::key"）を v6.4 のエントリ形式へ移行する */
+  if (customs.length === 0 && (keys["custom"] || "").trim()) {
+    const parts = (keys["custom"] || "").split("::");
+    const base = (parts[0] || "").trim();
+    const key = parts.slice(1).join("::").trim();
+    if (base || key) {
+      const id = newCustomId();
+      customs = [{ id, name: "カスタム", base, key }];
+      writeJSON(LS.customs, customs);
+      if (fetchedModels["custom"]) {
+        fetchedModels[id] = fetchedModels["custom"];
+        delete fetchedModels["custom"];
+        writeJSON(LS.models, fetchedModels);
+      }
+      if (modelFlags["custom"]) {
+        modelFlags[id] = modelFlags["custom"];
+        delete modelFlags["custom"];
+        writeJSON(LS.modelFlags, modelFlags);
+      }
+      if (tested["custom"]) {
+        tested[id] = tested["custom"];
+        delete tested["custom"];
+        writeJSON(LS.tested, tested);
+      }
+      let confChanged = false;
+      if (conf.models["custom"]) {
+        conf.models[id] = conf.models["custom"];
+        delete conf.models["custom"];
+        confChanged = true;
+      }
+      if (conf.provider === "custom") {
+        conf.provider = id;
+        confChanged = true;
+      }
+      if (confChanged) writeJSON(LS.conf, conf);
+      delete keys["custom"];
+      writeJSON(LS.keys, keys);
+    }
+  }
   return {
-    keys: readJSON(LS.keys, {}),
-    tested: readJSON(LS.tested, {}),
-    fetchedModels: readJSON(LS.models, {}),
+    keys,
+    tested,
+    fetchedModels,
     modelMeta: readJSON(LS.modelMeta, {}),
-    modelFlags: readJSON(LS.modelFlags, {}),
+    modelFlags,
     favorites: readJSON(LS.favorites, {}),
     recents: readJSON(LS.recents, []),
     conf,
@@ -101,6 +156,7 @@ function initialState(): AppState {
     connectors: readJSON(LS.connectors, {}),
     connectorAccounts: readJSON(LS.connectorAccounts, {}),
     codes: readJSON(LS.codes, {}),
+    customs,
     currentId: null,
     theme,
   };
@@ -129,6 +185,7 @@ export function update(patch: Partial<AppState>): void {
   if (patch.connectors) writeJSON(LS.connectors, state.connectors);
   if (patch.connectorAccounts) writeJSON(LS.connectorAccounts, state.connectorAccounts);
   if (patch.codes) writeJSON(LS.codes, state.codes);
+  if (patch.customs) writeJSON(LS.customs, state.customs);
   if (patch.theme) writeJSON(LS.theme, state.theme);
   emit();
 }
@@ -153,7 +210,53 @@ export const runtime = {
   abortCtl: null as AbortController | null,
 };
 
-/* ---------- キーの複数欄ヘルパー（保存形式は旧版と同じ "::" 区切り） ---------- */
+/* ---------- カスタムプロバイダー（動的プロバイダー定義） ---------- */
+
+export const CUSTOM_MODELS_NOTE =
+  "モデルはベースURLの /models から自動取得します。通信はEluntraのサーバー経由で中継するため、CORSを許可していない接続先でも使えます。無料／通常の分類は、接続先が価格情報を返す場合と、モデルIDに :free が付く場合に判定します（判定材料がないモデルは「通常モデル」に入ります）。";
+
+/** カスタムエントリから実行時に使う ProviderDef を合成する */
+export function customDef(entry: CustomEntry): ProviderDef {
+  const name = (entry.name || "").trim() || "カスタム";
+  return {
+    id: entry.id,
+    name,
+    mono: name.slice(0, 2),
+    color: "#5B7C99",
+    kind: "openai",
+    base: entry.base,
+    keyUrl: "",
+    keyHint: "",
+    models: [],
+    defaultModel: "",
+    vision: true,
+    reasoning: true,
+    backendProxy: true,
+    modelsNote: CUSTOM_MODELS_NOTE,
+  };
+}
+
+/** 組み込み30社＋自分のカスタムすべて */
+export function allProviders(): ProviderDef[] {
+  return [...PROVIDERS, ...state.customs.map(customDef)];
+}
+
+/** id から ProviderDef を引く（組み込み→カスタムの順）。見つからなければ undefined */
+export function providerDefOf(id: string): ProviderDef | undefined {
+  const p = PROVIDERS.find((x) => x.id === id);
+  if (p) return p;
+  const entry = state.customs.find((c) => c.id === id);
+  return entry ? customDef(entry) : undefined;
+}
+
+/** その id がカスタムプロバイダーか（エントリ実在、または custom- 接頭辞） */
+export function isCustomId(id: string): boolean {
+  return id.startsWith("custom-") || state.customs.some((c) => c.id === id);
+}
+
+export function customEntryOf(id: string): CustomEntry | undefined {
+  return state.customs.find((c) => c.id === id);
+}
 
 export function keyFieldsOf(pid: string, raw: string): Record<string, string> {
   const p = PROVIDERS.find((x) => x.id === pid);
@@ -174,11 +277,12 @@ export function joinKeyFields(pid: string, values: Record<string, string>): stri
 
 /** その会社の実効ベースURL（Cloudflare/ローカル/Azure等の置換を含む） */
 export function effectiveBase(pid: string): string {
+  const entry = customEntryOf(pid);
+  if (entry) return (entry.base || "").trim().replace(/\/+$/, "");
   const p = PROVIDERS.find((x) => x.id === pid);
   if (!p) return "";
   const vals = keyFieldsOf(pid, state.keys[pid] || "");
   if (pid === "cloudflare") return p.base.replace("{account}", vals.acct || "");
-  if (pid === "custom") return (vals.base || "").trim().replace(/\/+$/, "");
   if (p.local) return (vals.base || "").trim() || p.base;
   if (pid === "azure") return (vals.endpoint || "").trim().replace(/\/$/, "");
   return p.base;
@@ -186,13 +290,14 @@ export function effectiveBase(pid: string): string {
 
 /** Bearer 等に使う実トークン */
 export function effectiveToken(pid: string): string {
+  const entry = customEntryOf(pid);
+  if (entry) return entry.key || "";
   const p = PROVIDERS.find((x) => x.id === pid);
   if (!p) return "";
   const raw = (state.keys[pid] || "").trim();
   if (!p.fields?.length) return raw;
   const vals = keyFieldsOf(pid, raw);
   if (pid === "cloudflare") return vals.token || "";
-  if (pid === "custom") return vals.key || "";
   if (pid === "azure") return vals.key || "";
   if (pid === "vertex") return vals.token || "";
   if (p.local) return vals.key || "";
@@ -201,6 +306,8 @@ export function effectiveToken(pid: string): string {
 
 /** 入力が揃っているか（ローカルは接続テスト成功で判定） */
 export function hasCredentials(pid: string): boolean {
+  const entry = customEntryOf(pid);
+  if (entry) return (entry.base || "").trim().length > 0;
   const p = PROVIDERS.find((x) => x.id === pid);
   if (!p) return false;
   if (p.noKey) return !!state.tested[pid];
@@ -213,6 +320,8 @@ export function hasCredentials(pid: string): boolean {
 
 export function keyStateOf(pid: string): "ok" | "set" | "none" {
   if (state.tested[pid]) return "ok";
+  const entry = customEntryOf(pid);
+  if (entry) return (entry.base || "").trim() ? "set" : "none";
   if ((state.keys[pid] || "").trim()) return "set";
   const p = PROVIDERS.find((x) => x.id === pid);
   if (p?.noKey && p.fields?.length) {
@@ -261,14 +370,14 @@ export function ensureSession(): ChatSession {
 }
 
 export function selectedModel(pid: string): string {
-  const p = PROVIDERS.find((x) => x.id === pid);
+  const p = providerDefOf(pid);
   if (!p) return "";
   return state.conf.models[pid] || p.defaultModel;
 }
 
 export function modelListOf(pid: string): string[] {
   const fetched = state.fetchedModels[pid];
-  const p = PROVIDERS.find((x) => x.id === pid);
+  const p = providerDefOf(pid);
   const base = fetched && fetched.length ? fetched : p?.models || [];
   const favs = state.favorites[pid] || [];
   const rest = base.filter((m) => !favs.includes(m));
@@ -303,7 +412,7 @@ export function resetAllData(): void {
       /* ignore */
     }
   });
-  state = { ...initialState(), sessions: [], notes: [], keys: {}, tested: {}, currentId: null };
+  state = { ...initialState(), sessions: [], notes: [], keys: {}, tested: {}, customs: [], currentId: null };
   state.conf = defaultConf();
   PROVIDERS.forEach((p) => {
     state.conf.models[p.id] = p.defaultModel;

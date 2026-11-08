@@ -1,7 +1,7 @@
-import { effectiveBase, effectiveToken, getState, keyFieldsOf, update, type ModelFlag } from "../store";
+import { effectiveBase, effectiveToken, getState, isCustomId, keyFieldsOf, update, type ModelFlag } from "../store";
 import type { ChatMessage, Effort, ProviderDef, SourceLink, TestResult } from "../types";
 import { signRequest } from "./bedrock";
-import { apiFetch, fetchWithTimeout, friendlyError, proxyEnabled, readSse, setRouteOverride, UserError } from "./transport";
+import { apiFetch, fetchWithTimeout, friendlyError, proxyEnabled, readSse, setRouteOverride, UserError, type RouteMode } from "./transport";
 
 /**
  * プロバイダーアダプター群（新規実装）。
@@ -97,14 +97,21 @@ function openaiMessages(p: ProviderDef, history: ChatMessage[], effort: Effort) 
 /** カスタム等のベースURL必須プロバイダーで未入力のときの案内 */
 function missingBaseError(p: ProviderDef): UserError {
   return new UserError(
-    `ベースURLが未入力です。対処：設定の「${p.name}」を開き、ベースURLを入力して保存してください。`,
+    `ベースURLが未入力です。対処：設定の「カスタムプロバイダー」で「${p.name}」を開き、ベースURLを入力して保存してください。`,
   );
+}
+
+/** プロバイダーごとの通信経路（カスタムはバックエンド中継、ローカルは直接、それ以外は自動） */
+function routeModeOf(p: ProviderDef): RouteMode {
+  if (p.backendProxy) return "backend";
+  if (p.local) return "direct";
+  return "auto";
 }
 
 async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[], onDelta: OnDelta, signal?: AbortSignal): Promise<ChatResult> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
-  if (p.direct && !base) throw missingBaseError(p);
+  if (p.backendProxy && !base) throw missingBaseError(p);
   const effort = getState().conf.effort;
   const body: Record<string, unknown> = {
     model,
@@ -116,7 +123,7 @@ async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
-  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!(p.local || p.direct));
+  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, routeModeOf(p));
   if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const text = await readSse(
     res,
@@ -129,7 +136,7 @@ async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[
 async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessage[], signal?: AbortSignal): Promise<ChatResult> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
-  if (p.direct && !base) throw missingBaseError(p);
+  if (p.backendProxy && !base) throw missingBaseError(p);
   const effort = getState().conf.effort;
   const body: Record<string, unknown> = {
     model,
@@ -140,7 +147,7 @@ async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessag
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
-  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, !!(p.local || p.direct));
+  const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, routeModeOf(p));
   if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
   const j = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
@@ -448,7 +455,7 @@ export async function streamWithFallback(
     if (t) lastText = t;
     onDelta(t);
   };
-  const routes: Array<boolean | null> = p.local || p.direct ? [null] : [null, getState().conf.proxyOn === false];
+  const routes: Array<boolean | null> = p.local || p.backendProxy ? [null] : [null, getState().conf.proxyOn === false];
   let lastErr: unknown = null;
   for (const r of routes) {
     setRouteOverride(r);
@@ -477,7 +484,7 @@ export async function streamWithFallback(
 function modelsRequest(p: ProviderDef): Promise<Response> {
   const key = effectiveToken(p.id);
   const base = effectiveBase(p.id);
-  if (p.direct && !base) return Promise.reject(missingBaseError(p));
+  if (p.backendProxy && !base) return Promise.reject(missingBaseError(p));
   if (p.kind === "gemini") return apiFetch(`${p.base}/models?key=${encodeURIComponent(key)}`);
   if (p.kind === "anthropic") {
     return apiFetch(`${p.base}/models`, {
@@ -496,16 +503,16 @@ function modelsRequest(p: ProviderDef): Promise<Response> {
   }
   const headers: Record<string, string> = {};
   if (key) headers.Authorization = `Bearer ${key}`;
-  return apiFetch(`${base}/models`, { headers }, !!(p.local || p.direct));
+  return apiFetch(`${base}/models`, { headers }, routeModeOf(p));
 }
 
 export async function testConnection(p: ProviderDef): Promise<TestResult> {
   const st = getState();
   const raw = (st.keys[p.id] || "").trim();
-  if (p.direct && !effectiveBase(p.id)) {
+  if (p.backendProxy && !effectiveBase(p.id)) {
     return { ok: false, msg: "ベースURLが未入力です。対処：上の「ベースURL」欄に接続先URLを入力して保存してください。" };
   }
-  if (!p.noKey && !raw) return { ok: false, msg: "キーが未入力です。上の欄にキーを貼ってください。" };
+  if (!p.noKey && !raw && !isCustomId(p.id)) return { ok: false, msg: "キーが未入力です。上の欄にキーを貼ってください。" };
   if (p.id === "sambanova" && !proxyEnabled()) return { ok: false, msg: SAMBA_MSG };
   try {
     // 一覧APIがない会社は、その会社なりの確認方法で疎通を確かめる
@@ -555,7 +562,9 @@ export async function testConnection(p: ProviderDef): Promise<TestResult> {
       ok: false,
       msg: p.local
         ? "接続先に届きませんでした。対処：ローカルサーバーが起動しているか、接続先URLが合っているか確認してください（スマホからは自宅PCの localhost に届きません）。"
-        : "いま接続を確認できませんでした。対処：電波の良い場所でもう一度試してください。",
+        : p.backendProxy
+          ? "接続先に届きませんでした。対処：ベースURLが正しいか、接続先サーバーが応答するか確認してください。"
+          : "いま接続を確認できませんでした。対処：電波の良い場所でもう一度試してください。",
     };
   }
 }
@@ -595,8 +604,8 @@ async function bedrockFoundationModels(p: ProviderDef): Promise<string[]> {
 export async function fetchModels(p: ProviderDef): Promise<string[]> {
   const st = getState();
   const raw = (st.keys[p.id] || "").trim();
-  if (p.direct && !effectiveBase(p.id)) throw missingBaseError(p);
-  if (!p.noKey && !raw) throw new UserError(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
+  if (p.backendProxy && !effectiveBase(p.id)) throw missingBaseError(p);
+  if (!p.noKey && !raw && !isCustomId(p.id)) throw new UserError(`キーが未設定です。先に設定で${p.name}のキーを保存してください。`);
   if (p.id === "sambanova" && !proxyEnabled()) throw new Error(SAMBA_MSG);
   if (p.modelsMode === "none") {
     saveModelMeta(p, p.modelsNote || "一覧APIがないため初期値を表示しています");
@@ -638,7 +647,7 @@ export async function fetchModels(p: ProviderDef): Promise<string[]> {
     tested: { ...cur.tested, [p.id]: true },
   };
   // 無料／通常の分類は、価格情報を持つ会社（カスタム・OpenRouter）だけ保存する
-  if (p.id === "custom" || p.id === "openrouter") {
+  if (isCustomId(p.id) || p.id === "openrouter") {
     const flags: Record<string, ModelFlag> = {};
     ids.forEach((id) => {
       flags[id] = rawFlags[id] ?? "paid";

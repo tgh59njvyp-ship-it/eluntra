@@ -22,9 +22,10 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
     <div className="welcome">
       <div className="welcome-inner">
         <span className="logo" style={{ fontSize: 26 }}>Eluntra</span>
-        <h1>31社のAIを、<br />自分のキーで。</h1>
+        <h1>30社のAIを、<br />自分のキーで。</h1>
         <p className="lead">
-          OpenAI・Gemini・Claudeなど31社のAIを、自分のAPIキー（BYOK）で使うチャットです。
+          OpenAI・Gemini・Claudeなど30社のAIを、自分のAPIキー（BYOK）で使うチャットです。
+          自分専用のカスタム接続も作れます。
           キーは端末の中にだけ保存され、選んだ会社のAPIへ直接つながります。
         </p>
         <div className="login-col">
