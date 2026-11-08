@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eluntra は引っ越しました</title>
+<style>
+  body { margin: 0; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; background: #fff; color: #1a1a1a; }
+  .box { max-width: 560px; margin: 12vh auto 0; padding: 0 24px; }
+  h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+  p { font-size: 14.5px; line-height: 1.8; margin: 0 0 10px; }
+  a { color: #2563eb; }
+  .note { color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <h1>Eluntra は引っ越しました</h1>
+  <p>Eluntra は <a href="https://eluntra.vercel.app/">https://eluntra.vercel.app</a> に引っ越しました。自動で移動します。</p>
+  <p>自動で移動しない場合は、上のリンクを押してください。</p>
+  <p class="note">以前のURLで使っていたデータ（キー・会話など）は、新しいURLの設定にある「データの引き継ぎ」から取り込めます。</p>
+</div>
+<script>
+(function () {
+  var CANONICAL = "https://eluntra.vercel.app";
+  var params = new URLSearchParams(location.search);
+  var iframed = window.parent !== window;
+
+  /* 引き継ぎ用エクスポーター：新しいURLから iframe で埋め込まれた時だけ動作する */
+  if (iframed && params.get("migrate_export") === "1") {
+    var parentOrigin = "";
+    try {
+      parentOrigin = (location.ancestorOrigins && location.ancestorOrigins[0]) || "";
+    } catch (e) { /* ignore */ }
+    var allowed =
+      parentOrigin === CANONICAL ||
+      parentOrigin === "http://localhost" ||
+      parentOrigin === "http://127.0.0.1" ||
+      parentOrigin.indexOf("http://localhost:") === 0 ||
+      parentOrigin.indexOf("http://127.0.0.1:") === 0;
+    if (allowed) {
+      var data = {};
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf("eluntra_") === 0) {
+            var v = localStorage.getItem(k);
+            if (v !== null) data[k] = v;
+          }
+        }
+      } catch (e) { /* ignore */ }
+      window.parent.postMessage({ type: "eluntra-export-v1", data: data }, parentOrigin);
+      document.getElementById("box").innerHTML = "<p>引き継ぎデータを送信しました。</p>";
+    } else {
+      document.getElementById("box").innerHTML = "<p>引き継ぎデータの送信先を確認できませんでした。</p>";
+    }
+    return;
+  }
+
+  /* 通常アクセスは新しいURLへ自動遷移する（iframe 内では遷移しない） */
+  if (!iframed) {
+    setTimeout(function () {
+      location.replace(CANONICAL + "/");
+    }, 1500);
+  }
+})();
+</script>
+</body>
+</html>
