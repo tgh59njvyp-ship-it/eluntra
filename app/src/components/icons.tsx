@@ -47,11 +47,12 @@ export function hasLogo(id: string): boolean {
 }
 
 /* コネクタの公式ロゴ（public/logos/conn-<id>.svg に同梱。出典は DESIGN.md に記録）。
-   16種すべて Simple Icons に実在するブランドマークを取得済み。 */
+   17種すべて Simple Icons に実在するブランドマークを取得済み。 */
 const CONNECTOR_LOGO_IDS = new Set([
   "github", "youtube", "notion", "discord", "slack",
   "gdrive", "gcal", "gmail", "gdocs", "gsheets",
   "onedrive", "outlook", "dropbox", "linear", "trello", "jira",
+  "supabase",
 ]);
 
 export function hasConnectorLogo(id: string): boolean {

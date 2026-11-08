@@ -80,3 +80,10 @@ v6.0は旧コードを流用せず、React + TypeScript で1から設計し直�
   - Google系：client_id は Supabase ログイン用アプリのものが取得できたが、リダイレクトURIが Supabase コールバック専用のため、コネクタ用には REDIRECT_URI の追加登録とシークレットの環境変数登録が別途必要
   - Trello：認可コード方式ではなく独自方式のため汎用エンジンの対象外と明記
   - トークン貼り付けは主UIから撤去し、実働5種（GitHub／YouTube／Notion／Slack／Discord）の行末に「トークンで接続（上級者向け）」の折りたたみとしてのみ残した。トークン接続済みのサービスは従来どおり「接続中」と表示される
+
+## v6.5（2026-11-08）Supabaseコネクタとブラウザツール
+
+- コネクタに Supabase を追加し17種に。ロゴ（`conn-supabase.svg`）は Simple Icons（現行版）から取得
+- Supabase の接続は2方式：ログイン式（Management API OAuth、`OAUTH_SERVICES.supabase`。アプリ登録が済むまで「準備中」）とトークン式（プロジェクトURL＋サービスロールキー＋任意で sbp_、接続情報を JSON で端末内保存・同期対象外）
+- エージェントの Supabase ツール（tables/select/insert/update/delete/sql/auth_users）はコネクタ接続時のみ実働し、未接続時は接続を促すメッセージを返す。update/delete はフィルタ必須で全件書き込みを拒否する
+- エージェントに「ブラウザ」ツールを追加。実ブラウザではなく Vercel Node Function `/api/browser`（サーバー側の軽量ブラウザ：取得・リンク/フォーム抽出・送信、Cookie はクライアント側 sessionStorage で保持）。制限（JS描画不可・ログイン必須ページ不可）はツール説明と README に明記する

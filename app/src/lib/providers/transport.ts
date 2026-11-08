@@ -7,6 +7,8 @@ export const PROXY_URL = "https://eluntra.vercel.app/api/proxy";
 export const CUSTOM_PROXY_URL = "https://eluntra.vercel.app/api/custom-proxy";
 export const SEARCH_URL = "https://eluntra.vercel.app/api/search";
 export const FETCHPAGE_URL = "https://eluntra.vercel.app/api/fetchpage";
+/** エージェント「ブラウザ」ツールの中継（Vercel Node Function。サーバー側の軽量ブラウザ） */
+export const BROWSER_URL = "https://eluntra.vercel.app/api/browser";
 
 /**
  * 通信経路の指定。

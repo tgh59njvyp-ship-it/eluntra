@@ -370,7 +370,57 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
     ? account ? `${account} として接続中` : "接続中"
     : id === "github"
       ? "ログインで接続（GitHub側でデバイスフローの有効化が必要）"
-      : "準備中（アプリ登録が必要）";
+      : id === "supabase"
+        ? "トークンで接続できます（ログイン式は準備中）"
+        : "準備中（アプリ登録が必要）";
+
+  /* Supabase トークン式接続（プロジェクトURL＋サービスロールキー＋任意でsbp_） */
+  const [sbUrl, setSbUrl] = useState("");
+  const [sbServiceKey, setSbServiceKey] = useState("");
+  const [sbSbp, setSbSbp] = useState("");
+  useEffect(() => {
+    if (id !== "supabase" || !panel) return;
+    const raw = (getState().connectors["supabase"] || "").trim();
+    if (raw.startsWith("{")) {
+      try {
+        const j = JSON.parse(raw) as { url?: string; serviceKey?: string; sbp?: string };
+        setSbUrl(j.url || "");
+        setSbServiceKey(j.serviceKey || "");
+        setSbSbp(j.sbp || "");
+      } catch { /* 壊れた保存値は無視する */ }
+    }
+  }, [id, panel]);
+
+  const saveSupabase = () => {
+    const st = getState();
+    const next = { ...st.connectors };
+    const obj = {
+      url: sbUrl.trim().replace(/\/+$/, ""),
+      serviceKey: sbServiceKey.trim(),
+      sbp: sbSbp.trim(),
+    };
+    if (!obj.url && !obj.serviceKey && !obj.sbp) {
+      /* 空保存でログイン式のトークンを消さない（トークン式の保存値だけ消す） */
+      if ((next[id] || "").trim().startsWith("{")) delete next[id];
+    } else {
+      next[id] = JSON.stringify(obj);
+    }
+    update({ connectors: next });
+  };
+
+  const testSupabase = async () => {
+    saveSupabase();
+    setBusy(true);
+    const r = await testConnector("supabase");
+    if (r.ok) {
+      const m = sbUrl.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/i);
+      if (m) {
+        update({ connectorAccounts: { ...getState().connectorAccounts, [id]: `プロジェクト ${m[1]}` } });
+      }
+    }
+    setMsg(r);
+    setBusy(false);
+  };
 
   return (
     <div className="prov-item">
@@ -451,7 +501,7 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
               )}
             </>
           )}
-          {supported && (
+          {supported && id !== "supabase" && (
             <details className="conn-fallback">
               <summary>トークンで接続（上級者向け）</summary>
               {help && <p className="set-desc">{help}</p>}
@@ -504,6 +554,73 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
               {msg && <div className={`testmsg ${msg.ok ? "ok" : "ng"}`}>{msg.msg}</div>}
             </details>
           )}
+          {id === "supabase" && (
+            <details className="conn-fallback">
+              <summary>トークンで接続（上級者向け）</summary>
+              <p className="set-desc">
+                Supabase の Settings → API で確認できる「プロジェクトURL」と「サービスロールキー（service_role）」を入力します。
+                接続すると、エージェントがテーブル操作（読み書き）・認証ユーザーの管理を行えます。
+              </p>
+              <p className="set-desc">
+                サービスロールキーはデータベースへのフルアクセス権限を持つ重要なキーです。この端末内にのみ保存され、クラウド同期はされません。
+                アクセストークン（sbp_）も入れると、エージェントが SQL も実行できます（URL＋サービスロールキーだけでも接続できます）。
+              </p>
+              <div className="field">
+                <label>プロジェクトURL</label>
+                <input
+                  className="key-input"
+                  type="text"
+                  placeholder="https://xxxxx.supabase.co"
+                  value={sbUrl}
+                  onChange={(e) => setSbUrl(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="field">
+                <label>サービスロールキー（service_role）</label>
+                <input
+                  className="key-input"
+                  type="password"
+                  placeholder="eyJ…（service_role キー）"
+                  value={sbServiceKey}
+                  onChange={(e) => setSbServiceKey(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="field">
+                <label>アクセストークン（任意・SQL実行用）</label>
+                <input
+                  className="key-input"
+                  type="password"
+                  placeholder="sbp_…"
+                  value={sbSbp}
+                  onChange={(e) => setSbSbp(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="rowbtns">
+                <button
+                  type="button"
+                  className="btn primary sm"
+                  onClick={() => {
+                    saveSupabase();
+                    toast("Supabaseの接続情報を保存しました");
+                  }}
+                >
+                  保存
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary sm"
+                  disabled={busy}
+                  onClick={() => void testSupabase()}
+                >
+                  {busy ? "確認中…" : "接続テスト"}
+                </button>
+              </div>
+              {msg && <div className={`testmsg ${msg.ok ? "ok" : "ng"}`}>{msg.msg}</div>}
+            </details>
+          )}
         </div>
       )}
     </div>
@@ -540,7 +657,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.4</span>
+          <span className="pill-state">現在の版：v6.5</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
@@ -668,8 +785,8 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
             </button>
           </div>
 
-          <div className="set-sec">コネクタ（16種）</div>
-          <p className="set-desc">「接続」を押すとログイン画面でつなぐ方式が基本です。GitHubはデバイスフローに対応していますが、GitHubアプリ側で有効化が必要です。その他のサービスは各サービスの開発者画面でのアプリ登録（1回限り）が済むまで「準備中」と表示します。トークンで接続できる5種は、各行の「トークンで接続（上級者向け）」から従来どおり使えます。接続情報は端末内にのみ保存されます。</p>
+          <div className="set-sec">コネクタ（17種）</div>
+          <p className="set-desc">「接続」を押すとログイン画面でつなぐ方式が基本です。GitHubはデバイスフローに対応していますが、GitHubアプリ側で有効化が必要です。その他のサービスは各サービスの開発者画面でのアプリ登録（1回限り）が済むまで「準備中」と表示します。トークンで接続できるもの（GitHub / YouTube / Notion / Slack / Discord の5種と Supabase）は、各行の「トークンで接続（上級者向け）」から従来どおり使えます。Supabaseを接続すると、エージェントがデータベース操作や認証ユーザー管理を行えます。接続情報は端末内にのみ保存されます。</p>
           {CONNECTORS.map((c) => (
             <ConnectorItem key={`${open}-${c.id}`} {...c} toast={toast} />
           ))}

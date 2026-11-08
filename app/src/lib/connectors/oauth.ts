@@ -28,6 +28,12 @@ export const REDIRECT_URI = "https://eluntra.vercel.app/connectors/callback";
 
 const GITHUB_CLIENT_ID = "Ov23livoDT2raVlwV2o1";
 const GOOGLE_CLIENT_ID = "743031984555-f4b1v8tsqkp7o2jqopiifgkgfblg88c5.apps.googleusercontent.com";
+/* Supabase Management API OAuth アプリの client_id（公開値）。
+   アプリ登録が完了したら、ここに値を入れて OAUTH_SERVICES.supabase の
+   clientIdKnown を true にするとログイン式接続が有効になる。
+   あわせて Vercel 環境変数 OAUTH_SUPABASE_CLIENT_ID / OAUTH_SUPABASE_CLIENT_SECRET
+   の登録が必要（トークン交換は /api/oauth/exchange が行う）。 */
+const SUPABASE_CLIENT_ID = "";
 
 const API_BASE =
   typeof window !== "undefined" && window.location.hostname.endsWith("vercel.app")
@@ -42,6 +48,8 @@ export interface OAuthService {
   userInfoUrl?: string;
   /** client_id が判明しているか（Google系は判明済み、その他は未登録） */
   clientIdKnown: boolean;
+  /** サービス固有の client_id（公開値）。未指定なら Google 系のものを使う */
+  clientId?: string;
   /** 開発者画面で登録するときの注意 */
   note: string;
   extraAuthorizeParams?: Record<string, string>;
@@ -145,6 +153,18 @@ export const OAUTH_SERVICES: Record<string, OAuthService> = {
     note: "Atlassian Developer Console で OAuth 2.0 (3LO) アプリを作成し、コールバックURLとクライアント情報を登録する必要があります。",
     extraAuthorizeParams: { audience: "api.atlassian.com", prompt: "consent" },
   },
+  /* Supabase Management API の OAuth 2.0。認可・トークン交換とも
+     api.supabase.com 配下。アカウント確認専用エンドポイントは無いため、
+     接続確認はプロジェクト一覧（GET /v1/projects）の成功で代替する
+     （交換側 /api/oauth/exchange の SERVICES.supabase を参照）。
+     リフレッシュトークンが発行される場合も、保存形式は他のサービスと
+     同じくアクセストークン文字列とし、失効したら再接続する運用にする。 */
+  supabase: {
+    id: "supabase", authorizeUrl: "https://api.supabase.com/v1/oauth/authorize",
+    tokenUrl: "https://api.supabase.com/v1/oauth/token",
+    scopes: "projects:read projects:write", clientIdKnown: false, clientId: SUPABASE_CLIENT_ID,
+    note: "Supabase 側で OAuth アプリの登録（リダイレクトURIの登録）と、クライアント情報の Vercel 環境変数への登録が必要です。登録が完了するとログインだけで繋がり、Management API（SQL実行など）が使えるようになります。それまでは「トークンで接続（上級者向け）」からプロジェクトURL＋サービスロールキーで接続できます。",
+  },
 };
 
 /** 現時点で実際にOAuth接続まで進めるサービスか（サーバー側シークレット登録が前提のため、現在は全て false） */
@@ -176,7 +196,7 @@ interface PendingOAuth { service: string; state: string; verifier: string }
 export async function startOAuth(id: string): Promise<void> {
   const svc = OAUTH_SERVICES[id];
   if (!svc) throw new Error("このサービスはOAuth設定がありません");
-  const clientId = id in OAUTH_SERVICES && svc.clientIdKnown ? GOOGLE_CLIENT_ID : "";
+  const clientId = svc.clientIdKnown ? svc.clientId || GOOGLE_CLIENT_ID : "";
   if (!clientId) throw new Error("クライアント情報が未登録のため、まだ認可画面へ進めません");
   const state = randomString(24);
   const verifier = randomString(64);

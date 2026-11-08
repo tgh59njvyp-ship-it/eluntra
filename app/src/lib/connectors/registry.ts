@@ -1,16 +1,19 @@
 import { getState } from "../store";
 
 /**
- * コネクタレジストリ（16種）。
+ * コネクタレジストリ（17種）。
  * 接続体験は「押すとログイン画面に飛ぶ」ChatGPT式を主役にする（lib/connectors/oauth.ts）。
  * 現時点で実際に接続できるのは、トークン方式で本当に動く5種（GitHub／YouTube／Notion／
  * Slack／Discord、設定の折りたたみ「トークンで接続」から）と、GitHubのデバイスフロー
- * （ただしGitHubアプリ側でデバイスフローの有効化が済んだ場合のみ）だけ。
+ * （ただしGitHubアプリ側でデバイスフローの有効化が済んだ場合のみ）、そして Supabase
+ * （トークン方式＝プロジェクトURL＋サービスロールキー等。ログイン式はアプリ登録待ち）。
  * その他のサービスは OAuth アプリ登録（1回限り）が済むまで「準備中」と明示し、
  * 接続済みには見せない。
  * トークンは APIキーとは別枠（eluntra_connectors）で端末内にのみ保存する。
  * ロゴは全種とも公式ブランドマーク（public/logos/conn-<id>.svg、出典は DESIGN.md）。
  */
+
+import { testSupabaseConnection } from "./supabase";
 
 export interface ConnectorDef {
   id: string;
@@ -42,6 +45,7 @@ export const CONNECTORS: ConnectorDef[] = [
   { id: "linear", name: "Linear", mono: "Li", color: "#5E6AD2", supported: false, desc: "課題の検索" },
   { id: "trello", name: "Trello", mono: "Tr", color: "#0F5FA8", supported: false, desc: "ボード・カードの参照" },
   { id: "jira", name: "Jira", mono: "Ji", color: "#0F5FA8", supported: false, desc: "課題の検索" },
+  { id: "supabase", name: "Supabase", mono: "Su", color: "#1E7A4F", supported: true, desc: "データベース・認証（ログイン機能）をエージェントが操作できます", help: "プロジェクトURL＋サービスロールキーで、エージェントがテーブル操作・SQL・認証ユーザー管理を行えます" },
 ];
 
 export function connectorToken(id: string): string {
@@ -49,6 +53,7 @@ export function connectorToken(id: string): string {
 }
 
 export async function testConnector(id: string): Promise<{ ok: boolean; msg: string }> {
+  if (id === "supabase") return testSupabaseConnection();
   const token = connectorToken(id);
   if (!token) return { ok: false, msg: "トークンが未入力です" };
   try {

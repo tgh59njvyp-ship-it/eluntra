@@ -1,4 +1,4 @@
-# Eluntra（v6.4・作り直し版）
+# Eluntra（v6.5・作り直し版）
 
 30社のAIプロバイダーを、自分のAPIキー（BYOK）で使うAIチャットプラットフォーム。さらに、OpenAI互換のカスタム接続を自分で何件でも作れます。
 v6.0は旧バージョンのコードを流用せず、React 18 + Vite + TypeScript（strict）で1から作り直した版です。
@@ -28,8 +28,8 @@ OpenAI / Google Gemini / Anthropic / Mistral AI / Groq / OpenRouter / Cohere / C
 - BYOK（複数欄キー対応・マスキング・接続テスト・モデル一覧の自動/手動取得・取得日時・お気に入り・最近使用）
 - Eluntra Auto（質問分類でスコアリングし、選択理由を表示。失敗時は次候補へ自動切替）
 - 思考レベル Low / Medium / High / Super high（対応範囲で実リクエストへ反映）
-- Agent Mode（Web検索・ページ取得・JS実行・日時・メモ・コネクタツール、最大8手順、出典表示）
-- コネクタ16種（公式ロゴ表示。接続はログイン式が基本で、実働はトークン方式の GitHub / YouTube / Notion / Slack / Discord の5種。GitHubはデバイスフロー実装済みだがアプリ側の有効化待ち。その他はOAuthアプリ登録が必要なため「準備中」と明示。詳細は下記 v6.2 の変更）
+- Agent Mode（Web検索・ページ取得・JS実行・日時・メモ・コネクタツール・Supabase操作・ブラウザ、最大8手順、出典表示）
+- コネクタ17種（公式ロゴ表示。接続はログイン式が基本で、実働はトークン方式の GitHub / YouTube / Notion / Slack / Discord の5種と Supabase。GitHubはデバイスフロー実装済みだがアプリ側の有効化待ち。Supabaseのログイン式はOAuthアプリ登録が必要なため「準備中」と明示。詳細は下記 v6.5 の変更）
 - ファイル添付（テキスト系と画像。PDF・DOCX・XLSXは未対応と明示）
 - コードモード（端末幅プレビュー 390/430/768/1280/全幅、コード表示、Zip保存）
 - チャット（ストリーミング、Markdown、履歴の検索・削除、再生成、編集、コピー）
@@ -59,6 +59,25 @@ npm run build   # tsc strict + vite build
   - その他のサービス：認可コード＋PKCE の汎用エンジン＋設定テーブル、戻り先ページ（/connectors/callback）、トークン交換エンドポイント（/api/oauth/exchange、シークレットは Vercel 環境変数・未登録）まで基盤を実装。実際に繋げるには各サービスの開発者画面でのアプリ登録（リダイレクト先 https://eluntra.vercel.app/connectors/callback とクライアント情報）＋シークレットの環境変数登録が必要で、未登録の間はアプリ内で説明を表示して「準備中」とする
   - Google系について：client_id は既存ログイン用アプリから取得できたが、そのリダイレクトURIは Supabase コールバック（https://rzgldbedsjocmvqrfdhf.supabase.co/auth/v1/callback）専用登録のため、コネクタ用リダイレクトURIの追加登録なしには認可が進まない。これが「あと何をすれば繋がるか」の具体的な残作業
   - トークン入力欄は主UIから撤去し、実働5種のみ「トークンで接続（上級者向け）」の折りたたみに残置
+
+## v6.5の変更
+
+- **コネクタに Supabase を追加（17種目）**。ロゴは Simple Icons（現行版）から取得し `app/public/logos/conn-supabase.svg` に同梱
+  - 接続方法は2つ：
+    - **ブラウザでログイン（OAuth）**：Supabase Management API の OAuth 2.0（認可 `https://api.supabase.com/v1/oauth/authorize`、トークン `https://api.supabase.com/v1/oauth/token`、スコープ `projects:read projects:write`）。`lib/connectors/oauth.ts` の汎用PKCEエンジンにサービス定義を追加した。**有効化の状態：現時点では未有効化（「準備中」表示）**。有効化に必要なのは、(1) Supabase 側で OAuth アプリを登録しリダイレクトURI `https://eluntra.vercel.app/connectors/callback` を許可すること、(2) 発行された client_id を `oauth.ts` の `SUPABASE_CLIENT_ID` に入れて `clientIdKnown: true` にすること、(3) Vercel 環境変数 `OAUTH_SUPABASE_CLIENT_ID` / `OAUTH_SUPABASE_CLIENT_SECRET` を登録すること、(4) 再デプロイ。トークン交換エンドポイント `/api/oauth/exchange` は環境変数をサービス名から汎用的に読むため変更不要だったが、転送先の許可リスト（SERVICES）に supabase のエントリが無かったため1件追加した（アカウント表示はプロジェクト一覧の先頭の名前、無ければ "Supabase"）。Supabase にはプロフィール取得用エンドポイントが無いため、接続確認はプロジェクト一覧の成功で代替する。リフレッシュトークンが発行される場合も保存はアクセストークンのみで、失効したら再接続する運用
+    - **トークンで接続（上級者向け）**：プロジェクトURL／サービスロールキー／アクセストークン sbp_（任意）の3欄。URL＋サービスロールキー、または sbp_ 単独で「接続済み」になる。保存形式は他のトークンコネクタと同じ `eluntra_connectors` 枠に JSON 文字列で一体化し、端末内のみ保存（Supabase 同期の collect 対象は sessions/conf/notes/code のみで、コネクタ情報は含まれないことを確認済み）。サービスロールキーはフルアクセス権限を持つ旨を入力欄の説明に明記した
+  - 接続テスト：URL＋サービスロールキー時は `GET {url}/rest/v1/`（apikey＋Authorization）、sbp_ 時は `GET https://api.supabase.com/v1/projects`
+- **エージェントに Supabase ツールを追加**（コネクタ接続時のみ実働。未接続時は接続を促す日本語メッセージを返す）
+  - `supabase_tables`：テーブル一覧（REST 時は PostgREST の OpenAPI ルートから、Management のみ時は information_schema への SQL で）
+  - `supabase_select`：行の読み取り（REST GET、limit 最大50、任意で「列名=値」フィルタ。REST 情報が無い場合は SQL 経路）
+  - `supabase_insert` / `supabase_update` / `supabase_delete`：REST の POST/PATCH/DELETE（サービスロールキーのみ）。update/delete はフィルタ必須で、全件書き込みは拒否する
+  - `supabase_sql`：Management API `POST /v1/projects/{ref}/database/query`（sbp_ または OAuth トークン。ref はプロジェクトURLから、無い場合はプロジェクト一覧の先頭）
+  - `supabase_auth_users`：Auth Admin API で「ログイン機能」のユーザー管理（一覧／作成／削除、サービスロールキー）
+  - 通信は Supabase API が CORS 対応のため直接。ネットワーク層の失敗時のみ `/api/custom-proxy` 経由で1回再試行する。結果は長さを切り詰め、キー類はツール結果に含めない
+- **エージェントに「ブラウザ」ツールを追加**（ブラウザ連携）
+  - 実ブラウザエンジンは Web アプリ内では動かせないため、サーバー補助の軽量ブラウザとして正直に設計：新ルート `deploy/api/browser.js`（Vercel Node Function）がページ取得・本文/リンク/フォーム抽出・フォーム送信を行う。SSRF ガードは custom-proxy と同方式（https のみ、リテラルIP＋DNS解決後アドレスの内部レンジ拒否）。リダイレクトは最大5ホップ、各ホップで再検証。応答サイズ上限 2MB、本文は約6000字まで
+  - クライアント側（`lib/agent/browser.ts`）は現在のページと Cookie ジャーを sessionStorage に保持し（同期対象外）、ツールの action は open / click（リンク番号）/ submit（フォーム番号＋値）/ read
+  - **制限**：JavaScript で描画されるページや、ログインが必要なページは開けない場合があります（ツール説明にも明記）
 
 ## v6.4の変更
 

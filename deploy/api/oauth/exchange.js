@@ -21,6 +21,9 @@ const SERVICES = {
   dropbox: { token: "https://api.dropboxapi.com/oauth2/token" },
   linear: { token: "https://api.linear.app/oauth/token" },
   jira: { token: "https://auth.atlassian.com/oauth/token", userinfo: "https://api.atlassian.com/me", accountField: "email" },
+  // Supabase Management API OAuth。アカウント確認用エンドポイントは無いため
+  // プロジェクト一覧で代替する（配列が返るので下で先頭の name を使う）。
+  supabase: { token: "https://api.supabase.com/v1/oauth/token", userinfo: "https://api.supabase.com/v1/projects", accountFirstName: true },
 };
 
 function cors(origin) {
@@ -112,7 +115,14 @@ export default async function handler(req) {
         const me = await fetch(svc.userinfo, { headers: { Authorization: `Bearer ${tok}` } });
         if (me.ok) {
           const u = await me.json();
-          account = (svc.accountField && u[svc.accountField]) || u.name || "";
+          if (svc.accountFirstName && Array.isArray(u)) {
+            // Supabase：プロジェクト一覧の先頭の名前をアカウント表示にする
+            account = (u[0] && u[0].name) || "Supabase";
+          } else {
+            account = (svc.accountField && u[svc.accountField]) || u.name || "";
+          }
+        } else if (svc.accountFirstName) {
+          account = "Supabase";
         }
       } catch { /* アカウント名が取れなくても接続は成立 */ }
     }
