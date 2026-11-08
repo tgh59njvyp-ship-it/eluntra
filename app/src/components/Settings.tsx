@@ -657,7 +657,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v6.5</span>
+          <span className="pill-state">現在の版：v6.5.1</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
