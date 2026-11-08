@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden; position: relative;
+    background: #ffffff;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    color: #0F1E3A;
+  }
+  .blob {
+    position: absolute; top: -180px; right: -140px; width: 480px; height: 480px;
+    background: radial-gradient(circle at center, #DCEBFF 0%, rgba(220,235,255,0) 70%);
+  }
+  .waves { position: absolute; left: 0; right: 0; bottom: 0; width: 1200px; }
+  .center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding-bottom: 56px;
+  }
+  .wordmark { font-size: 96px; font-weight: 800; letter-spacing: -1px; margin-top: 10px; }
+  .tagline { font-size: 37px; font-weight: 700; margin-top: 26px; }
+  .sub { font-size: 27px; color: #68758C; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <div class="blob"></div>
+  <svg class="waves" viewBox="0 0 1200 220" preserveAspectRatio="none" height="220">
+    <path d="M0,120 C240,60 420,170 700,130 C940,96 1080,140 1200,110 L1200,220 L0,220 Z" fill="#E3EEFF" opacity="0.55"/>
+    <path d="M0,160 C260,105 480,195 760,155 C980,126 1100,165 1200,145 L1200,220 L0,220 Z" fill="#D3E4FF" opacity="0.55"/>
+    <path d="M0,195 C300,150 560,215 840,180 C1010,160 1120,190 1200,175 L1200,220 L0,220 Z" fill="#C2D9FF" opacity="0.5"/>
+  </svg>
+  <div class="center">
+    <svg width="400" height="262" viewBox="0 0 260 170">
+      <defs>
+        <linearGradient id="star" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#38BDF8"/>
+          <stop offset="0.38" stop-color="#2E7CF6"/>
+          <stop offset="0.72" stop-color="#6366F1"/>
+          <stop offset="1" stop-color="#A855F7"/>
+        </linearGradient>
+        <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#BDE3FF" stop-opacity="0.5"/>
+          <stop offset="0.45" stop-color="#7CC4FA" stop-opacity="0.8"/>
+          <stop offset="1" stop-color="#B7A6F9" stop-opacity="0.95"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="128" cy="97" rx="118" ry="35" fill="none" stroke="url(#ring)" stroke-width="5.5" stroke-linecap="round" transform="rotate(-11 128 97)"/>
+      <g transform="translate(118 85) scale(1.07) translate(-118 -85)">
+        <path fill="url(#star)" d="M118 4 C124 44 128 58 198 80 C128 90 124 118 118 166 C112 118 108 90 38 80 C108 58 112 44 118 4 Z"/>
+      </g>
+      <g transform="translate(198 23) scale(1.5) translate(-198 -23)">
+        <path fill="url(#star)" d="M198 6 C200 17 202 19 214 23 C202 26 200 29 198 40 C196 29 194 26 182 23 C194 19 196 17 198 6 Z"/>
+      </g>
+    </svg>
+    <div class="wordmark">Eluntra</div>
+    <div class="tagline">あなたの想像を、もっと先へ――</div>
+    <div class="sub">最高のAIと、無限の可能性を。</div>
+  </div>
+</body>
+</html>
