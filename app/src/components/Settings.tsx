@@ -5,6 +5,7 @@ import {
   oauthReady, saveConnectorToken, startOAuth,
 } from "../lib/connectors/oauth";
 import { CONNECTORS, testConnector } from "../lib/connectors/registry";
+import { supabaseCreds } from "../lib/connectors/supabase";
 import { fetchModels, testConnection } from "../lib/providers/chat";
 import { PROVIDERS } from "../lib/providers/registry";
 
@@ -314,6 +315,9 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
   const saved = useStore((s) => s.connectors[id]) || "";
   const account = useStore((s) => s.connectorAccounts[id]) || "";
   const connected = !!saved;
+  /* Supabase: Management APIトークン（sbp_ / ログイン式）があると、AIがプロジェクトを作成できる */
+  const sbCreds = id === "supabase" ? supabaseCreds() : null;
+  const sbMgmt = !!(sbCreds && (sbCreds.sbp || sbCreds.oauthToken));
   const [panel, setPanel] = useState(false);
   const [draft, setDraft] = useState(saved);
   const [msg, setMsg] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -435,6 +439,14 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
           </span>
           <br />
           <span className="st" style={{ color: "var(--text-3)" }}>{desc}</span>
+          {sbMgmt && (
+            <>
+              <br />
+              <span className="st" style={{ color: "var(--text-3)" }}>
+                AIに「Supabaseのプロジェクトを作って」と頼めます（エージェントモードで新規プロジェクトを作成し、自動で接続します）
+              </span>
+            </>
+          )}
         </span>
         {connected ? (
           <button
@@ -564,7 +576,7 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
               </p>
               <p className="set-desc">
                 サービスロールキーはデータベースへのフルアクセス権限を持つ重要なキーです。この端末に保存され、ログイン中は他の接続情報と同様に、あなたのSupabaseアカウントの専用領域（自分の行だけ読み書き可能）にも同期されます。
-                アクセストークン（sbp_）も入れると、エージェントが SQL も実行できます（URL＋サービスロールキーだけでも接続できます）。
+                アクセストークン（sbp_）も入れると、エージェントが SQL の実行や、新規プロジェクトの作成もできます（URL＋サービスロールキーだけでも接続できます）。
               </p>
               <div className="field">
                 <label>プロジェクトURL</label>
@@ -658,7 +670,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v7.2.4</span>
+          <span className="pill-state">現在の版：v7.2.5</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>
