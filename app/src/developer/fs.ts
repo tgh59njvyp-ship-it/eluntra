@@ -369,6 +369,67 @@ export function runFsTool(files: Record<string, string>, tool: string, args: Rec
   }
 }
 
+/* ---------- 一括ツール（API呼び出し回数を抑えるためのバッチ操作） ---------- */
+
+export interface FsWriteManyResult {
+  files: Record<string, string>;
+  changes: FsChange[];
+  output: string;
+}
+
+/** 複数ファイルを1回のツール呼び出しでまとめて書き込む。各ファイルの変更は個別に記録する */
+export function runFsWriteMany(
+  files: Record<string, string>,
+  items: Array<{ path: string; content: string }>,
+): FsWriteManyResult {
+  if (!items.length) throw new Error("fs_write_many: files が空です");
+  let cur = files;
+  const changes: FsChange[] = [];
+  const lines: string[] = [];
+  for (const item of items) {
+    const r = runFsTool(cur, "fs_write", { path: item.path || "", content: item.content ?? "" });
+    cur = r.files;
+    if (r.change) changes.push(r.change);
+    lines.push(r.output);
+  }
+  return { files: cur, changes, output: lines.join("\n") };
+}
+
+export interface FsReadManyResult {
+  output: string;
+  read: string[];
+  missing: string[];
+}
+
+/** 複数ファイルを1回でまとめて読む。存在しないファイルは例外にせず、その旨を結果に含める */
+export function runFsReadMany(files: Record<string, string>, paths: string[]): FsReadManyResult {
+  if (!paths.length) throw new Error("fs_read_many: paths が空です");
+  const read: string[] = [];
+  const missing: string[] = [];
+  const chunks: string[] = [];
+  let total = 0;
+  const TOTAL_MAX = 20000;
+  const PER_FILE_MAX = 8000;
+  for (const raw of paths) {
+    const p = normalizePath(raw || "");
+    if (!(p in files)) {
+      missing.push(p);
+      chunks.push(`===== ${p} =====\n（ファイルが存在しません）`);
+      continue;
+    }
+    read.push(p);
+    let content = files[p];
+    if (content.length > PER_FILE_MAX) content = content.slice(0, PER_FILE_MAX) + `\n…（以下省略。全 ${files[p].length} 文字）`;
+    if (total + content.length > TOTAL_MAX) {
+      chunks.push(`===== ${p} =====\n（全体の上限に達したため省略）`);
+      continue;
+    }
+    total += content.length;
+    chunks.push(`===== ${p} =====\n${content}`);
+  }
+  return { output: chunks.join("\n\n"), read, missing };
+}
+
 /** 変更を取り消す（Undo）ための逆操作 */
 export function revertChange(files: Record<string, string>, change: FsChange): Record<string, string> {
   if (change.kind === "create") {

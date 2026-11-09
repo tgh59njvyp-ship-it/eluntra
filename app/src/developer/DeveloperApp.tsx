@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.2.2）
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2.3）
    構成: 左=プロジェクト/ファイルツリー、中央=Monacoエディター、右=AI開発チャット、
    下部=ターミナル/プレビュー/問題。モバイルは下部タブで画面を切り替える。
    ファイルは eluntra_dev_projects（localStorage）に実保存され、ターミナルと

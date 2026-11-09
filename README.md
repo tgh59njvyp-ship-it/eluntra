@@ -217,3 +217,21 @@ v7.1で「対応していないもの」として明示していた項目のう�
 ## v7.2.2（Developerをログインなしで利用可能に）
 - v7.2.2: Eluntra Developer をログインなしで利用可能に（AIは端末内のBYOKキー、GitHubはコネクタの接続状態で動作。本体のログインゲートは変更なし）
 - DeveloperApp のログイン状態チェックと、パネル側の「ログインが必要です」バナー／AI送信時のログインブロックを削除。GitHubシートはコネクタのトークンがあれば（Eluntra未ログインでも）表示される
+
+## v7.2.3（本体エージェントのエラー修正＋DeveloperのRPM対策）
+
+### Bug 1: 本体チャットの Agent モードがどのモデルでもエラーになる
+利用者報告を受け、実モジュール（store / providers / agent）を Node ハーネスで駆動し、各社スキーマどおりの応答を返す fetch スタブで切り分けた（`app/tests/agent-main.test.mjs`）。エージェントのループ自体は全 kind で完走し、原因は「complete 経路のリクエスト形状」と「経路フォールバックの欠如」だった。
+- 根本原因1（経路）: 通常チャットは `streamWithFallback` が失敗時に経路（中継⇔直接）を切り替えて復旧するが、エージェントが使う `completeChat` は単一経路しか試さなかった。中継の一時的失敗や、直接接続が CORS で弾かれる会社では、チャットは無事でもエージェントだけ全滅する。→ `completeWithFallback` を追加し、エージェントはこちらを使うようにした（UserError と中断は再送しない）
+- 根本原因2（Anthropic）: 拡張思考が有効な間も `temperature: 0.7` を併記していた。Anthropic API は思考有効時に temperature（1以外）を 400 で拒否する。→ 思考有効時は temperature を送らない
+- 根本原因3（OpenAI 推論モデル）: o 系 / GPT-5 系にも `temperature` を送っていた（同系は任意の temperature を 400 で拒否する）。→ 該当モデル（OpenRouter 経由・DeepSeek reasoner 含む）には temperature を送らない
+- 根本原因4（Gemini）: thinkingConfig をモデル系列で出し分けていなかった。Gemini 3 系は thinkingLevel が正しい指定で、2.5 Pro に thinkingBudget=0（思考レベル Low）は不正だった。→ 3 系は thinkingLevel、2.5 系は thinkingBudget（Pro の 0 は最小値 128 に丸める）、それ以外は送らない
+- あわせて、429 を `RateLimitError`（UserError の一種。Retry-After を保持）として型付けし、エージェントのツール実行エラーと最終失敗メッセージで詳細を握り潰さないようにした
+- 検証: ハーネス29件が通過（全 kind の通常質問・web_search ツール経由＝検索は本番 /api/search へ実接続・経路フォールバック・401 の詳細保持・429 の型付け）。利用者の実キー・実モデルでの往復は未検証（端末側にのみ存在するため）
+
+### Bug 2: Developer で TS プロジェクトを作ると RPM 制限に当たる
+- 一括ツール `fs_write_many`（複数ファイルを1回の呼び出しで作成・上書き。既存ファイルの確認は対象をまとめて1回。変更記録はファイル単位）と `fs_read_many`（複数ファイルを1回で読む。探索予算では1回の読み取りとして数える）を追加
+- 1応答に複数のツール呼び出し（JSON配列 / {"calls":[...]}）が返ってきた場合は、その手順内でまとめて実行する（= LLM 1リクエストで複数ファイルが進む）
+- 429（レート制限）では即失敗せず待機して同じ手順を再試行する（Retry-After 優先、無ければ 15秒→30秒→60秒、最大3回）。待機中は進捗に「レート制限のため待機中（約n秒）」を表示し、停止ボタンで中断できる。上限を超えたら制限の内容と対処（待つ／モデル・プロバイダー切替）を明記して停止する
+- プロンプトにも「土台は fs_write_many、読み取りは fs_read_many でまとめる」ことを明記
+- 検証: 既存57件＋新規19件（`app/tests/dev-agent.test.mjs`、計76件）が通過

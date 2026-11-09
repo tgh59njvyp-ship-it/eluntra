@@ -9,8 +9,8 @@ try {
   console.error("先に node tests/build-harness.mjs を実行してください");
   process.exit(1);
 }
-const { runDevAgent, EXPLORE_BUDGET, EXPLORE_BUDGET_READONLY_MODE, STALL_LIMIT, fsMod, isReadOnlySql } = bundle;
-const { runFsTool, createFile, writeFile, renamePath, deletePath, applyExactEdit, searchFiles, diffLines, diffStat, UndoManager, revertChange, TEMPLATES, buildStaticPreview, listPaths } = fsMod;
+const { runDevAgent, EXPLORE_BUDGET, EXPLORE_BUDGET_READONLY_MODE, STALL_LIMIT, DEV_AGENT_BACKOFF, RateLimitError, fsMod, isReadOnlySql } = bundle;
+const { runFsTool, runFsWriteMany, runFsReadMany, createFile, writeFile, renamePath, deletePath, applyExactEdit, searchFiles, diffLines, diffStat, UndoManager, revertChange, TEMPLATES, buildStaticPreview, listPaths } = fsMod;
 
 let pass = 0;
 let fail = 0;
@@ -231,6 +231,87 @@ group("G: FS 回帰");
   um2.push("p", "same", "same");
   ok(!um2.canUndo("p"), "G27: 変化なしは履歴に積まない");
   ok(runFsTool({ "a.txt": "1" }, "fs_list", { path: "sub" }).output === runFsTool({ "a.txt": "1" }, "fs_list", {}).output, "G28: fs_list は引数によらず同じ結果（重複判定の前提）");
+}
+
+/* ============ H: fs_write_many（一括作成・確認の一本化） ============ */
+group("H: fs_write_many / fs_read_many");
+{
+  const items = [1, 2, 3, 4, 5].map((n) => ({ path: `src/f${n}.ts`, content: `export const v${n} = ${n};\n` }));
+  const st = scripted((i) => (i === 0 ? toolJson("fs_write_many", { files: items }) : "土台を作りました。"));
+  const { ctx, events, files } = makeCtx({ "package.json": "{}" });
+  const res = await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "土台を作って", ctx });
+  ok(st.calls === 2, `H1: 一括作成は LLM 1リクエストで完了し、次が最終報告（実際 ${st.calls} 回）`);
+  ok([1, 2, 3, 4, 5].every((n) => files()[`src/f${n}.ts`]?.includes(`v${n}`)), "H2: 5ファイルすべて作成された");
+  ok(events.filter((e) => e.kind === "change").length === 5, "H3: 変更記録が5件");
+  ok(!res.stopped && res.text === "土台を作りました。", "H4: 正常完了");
+  // 既存ファイルを含む一括は1回だけ確認し、拒否されたら何も書かない
+  let confirms = 0;
+  scripted((i) => (i === 0 ? toolJson("fs_write_many", { files: [{ path: "src/App.tsx", content: "new" }, { path: "src/new.ts", content: "n" }] }) : "断念しました。"));
+  const c2 = makeCtx({ "src/App.tsx": "orig" }, { confirm: async () => { confirms++; return false; } });
+  await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "変えて", ctx: c2.ctx });
+  ok(confirms === 1, "H5: 一括の確認は対象をまとめて1回だけ");
+  ok(c2.files()["src/App.tsx"] === "orig" && !("src/new.ts" in c2.files()), "H6: 拒否されたら一括すべて実行されない");
+  // 純粋関数
+  const wm = runFsWriteMany({}, items);
+  ok(wm.changes.length === 5 && Object.keys(wm.files).length === 5, "H7: runFsWriteMany が5件の変更を返す");
+  const rm = runFsReadMany(wm.files, ["src/f1.ts", "src/f3.ts", "none.ts"]);
+  ok(rm.read.length === 2 && rm.missing.length === 1 && rm.output.includes("v1") && rm.output.includes("存在しません"), "H8: runFsReadMany（欠けは例外でなく結果に含める）");
+}
+
+/* ============ I: 1応答に複数ツール（配列形式） ============ */
+group("I: 複数ツールの一括実行");
+{
+  const multi = "```json\n" + JSON.stringify([
+    { tool: "fs_write", args: { path: "src/x.ts", content: "X" } },
+    { tool: "fs_write", args: { path: "src/y.ts", content: "Y" } },
+  ]) + "\n```";
+  const st = scripted((i) => (i === 0 ? multi : "2ファイル作りました。"));
+  const { ctx, events, files } = makeCtx({});
+  const res = await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "作って", ctx });
+  ok(st.calls === 2, `I1: 2ツールが LLM 1リクエストで実行された（実際 ${st.calls} 回）`);
+  ok(files()["src/x.ts"] === "X" && files()["src/y.ts"] === "Y", "I2: 両方のファイルが作られた");
+  ok(events.filter((e) => e.kind === "change").length === 2, "I3: 変更イベント2件");
+  ok(!res.stopped && res.text === "2ファイル作りました。", "I4: 正常完了");
+  // fs_read_many は「1回の読み取り」として数える（6ファイル読んでも予算に当たらない）
+  const many = {};
+  for (let n = 1; n <= 6; n++) many[`r${n}.txt`] = `data ${n}`;
+  const st2 = scripted((i) => {
+    if (i === 0) return toolJson("fs_read_many", { paths: ["r1.txt", "r2.txt", "r3.txt"] });
+    if (i === 1) return toolJson("fs_read_many", { paths: ["r4.txt", "r5.txt", "r6.txt"] });
+    return "読みました。";
+  });
+  const c2 = makeCtx(many);
+  const r2 = await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "読んで", ctx: c2.ctx });
+  ok(!r2.stopped && r2.text === "読みました。", "I5: fs_read_many×2（実6ファイル）でも探索上限に当たらない");
+  ok(st2.results.some((r) => r.includes("data 1")) && st2.results.some((r) => r.includes("data 6")), "I6: 一括読み取りの結果がモデルに届く");
+}
+
+/* ============ J: レート制限（429）で待機して再試行する ============ */
+group("J: 429 バックオフ");
+{
+  DEV_AGENT_BACKOFF.baseMs = 5; // テスト用に待機を短縮（本番は 15s→30s→60s）
+  DEV_AGENT_BACKOFF.maxMs = 10;
+  let attempts = 0;
+  globalThis.__mockLLM = async () => {
+    attempts++;
+    if (attempts === 1) throw new RateLimitError("利用上限（レート制限）に達しました。対処：少し待って再送してください。", 1);
+    if (attempts === 2) return toolJson("fs_write", { path: "src/a.ts", content: "A" });
+    return "作成しました。";
+  };
+  const { ctx, events, files } = makeCtx({});
+  const res = await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "作って", ctx });
+  ok(attempts === 3, `J1: 429 の後に同じ手順を再試行した（LLM呼び出し ${attempts} 回）`);
+  ok(events.some((e) => e.kind === "note" && e.label.includes("レート制限のため待機中")), "J2: 待機イベントが表示用に発火した");
+  ok(files()["src/a.ts"] === "A" && !res.stopped && res.text === "作成しました。", "J3: 待機後に完走する");
+  // 待機上限を超えたら正直に停止する
+  let attempts2 = 0;
+  globalThis.__mockLLM = async () => { attempts2++; throw new RateLimitError("利用上限（レート制限）に達しました。", 1); };
+  const c2 = makeCtx({});
+  const res2 = await runDevAgent({ provider: PROVIDER, model: "mock", mode: "build", history: [], userText: "作って", ctx: c2.ctx });
+  ok(!!res2.stopped && res2.stopped.includes("利用上限（レート制限）に繰り返し達したため停止しました"), "J4: 待機上限を超えたら停止メッセージ");
+  ok(attempts2 === 1 + DEV_AGENT_BACKOFF.maxWaits, `J5: 初回＋待機${DEV_AGENT_BACKOFF.maxWaits}回で打ち止め（実際 ${attempts2} 回）`);
+  DEV_AGENT_BACKOFF.baseMs = 15000;
+  DEV_AGENT_BACKOFF.maxMs = 60000;
 }
 
 console.log(`\n===== 結果: ${pass} pass / ${fail} fail =====`);

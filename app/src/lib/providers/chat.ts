@@ -1,7 +1,7 @@
 import { effectiveBase, effectiveToken, getState, isCustomId, keyFieldsOf, update, type ModelFlag } from "../store";
 import type { ChatMessage, Effort, ProviderDef, SourceLink, TestResult } from "../types";
 import { signRequest } from "./bedrock";
-import { apiFetch, fetchWithTimeout, friendlyError, proxyEnabled, readSse, setRouteOverride, UserError, type RouteMode } from "./transport";
+import { apiFetch, fetchWithTimeout, friendlyError, proxyEnabled, readSse, setRouteOverride, throwHttpError, UserError, type RouteMode } from "./transport";
 
 /**
  * プロバイダーアダプター群（新規実装）。
@@ -40,6 +40,19 @@ function effortBody(p: ProviderDef, model: string, effort: Effort): Record<strin
     }
   }
   return out;
+}
+
+/**
+ * temperature を送ると 400 になるモデル系統（推論モデル）。
+ * OpenAI の o 系 / GPT-5 系は temperature の任意値を受け付けず、DeepSeek reasoner も同様。
+ * 通常チャットは経路フォールバック裏で失敗が見えにくいが、complete 経路では即エラーになるため、
+ * 該当モデルには temperature 自体を送らない。
+ */
+function samplingRestricted(p: ProviderDef, model: string): boolean {
+  if (/^(o\d|gpt-5)/.test(model)) return true;
+  if (p.id === "openrouter" && /(^|\/)(o\d|gpt-5)/.test(model)) return true;
+  if (p.id === "deepseek" && model.includes("reasoner")) return true;
+  return false;
 }
 
 function systemText(p: ProviderDef, effort: Effort): string {
@@ -116,15 +129,15 @@ async function streamOpenAI(p: ProviderDef, model: string, history: ChatMessage[
   const body: Record<string, unknown> = {
     model,
     messages: openaiMessages(p, history, effort),
-    temperature: getState().conf.temp,
     stream: true,
     ...effortBody(p, model, effort),
   };
+  if (!samplingRestricted(p, model)) body.temperature = getState().conf.temp;
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
   const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, routeModeOf(p));
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const text = await readSse(
     res,
     (j: { choices?: Array<{ delta?: { content?: string } }> }) => j.choices?.[0]?.delta?.content || "",
@@ -141,14 +154,14 @@ async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessag
   const body: Record<string, unknown> = {
     model,
     messages: openaiMessages(p, history, effort),
-    temperature: getState().conf.temp,
     ...effortBody(p, model, effort),
   };
+  if (!samplingRestricted(p, model)) body.temperature = getState().conf.temp;
   const path = p.chatPath || "/chat/completions";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
   const res = await fetchWithTimeout(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 90000, signal, routeModeOf(p));
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
     citations?: string[];
@@ -167,7 +180,27 @@ async function completeOpenAI(p: ProviderDef, model: string, history: ChatMessag
 
 /* ---------- Gemini / Vertex ---------- */
 
-function geminiBody(p: ProviderDef, history: ChatMessage[], effort: Effort) {
+/**
+ * Gemini の思考設定はモデル系列ごとに正しい形が違うため、系列に合わせて出し分ける。
+ * - Gemini 3 系: thinkingLevel を使う（thinkingBudget は 3 系の指定方法ではない）
+ * - Gemini 2.5 系: thinkingBudget。ただし Pro は 0（無効化）を受け付けないので最小値に丸める
+ * - それ以外（2.0 系など）: thinkingConfig 自体を送らない（未対応モデルでは 400 になるため）
+ */
+function geminiThinkingConfig(model: string, effort: Effort): Record<string, unknown> | undefined {
+  if (/gemini-3/.test(model)) {
+    const isPro = model.includes("pro");
+    const level = effort === "low" ? "low" : effort === "medium" ? (isPro ? "high" : "medium") : "high";
+    return { thinkingLevel: level };
+  }
+  if (/gemini-2\.5/.test(model)) {
+    let budget = effort === "low" ? 0 : effort === "medium" ? 2048 : effort === "high" ? 8192 : -1;
+    if (model.includes("pro") && budget === 0) budget = 128;
+    return { thinkingBudget: budget };
+  }
+  return undefined;
+}
+
+function geminiBody(p: ProviderDef, history: ChatMessage[], effort: Effort, model = "") {
   const contents = mergedHistory(history).map((m) => {
     const parts: Array<Record<string, unknown>> = [{ text: textWithAttachments(m) }];
     if (m.role === "user" && p.vision) {
@@ -180,14 +213,10 @@ function geminiBody(p: ProviderDef, history: ChatMessage[], effort: Effort) {
     }
     return { role: m.role === "assistant" ? "model" : "user", parts };
   });
-  const budget = effort === "low" ? 0 : effort === "medium" ? 2048 : effort === "high" ? 8192 : -1;
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: {
-      temperature: getState().conf.temp,
-      thinkingConfig: { thinkingBudget: budget },
-    },
-  };
+  const generationConfig: Record<string, unknown> = { temperature: getState().conf.temp };
+  const tc = geminiThinkingConfig(model, effort);
+  if (tc) generationConfig.thinkingConfig = tc;
+  const body: Record<string, unknown> = { contents, generationConfig };
   const sys = systemText(p, effort);
   if (sys) body.systemInstruction = { parts: [{ text: sys }] };
   return body;
@@ -199,9 +228,9 @@ async function streamGemini(p: ProviderDef, model: string, history: ChatMessage[
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(geminiBody(p, history, getState().conf.effort)),
+    body: JSON.stringify(geminiBody(p, history, getState().conf.effort, model)),
   }, 90000, signal);
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const text = await readSse(
     res,
     (j: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }) =>
@@ -224,8 +253,8 @@ async function completeVertexOrGemini(p: ProviderDef, model: string, history: Ch
     const key = effectiveToken(p.id);
     url = `${p.base}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
   }
-  const res = await fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(geminiBody(p, history, effort)) });
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  const res = await fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(geminiBody(p, history, effort, model)) });
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
   const text = (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || "").join("");
   if (!text) throw new Error("応答が空でした");
@@ -259,9 +288,11 @@ async function completeAnthropic(p: ProviderDef, model: string, history: ChatMes
     model,
     messages: msgs,
     max_tokens: budget + 4096,
-    temperature: getState().conf.temp,
   };
+  // 拡張思考が有効な間、Anthropic API は temperature の併記を 400 で拒否する
+  // （temperature は 1 以外を指定できない）。思考オフのときだけ temperature を送る
   if (effort !== "low") body.thinking = { type: "enabled", budget_tokens: budget };
+  else body.temperature = getState().conf.temp;
   const sys = systemText(p, effort);
   if (sys) body.system = sys;
   const res = await fetchWithTimeout(`${p.base}/messages`, {
@@ -274,7 +305,7 @@ async function completeAnthropic(p: ProviderDef, model: string, history: ChatMes
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { content?: Array<{ type?: string; text?: string }> };
   const text = (j.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
   if (!text) throw new Error("応答が空でした");
@@ -299,7 +330,7 @@ async function completeCohere(p: ProviderDef, model: string, history: ChatMessag
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { message?: { content?: Array<{ text?: string }> } };
   const text = (j.message?.content || []).map((c) => c.text || "").join("");
   if (!text) throw new Error("応答が空でした");
@@ -318,7 +349,7 @@ async function completeReplicate(p: ProviderDef, model: string, history: ChatMes
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, Prefer: "wait" },
     body: JSON.stringify({ input: { prompt, system_prompt: sys, max_tokens: 2048 } }),
   }, 120000, signal);
-  if (!create.ok) throw new UserError(friendlyError(create.status, await create.text(), p));
+  if (!create.ok) await throwHttpError(create, p);
   let pred = (await create.json()) as { id?: string; status?: string; output?: unknown; error?: string };
   let tries = 0;
   while (pred.status && !["succeeded", "failed", "canceled"].includes(pred.status) && tries < 30) {
@@ -364,7 +395,7 @@ async function completeBedrock(p: ProviderDef, model: string, history: ChatMessa
   const url = `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(model)}/converse`;
   const { headers } = await signRequest({ method: "POST", url, body, accessKey, secret, region });
   const res = await fetchWithTimeout(url, { method: "POST", headers, body });
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { output?: { message?: { content?: Array<{ text?: string }> } } };
   const text = (j.output?.message?.content || []).map((c) => c.text || "").join("");
   if (!text) throw new Error("応答が空でした");
@@ -378,18 +409,18 @@ async function completeAzure(p: ProviderDef, model: string, history: ChatMessage
   const endpoint = effectiveBase(p.id);
   const key = effectiveToken(p.id);
   const effort = getState().conf.effort;
-  const body = {
+  const body: Record<string, unknown> = {
     model,
     messages: openaiMessages(p, history, effort),
-    temperature: getState().conf.temp,
   };
+  if (!samplingRestricted(p, model)) body.temperature = getState().conf.temp;
   const url = `${endpoint}/openai/deployments/${encodeURIComponent(model)}/chat/completions?api-version=2024-10-21`;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "api-key": key },
     body: JSON.stringify(body),
   }, 90000, signal);
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const text = j.choices?.[0]?.message?.content || "";
   if (!text) throw new Error("応答が空でした");
@@ -418,6 +449,39 @@ export function completeChat(p: ProviderDef, model: string, history: ChatMessage
     default:
       return completeOpenAI(p, model, history, signal);
   }
+}
+
+/**
+ * completeChat の経路フォールバック版（エージェント用）。
+ * completeChat は単一経路しか試さないため、中継が一時的に失敗したり、直接接続が
+ * CORS で弾かれる会社だったりすると、通常チャット（streamWithFallback で経路を
+ * 切り替えて復旧する）では問題ないのにエージェントだけ全滅していた。
+ * こちらも失敗時に経路を切り替えて再送する。ユーザー側の問題（UserError）と中断は再送しない。
+ */
+export async function completeWithFallback(
+  p: ProviderDef,
+  model: string,
+  history: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<ChatResult> {
+  const routes: Array<boolean | null> = p.local || p.backendProxy ? [null] : [null, getState().conf.proxyOn === false];
+  let lastErr: unknown = null;
+  for (const r of routes) {
+    setRouteOverride(r);
+    try {
+      const result = await completeChat(p, model, history, signal);
+      setRouteOverride(null);
+      return result;
+    } catch (e) {
+      if (e instanceof UserError || (e instanceof DOMException && e.name === "AbortError")) {
+        setRouteOverride(null);
+        throw e;
+      }
+      lastErr = e;
+    }
+  }
+  setRouteOverride(null);
+  throw lastErr instanceof Error ? lastErr : new Error("通信できませんでした");
 }
 
 export function streamChat(p: ProviderDef, model: string, history: ChatMessage[], onDelta: OnDelta, signal?: AbortSignal): Promise<ChatResult> {
@@ -592,7 +656,7 @@ async function bedrockFoundationModels(p: ProviderDef): Promise<string[]> {
   const url = `https://bedrock.${region}.amazonaws.com/foundation-models`;
   const { headers } = await signRequest({ method: "GET", url, body: "", accessKey, secret, region });
   const res = await fetchWithTimeout(url, { headers });
-  if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+  if (!res.ok) await throwHttpError(res, p);
   const j = (await res.json()) as { modelSummaries?: Array<{ modelId?: string; outputModalities?: string[] }> };
   return (j.modelSummaries || [])
     .filter((m) => !m.outputModalities || m.outputModalities.includes("TEXT"))
@@ -619,7 +683,7 @@ export async function fetchModels(p: ProviderDef): Promise<string[]> {
     const res = await apiFetch(`${effectiveBase(p.id)}/openai/deployments?api-version=2024-10-21`, {
       headers: { "api-key": effectiveToken(p.id) },
     });
-    if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+    if (!res.ok) await throwHttpError(res, p);
     const j = (await res.json()) as { data?: Array<{ id?: string }> };
     ids = (j.data || []).map((d) => d.id || "").filter(Boolean);
   } else if (p.id === "ollama") {
@@ -627,13 +691,13 @@ export async function fetchModels(p: ProviderDef): Promise<string[]> {
     if (tags && tags.length) ids = tags;
     else {
       const res = await modelsRequest(p);
-      if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+      if (!res.ok) await throwHttpError(res, p);
       const j = (await res.json()) as { data?: Array<{ id?: string }> };
       ids = (j.data || []).map((d) => d.id || "").filter(Boolean);
     }
   } else {
     const res = await modelsRequest(p);
-    if (!res.ok) throw new UserError(friendlyError(res.status, await res.text(), p));
+    if (!res.ok) await throwHttpError(res, p);
     const j = (await res.json()) as unknown;
     const parsed = parseModelListWithFlags(p, j);
     ids = parsed.ids;

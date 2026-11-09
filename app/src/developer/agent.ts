@@ -2,9 +2,10 @@
 既存エージェントと同じ「JSONでツールを1つ選ぶ」方式で全プロバイダー共通に動かす。
 モードによる書き込み禁止・確認・回数上限はプロンプトではなくコードで強制する。 */
 
-import { completeChat} from "../lib/providers/chat";
+import { completeWithFallback, type ChatResult } from "../lib/providers/chat";
+import { RateLimitError } from "../lib/providers/transport";
 import type { ChatMessage, ProviderDef} from "../lib/types";
-import { devUid, listPaths, normalizePath, runFsTool, type FsChange} from "./fs";
+import { devUid, listPaths, normalizePath, runFsReadMany, runFsTool, runFsWriteMany, type FsChange} from "./fs";
 import { isReadOnlySql } from "./db";
 
 export type DevMode = "plan" | "build" | "debug" | "review" | "ask" | "auto";
@@ -55,13 +56,72 @@ signal?: AbortSignal;
 onEvent: (e: AgentEvent) => void;
 }
 
-const WRITE_TOOLS = new Set(["fs_write", "fs_edit", "fs_delete"]);
+const WRITE_TOOLS = new Set(["fs_write", "fs_write_many", "fs_edit", "fs_delete"]);
 const MAX_STEPS = 25;
 export const MAX_TOOL_STEPS = MAX_STEPS;
 
+/* レート制限（RPM）対策: 429 では即失敗せず、待ってから同じ手順を再試行する（v7.2.3）。
+   待機は最大 maxWaits 回まで。baseMs はテストで差し替えられるよう export する */
+export const DEV_AGENT_BACKOFF = { baseMs: 15000, maxMs: 60000, maxWaits: 3 };
+
+/** 待機上限を超えたレート制限を表す内部エラー（runDevAgent が stopped として返す） */
+class RateLimitStop extends Error {}
+
+function isRateLimitError(e: unknown): boolean {
+if (e instanceof RateLimitError) return true;
+const msg = e instanceof Error? e.message: String(e);
+return /利用上限|レート制限|rate[\s_-]?limit|too many requests|429/i.test(msg);
+}
+
+/** 停止ボタンで中断できる待機 */
+function sleepAbortable(ms: number, signal?: AbortSignal): Promise<void> {
+return new Promise((resolve, reject) => {
+if (signal?.aborted) {
+reject(new DOMException("aborted", "AbortError"));
+return;
+}
+const onAbort = () => {
+clearTimeout(timer);
+reject(new DOMException("aborted", "AbortError"));
+};
+const timer = setTimeout(() => {
+signal?.removeEventListener("abort", onAbort);
+resolve();
+}, ms);
+signal?.addEventListener("abort", onAbort);
+});
+}
+
+/** completeWithFallback をレート制限リトライで包む。待機するたびに進捗イベントで知らせる */
+async function completeDev(
+provider: ProviderDef,
+model: string,
+convo: ChatMessage[],
+ctx: AgentContext,
+waitState: { waits: number},
+): Promise<ChatResult> {
+for (;;) {
+try {
+return await completeWithFallback(provider, model, convo, ctx.signal);
+} catch (e) {
+if (e instanceof DOMException && e.name === "AbortError") throw e;
+if (!isRateLimitError(e)) throw e;
+if (waitState.waits >= DEV_AGENT_BACKOFF.maxWaits) {
+throw new RateLimitStop(e instanceof Error? e.message: String(e));
+}
+waitState.waits++;
+const fromHeader = e instanceof RateLimitError? e.retryAfterMs: undefined;
+const backoff = Math.min(DEV_AGENT_BACKOFF.baseMs * 2 ** (waitState.waits - 1), DEV_AGENT_BACKOFF.maxMs);
+const waitMs = fromHeader !== undefined? Math.min(fromHeader, 120000): backoff;
+ctx.onEvent({ kind: "note", label: `レート制限のため待機中（約${Math.max(1, Math.round(waitMs / 1000))}秒）`});
+await sleepAbortable(waitMs, ctx.signal);
+}
+}
+}
+
 /* 探索ループ対策: 読み取り専用ツールの連続使用に上限を設け、
    変化のない手順が続いたら正直に停止する（v7.2.1） */
-const READONLY_TOOLS: ReadonlySet<string> = new Set(["fs_list", "fs_read", "code_search", "preview_info", "db_list", "db_schema"]);
+const READONLY_TOOLS: ReadonlySet<string> = new Set(["fs_list", "fs_read", "fs_read_many", "code_search", "preview_info", "db_list", "db_schema"]);
 /** 書き込み/ターミナル等の「前進」が無いまま許す読み取り回数（読み取り専用モードは調査が本業なので広め） */
 export const EXPLORE_BUDGET = 5;
 export const EXPLORE_BUDGET_READONLY_MODE = 10;
@@ -71,12 +131,14 @@ export const STALL_LIMIT = 6;
 const TOOL_GUIDE = [
 "あなたは Eluntra Developer のAIソフトウェアエンジニアです。ユーザーのプロジェクト内で、実際にファイルを読み書きし、ターミナルで確認しながら開発を進めてください。",
 "各回の応答は、次のどちらか一方だけにしてください。",
-"1) ツールを使う場合: ```json ブロックで {\"tool\":\"ツール名\",\"args\":{...}} を1つだけ返す",
+"1) ツールを使う場合: ```json ブロックで {\"tool\":\"ツール名\",\"args\":{...}} を返す。互いに依存しないツールは、JSON配列 [ {...}, {...} ] で複数まとめて返してよい（結果はまとめて返る）",
 "2) 最終回答の場合: 普通の文章で結果を報告する（JSONにしない）",
 "使えるツール:",
 "- fs_list {}: プロジェクトのファイル一覧（ファイルツリーはこの指示の末尾にすでに含まれています。特定のサブフォルダを再確認したいときだけ使ってください）",
 "- fs_read {path}: ファイルを読む",
+"- fs_read_many {paths: [path, ...]}: 複数ファイルを1回でまとめて読む（読み取りはこれでまとめると呼び出し回数を節約できる）",
 "- fs_write {path, content}: ファイルを新規作成または全体を上書きする（content はファイル全体）",
+"- fs_write_many {files: [{path, content}, ...]}: 複数ファイルを1回の呼び出しでまとめて作成・上書きする。新規プロジェクトの土台など複数ファイルを一度に作るときは、fs_write を繰り返さず必ずこれを使うこと（APIの回数制限対策）",
 "- fs_edit {path, old, new, replaceAll?}: 正確に一致する部分文字列を置換する（old は一意に特定できる長さにする）",
 "- fs_delete {path}: ファイルを削除する",
 "- code_search {query}: プロジェクト全体を文字列検索する",
@@ -87,7 +149,8 @@ const TOOL_GUIDE = [
 "- preview_info {}: プレビューの状態を確認する",
 "ルール:",
 "- プロジェクトのファイルツリーと package.json は、この指示の末尾にすでに含まれています。存在確認のために fs_list を繰り返す必要はありません",
-"- 編集対象ファイルの現在の内容が必要な場合だけ fs_read で確認してから編集する",
+"- 編集対象ファイルの現在の内容が必要な場合だけ fs_read / fs_read_many で確認してから編集する",
+"- ファイルの作成・読み取りは、まとめられるものは fs_write_many / fs_read_many で1回にまとめる（1ファイルごとに呼び出しを分けるとレート制限に当たりやすい）",
 "- BUILD / AUTO / DEBUG では、調査は必要最小限にし、最初の数手順以内にファイルの作成・編集またはターミナル実行を始めること。確認だけを繰り返さない",
 "- 変更は小さく確実に。大きな新規ファイルは fs_write、小さな修正は fs_edit を使う",
 "- term_exec が使えない環境では、実行確認ができない旨を最終報告に明記する（実行したことにしない）",
@@ -107,19 +170,53 @@ auto: "現在のモードは AUTO です。分析→計画→実装→term_exec�
 interface ToolCall {
 tool: string;
 args: Record<string, string>;
+/** fs_write_many 用の一括書き込み対象 */
+items?: Array<{ path: string; content: string}>;
+/** fs_read_many 用の一括読み取り対象 */
+paths?: string[];
 }
 
-function parseToolCall(text: string): ToolCall | null {
-const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*"tool"[\s\S]*\})/);
-if (!m) return null;
-try {
-const j = JSON.parse(m[1]) as { tool?: string; args?: Record<string, unknown>};
-if (!j.tool) return null;
+function toToolCall(j: unknown): ToolCall | null {
+if (!j || typeof j !== "object") return null;
+const o = j as { tool?: string; args?: Record<string, unknown>};
+if (!o.tool) return null;
+const rawArgs = o.args || {};
 const args: Record<string, string> = {};
-for (const [k, v] of Object.entries(j.args || {})) args[k] = typeof v === "string"? v: JSON.stringify(v);
-return { tool: j.tool, args};
+for (const [k, v] of Object.entries(rawArgs)) args[k] = typeof v === "string"? v: JSON.stringify(v);
+const call: ToolCall = { tool: o.tool, args};
+if (o.tool === "fs_write_many") {
+const arr = rawArgs.files ?? rawArgs.items;
+if (Array.isArray(arr)) {
+call.items = arr
+.filter((x) => x && typeof x === "object")
+.map((x) => {
+const it = x as { path?: unknown; content?: unknown};
+return { path: String(it.path ?? ""), content: typeof it.content === "string"? it.content: ""};
+})
+.filter((i) => i.path);
+}
+}
+if (o.tool === "fs_read_many") {
+const arr = rawArgs.paths ?? rawArgs.files;
+if (Array.isArray(arr)) call.paths = arr.map((x) => String(x)).filter(Boolean);
+}
+return call;
+}
+
+/** 応答からツール呼び出しを取り出す。単体オブジェクト・JSON配列・{"calls":[...]} の3形式に対応する */
+function parseToolCalls(text: string): ToolCall[] {
+const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\[[\s\S]*\]|\{[\s\S]*"tool"[\s\S]*\})/);
+if (!m) return [];
+try {
+const j = JSON.parse(m[1]) as unknown;
+if (Array.isArray(j)) return j.map(toToolCall).filter((c): c is ToolCall => !!c);
+if (j && typeof j === "object" && Array.isArray((j as { calls?: unknown}).calls)) {
+return ((j as { calls: unknown[]}).calls).map(toToolCall).filter((c): c is ToolCall => !!c);
+}
+const one = toToolCall(j);
+return one? [one]: [];
 } catch {
-return null;
+return [];
 }
 }
 
@@ -140,7 +237,9 @@ pkg? `\npackage.json:\n${pkg.slice(0, 2000)}`: "",
 const TOOL_LABEL: Record<string, string> = {
 fs_list: "ファイル一覧を確認",
 fs_read: "ファイルを読んでいます",
+fs_read_many: "複数ファイルを読んでいます",
 fs_write: "ファイルを作成・更新",
+fs_write_many: "複数ファイルを作成・更新",
 fs_edit: "ファイルを編集",
 fs_delete: "ファイルを削除",
 code_search: "コードを検索",
@@ -186,6 +285,52 @@ out = ctx.dbQuery? await ctx.dbQuery(args.db || "", sql): "データベース機
 }
 ctx.onEvent({ kind: "tool", tool, detail: args.db || "", output: out.slice(0, 2000)});
 return out.slice(0, 8000);
+}
+
+// 一括書き込み: 確認は「対象の既存ファイルすべて」を1回の確認にまとめる
+if (tool === "fs_write_many") {
+const items = call.items || [];
+if (!items.length) {
+return "fs_write_many の files が空、または形式が不正でした。{\"tool\":\"fs_write_many\",\"args\":{\"files\":[{\"path\":\"...\",\"content\":\"...\"}]}} の形で送ってください。";
+}
+const filesNow = ctx.getFiles();
+const targets = items.map((i) => ({ path: normalizePath(i.path), content: i.content})).filter((i) => i.path);
+const needConfirm = targets.filter((i) => i.path in filesNow &&!ctx.sessionFiles.has(i.path));
+if (needConfirm.length) {
+const extra = targets.length - needConfirm.length;
+const desc =
+`AIが次の既存ファイルを変更しようとしています（このセッションで作成したファイルではありません）:\n` +
+needConfirm.map((i) => `- ${i.path}`).join("\n") +
+(extra? `\n（あわせて新規ファイル ${extra} 件を作成します）`: "");
+const ok = await ctx.confirm(desc);
+if (!ok) {
+return `ユーザーが変更を承認しなかったため、fs_write_many（${targets.length}件）は実行しませんでした。別の方法を検討するか、最終報告で理由を伝えてください。`;
+}
+needConfirm.forEach((i) => ctx.sessionFiles.add(i.path));
+}
+ctx.onEvent({ kind: "tool", tool, detail: `${targets.length}ファイル一括`, output: ""});
+const result = runFsWriteMany(ctx.getFiles(), targets);
+for (const change of result.changes) {
+ctx.applyFiles(result.files, change);
+ctx.sessionFiles.add(change.path);
+const rec: ChangeRecord = {...change, id: devUid(), at: Date.now()};
+ctx.onEvent({ kind: "change", change: rec});
+}
+ctx.onEvent({ kind: "tool", tool, detail: `${targets.length}ファイル一括`, output: result.output.slice(0, 2000)});
+return result.output;
+}
+
+// 一括読み取り: 探索予算では「1回の読み取り」として数える（呼び出し側の readKey 判定と対応）
+if (tool === "fs_read_many") {
+const paths = (call.paths || []).map((p) => normalizePath(p)).filter(Boolean);
+if (!paths.length) {
+return "fs_read_many の paths が空、または形式が不正でした。{\"tool\":\"fs_read_many\",\"args\":{\"paths\":[\"...\",\"...\"]}} の形で送ってください。";
+}
+const label = paths.join(", ").slice(0, 80);
+ctx.onEvent({ kind: "tool", tool, detail: label, output: ""});
+const r = runFsReadMany(ctx.getFiles(), paths);
+ctx.onEvent({ kind: "tool", tool, detail: label, output: r.output.slice(0, 2000)});
+return r.output.slice(0, 12000);
 }
 
 // fs系: 確認ポリシー
@@ -280,29 +425,54 @@ return [
 ].join("\n");
 };
 
+const waitState = { waits: 0};
+const rateLimitStopped = (detail: string): { text: string; stopped: string} => ({
+text: finalText,
+stopped: `利用上限（レート制限）に繰り返し達したため停止しました。少し時間をおいて再送するか、別のモデル／プロバイダーに切り替えてください。（詳細: ${detail}）`,
+});
+
+/** 同一呼び出し判定用のキー（一括ツールの対象も含めて同一性を取る） */
+const callKeyOf = (call: ToolCall): string => {
+const extra = call.items? JSON.stringify(call.items): call.paths? JSON.stringify(call.paths): "";
+return `${call.tool}:${JSON.stringify(call.args)}:${extra}`;
+};
+
 for (let step = 0; step < MAX_STEPS; step++) {
 if (ctx.signal?.aborted) throw new DOMException("aborted", "AbortError");
 ctx.onEvent({ kind: "step", label: step === 0? "タスクを分析中": "次の作業を検討中", step: step + 1, max: MAX_STEPS});
-const r = await completeChat(provider, model, convo, ctx.signal);
-const call = parseToolCall(r.text);
-if (!call) {
+let r: ChatResult;
+try {
+r = await completeDev(provider, model, convo, ctx, waitState);
+} catch (e) {
+if (e instanceof RateLimitStop) return rateLimitStopped(e.message);
+throw e;
+}
+const calls = parseToolCalls(r.text);
+if (!calls.length) {
 finalText = r.text;
 break;
 }
+
+// 1手順（= LLM 1リクエスト）で返された複数ツールをまとめて実行する。
+// 探索予算・重複判定は呼び出し単位で効かせるが、停滞カウントは手順単位で最大1だけ進める
+let stepProgressed = false;
+let stepFreeWarning = false;
+const results: string[] = [];
+let stopRun: string | null = null;
+
+for (const call of calls) {
 toolUseCounts.set(call.tool, (toolUseCounts.get(call.tool) || 0) + 1);
 
 // 同一呼び出しの繰り返し検出（完全一致。引数を変えた繰り返しは後段の重複判定・探索上限・停滞検出で止める）
-const callKey = `${call.tool}:${JSON.stringify(call.args)}`;
+const callKey = callKeyOf(call);
 const cc = (callCounts.get(callKey) || 0) + 1;
 callCounts.set(callKey, cc);
 if (cc >= 3) {
-return {
-text: finalText,
-stopped: `同じツール呼び出し（${call.tool}）が繰り返されたため、ループを止めて停止しました。指示を具体的に変えて、もう一度お試しください。`,
-};
+stopRun = `同じツール呼び出し（${call.tool}）が繰り返されたため、ループを止めて停止しました。指示を具体的に変えて、もう一度お試しください。`;
+break;
 }
 
-const detail = (call.args.path || call.args.query || call.args.command || call.args.db || "").slice(0, 80);
+const detail = (call.args.path || call.args.query || call.args.command || call.args.db || (call.items? `${call.items.length}ファイル`: "") || (call.paths? call.paths.join(", "): "")).slice(0, 80);
 ctx.onEvent({ kind: "step", label: `${TOOL_LABEL[call.tool] || "作業中"}${detail? ` — ${detail}`: ""}`, step: step + 1, max: MAX_STEPS});
 
 const changesAtStart = changeCount;
@@ -359,41 +529,57 @@ progressed = acted;
 progressed = true;
 }
 if (acted) exploreStreak = 0;
-if (progressed) {
-stallSteps = 0;
-} else if (!freeWarning) {
-stallSteps++;
-if (stallSteps >= STALL_LIMIT) {
-return { text: finalText, stopped: stallMessage(step + 1)};
-}
-}
+if (progressed) stepProgressed = true;
+if (freeWarning) stepFreeWarning = true;
 
 if (isError) {
 const key = result.slice(0, 200);
 const n = (errorCounts.get(key) || 0) + 1;
 errorCounts.set(key, n);
 if (n >= 3) {
-return {
-text: finalText,
-stopped: `同じエラーが3回続いたため停止しました。最後のエラー: ${result}`,
-};
+stopRun = `同じエラーが3回続いたため停止しました。最後のエラー: ${result}`;
+}
+}
+results.push(result);
+if (stopRun) break;
+}
+
+if (stopRun) {
+return { text: finalText, stopped: stopRun};
+}
+
+// 停滞カウントは手順単位（この手順で1つでも前進があればリセットする）
+if (stepProgressed) {
+stallSteps = 0;
+} else if (!stepFreeWarning) {
+stallSteps++;
+if (stallSteps >= STALL_LIMIT) {
+return { text: finalText, stopped: stallMessage(step + 1)};
 }
 }
 
 convo.push({ role: "assistant", content: r.text});
 convo.push({
 role: "user",
-content: `ツール ${call.tool} の結果:\n${result}\n\n続けてください。追加のツールが必要ならJSONで1つ、終わるなら最終報告を書いてください。`,
+content:
+calls.map((c, i) => `ツール ${c.tool} の結果:\n${results[i]}`).join("\n\n") +
+"\n\n続けてください。追加のツールが必要ならJSONで（独立した複数ツールは配列でまとめて）、終わるなら最終報告を書いてください。",
 });
 
 if (step === MAX_STEPS - 1) {
-const last = await completeChat(
+try {
+const last = await completeDev(
 provider,
 model,
 [...convo, { role: "user", content: "手順の上限に達しました。ここまでの作業結果を最終報告としてまとめてください（JSONは使わないでください）。未完了の項目は正直に書いてください。"}],
-ctx.signal,
+ctx,
+waitState,
 );
 finalText = last.text;
+} catch (e) {
+if (e instanceof RateLimitStop) return rateLimitStopped(e.message);
+throw e;
+}
 }
 }
 return { text: finalText};
@@ -408,6 +594,9 @@ case "fs_list":
 return "fs_list";
 case "fs_read":
 return `fs_read:${normalizePath(call.args.path || "")}`;
+case "fs_read_many":
+// 一括読み取りは全体で1つの読み取りとして扱う（パスの集合が同じなら同一結果）
+return `fs_read_many:${[...(call.paths || [])].map((p) => normalizePath(p)).sort().join(",")}`;
 case "code_search":
 return `code_search:${(call.args.query || "").trim().replace(/\s+/g, " ")}`;
 case "db_schema":

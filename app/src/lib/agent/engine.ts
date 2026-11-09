@@ -3,7 +3,7 @@ import { connectorToken, githubListRepos, notionSearch, youtubeSearch } from "..
 import {
   supabaseAuthUsers, supabaseDelete, supabaseInsert, supabaseSelect, supabaseSql, supabaseTables, supabaseUpdate,
 } from "../connectors/supabase";
-import { completeChat } from "../providers/chat";
+import { completeWithFallback } from "../providers/chat";
 import { FETCHPAGE_URL, SEARCH_URL } from "../providers/transport";
 import { getState, uid, update } from "../store";
 import type { ChatMessage, ProviderDef, SourceLink } from "../types";
@@ -233,7 +233,7 @@ export async function runAgent(
   let finalText = "";
   for (let step = 0; step < MAX_STEPS; step++) {
     if (signal?.aborted) throw new DOMException("aborted", "AbortError");
-    const r = await completeChat(provider, model, convo, signal);
+    const r = await completeWithFallback(provider, model, convo, signal);
     const call = parseToolCall(r.text);
     if (!call) {
       finalText = r.text;
@@ -244,8 +244,9 @@ export async function runAgent(
     let result = "";
     try {
       result = await execTool(call, progress);
-    } catch {
-      result = "ツールの実行に失敗しました";
+    } catch (e) {
+      // 失敗理由の詳細を潰さず、モデル（と最終的にユーザー）が原因を追える形で返す
+      result = `ツールの実行に失敗しました（${e instanceof Error ? e.message : String(e)}）`;
     }
     onProgress({ steps: [...progress.steps], sources: [...progress.sources] });
     convo.push({ role: "assistant", content: r.text });
@@ -254,7 +255,7 @@ export async function runAgent(
       content: `ツール ${call.tool} の結果:\n${result}\n\n続けてください。追加のツールが必要ならJSONで、終わるなら最終回答を書いてください。`,
     });
     if (step === MAX_STEPS - 1) {
-      const last = await completeChat(provider, model, [
+      const last = await completeWithFallback(provider, model, [
         ...convo,
         { role: "user", content: "ここまでの情報で最終回答を書いてください（JSONは使わないでください）。" },
       ], signal);

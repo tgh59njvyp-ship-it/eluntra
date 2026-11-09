@@ -263,11 +263,16 @@ export default function App() {
           }
         }
         if (!done) {
-          void lastError;
+          // 失敗の詳細を握り潰さず、ユーザーが原因を追える形で添える
+          const detail = lastError instanceof Error && lastError.message ? lastError.message : "";
           setAi((m) => ({
             ...m,
             pending: false,
-            content: m.content || "いま応答が返ってきませんでした。少し時間をおいて、もう一度送ってください。",
+            content:
+              m.content ||
+              (detail
+                ? `いま応答が返ってきませんでした。少し時間をおいて、もう一度送ってください。（詳細：${detail}）`
+                : "いま応答が返ってきませんでした。少し時間をおいて、もう一度送ってください。"),
           }));
         }
       } finally {

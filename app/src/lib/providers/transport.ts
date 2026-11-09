@@ -27,6 +27,35 @@ function normalizeMode(mode: RouteMode | boolean | undefined): RouteMode {
 /** ユーザー側の問題（キー違い・モデルなし・上限など）だけを表すエラー。それ以外は画面に出さない */
 export class UserError extends Error {}
 
+/** レート制限（429）専用のエラー。UserError の一種として扱い（本体の表示は不変）、
+    待機時間の目安（Retry-After）を保持して、エージェント側の自動待機に使えるようにする */
+export class RateLimitError extends UserError {
+  retryAfterMs?: number;
+  constructor(message: string, retryAfterMs?: number) {
+    super(message);
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/** HTTPエラーを適切な型で投げる。429 は Retry-After を保持した RateLimitError、それ以外は UserError */
+export async function throwHttpError(res: Response, p: ProviderDef): Promise<never> {
+  const text = await res.text();
+  if (res.status === 429) {
+    let retryAfterMs: number | undefined;
+    const ra = res.headers.get("retry-after");
+    if (ra) {
+      const secs = Number(ra);
+      if (Number.isFinite(secs)) retryAfterMs = Math.max(0, Math.round(secs * 1000));
+      else {
+        const t = Date.parse(ra);
+        if (Number.isFinite(t)) retryAfterMs = Math.max(0, t - Date.now());
+      }
+    }
+    throw new RateLimitError(friendlyError(res.status, text, p), retryAfterMs);
+  }
+  throw new UserError(friendlyError(res.status, text, p));
+}
+
 let routeOverride: boolean | null = null;
 export function setRouteOverride(v: boolean | null): void {
   routeOverride = v;

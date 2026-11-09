@@ -199,7 +199,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.2 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.3 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         {p.project ? (
@@ -982,6 +982,8 @@ at: Date.now(),
 });
 } else if (e.kind === "step") {
 pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, step: e.step, max: e.max, at: Date.now()});
+} else if (e.kind === "note") {
+pushEvent({ id: `n${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "note", label: e.label, at: Date.now()});
 }
 },
 },
