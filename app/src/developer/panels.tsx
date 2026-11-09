@@ -2,7 +2,6 @@
    状態の正は DeveloperApp.tsx が持ち、ここは props 経由で描画と操作を行う。 */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isLoggedIn } from "../lib/auth";
 import { resolveAuto } from "../lib/auto";
 import { allProviders, getState, hasCredentials, modelListOf, providerDefOf, selectedModel, update } from "../lib/store";
 import type { AppConfig, ChatMessage, Effort } from "../lib/types";
@@ -59,7 +58,6 @@ export function fmtTime(at: number): string {
 export interface ShellProps {
   theme: "light" | "dark";
   conf: AppConfig;
-  loggedIn: boolean;
   projects: DevProject[];
   project: DevProject | null;
   activeId: string;
@@ -201,7 +199,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.1 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.2 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         {p.project ? (
@@ -218,18 +216,6 @@ export function ShellMain(p: ShellProps) {
           {modelLabel} <Icon name="chevron" className="ic sm" />
         </button>
       </header>
-
-      {!p.loggedIn && (
-        <div className="dev-login-notice">
-          <Icon name="alert" className="ic sm" />
-          <span>
-            AI開発とGitHub連携を使うにはログインが必要です。プロジェクトの閲覧・編集はこのままできます。
-          </span>
-          <a className="btn primary sm" href="./index.html">
-            Eluntraでログインしてください
-          </a>
-        </div>
-      )}
 
       <div className="dev-main">
         <LeftPanel {...p} askConfirm={askConfirm} onNewProject={() => setSheet("new")} onGitHub={() => setSheet("github")} />
@@ -818,10 +804,6 @@ if (!text || running) return;
 const project = projectRef.current;
 if (!project) {
 pushMsg("system", "プロジェクトが選択されていません。左のパネルでプロジェクトを作成・選択してください。");
-return;
-}
-if (!p.loggedIn) {
-pushMsg("system", "AI開発を使うにはログインが必要です。上の案内から本体でログインしてください。");
 return;
 }
 setInput("");
@@ -1923,10 +1905,7 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
             </a>
           </div>
         )}
-        {connected && !p.loggedIn && (
-          <div className="dev-gh-note">GitHub連携の操作には本体でのログインが必要です。上の案内からログインしてください。</div>
-        )}
-        {connected && p.loggedIn && (
+        {connected && (
           <>
             <div className="dev-gh-viewer">{viewer ? `@${viewer} として接続中` : "接続を確認中…"}</div>
             {error && <div className="dev-gh-error">{error}</div>}

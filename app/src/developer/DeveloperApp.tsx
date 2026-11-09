@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.2.1）
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2.2）
    構成: 左=プロジェクト/ファイルツリー、中央=Monacoエディター、右=AI開発チャット、
    下部=ターミナル/プレビュー/問題。モバイルは下部タブで画面を切り替える。
    ファイルは eluntra_dev_projects（localStorage）に実保存され、ターミナルと
@@ -6,7 +6,6 @@
    このファイルは状態管理を担い、描画は panels.tsx に委ねる。 */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isLoggedIn } from "../lib/auth";
 import { getState, useStore } from "../lib/store";
 import type { EditorApi, MarkerInfo } from "./Editor";
 import {
@@ -26,7 +25,6 @@ const ACTIVE_PROJECT_LS = "eluntra_dev_active_project";
 export function DeveloperApp() {
   const theme = useStore((s) => s.theme);
   const conf = useStore((s) => s.conf);
-  const loggedIn = isLoggedIn();
 
   const [projects, setProjects] = useState<DevProject[]>(() => loadProjects());
   const [activeId, setActiveId] = useState<string>(() => {
@@ -188,7 +186,6 @@ export function DeveloperApp() {
   const shellProps: ShellProps = {
     theme,
     conf,
-    loggedIn,
     projects,
     project,
     activeId,
