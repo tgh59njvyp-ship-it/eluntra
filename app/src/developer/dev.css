@@ -441,3 +441,51 @@ input, select, textarea { font-family: inherit; }
   .dev-db-main { flex-direction: column; }
   .dev-db-schema { flex: none; width: 100%; max-height: 180px; }
 }
+
+/* v7.2.4: ダッシュボード（プロジェクトのホーム） */
+.dev-dashbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--accent); background: var(--surface); color: var(--accent);
+  border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; min-height: 40px;
+}
+.dev-dashbtn:hover { background: var(--accent-soft); }
+.dev-dashbtn.on { background: var(--accent); color: var(--accent-ink); }
+.dev-dashbtn:disabled { opacity: 0.45; cursor: default; }
+.dev-proj-item:disabled { opacity: 0.5; cursor: default; }
+.dev-dash { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg); }
+.dev-dash-inner { max-width: 1080px; margin: 0 auto; padding: 22px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+.dev-dash-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.dev-dash-title { margin: 0; font-size: 22px; font-weight: 800; }
+.dev-dash-sub { margin: 5px 0 0; font-size: 13px; color: var(--text-2); }
+.dev-dash-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dev-dash-empty {
+  border: 1px dashed var(--line-strong); border-radius: var(--radius-lg);
+  padding: 26px 18px; color: var(--text-2); font-size: 13.5px; text-align: center; background: var(--surface);
+}
+.dev-dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.dev-card {
+  border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); padding: 15px 16px; display: flex; flex-direction: column; gap: 9px;
+}
+.dev-card.last { border-color: var(--accent); }
+.dev-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dev-card-head .dev-ic { color: var(--accent); }
+.dev-card-name { margin: 0; font-size: 15.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-card-badge {
+  margin-left: auto; flex: none; font-size: 11px; font-weight: 700; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
+}
+.dev-card-rename {
+  flex: 1; min-width: 0; border: 1px solid var(--line-strong); border-radius: 9px; padding: 6px 9px;
+  font-size: 14px; font-weight: 700; background: var(--surface); color: var(--ink); min-height: 36px;
+}
+.dev-card-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); }
+.dev-card-gh { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); word-break: break-all; }
+.dev-card-gh .dev-ic { color: var(--accent); flex: none; }
+.dev-card-btns { display: flex; gap: 7px; flex-wrap: wrap; margin-top: auto; }
+.dev-chat-proj { padding: 0 12px 8px; font-size: 12px; color: var(--text-2); }
+@media (max-width: 1023.98px) {
+  .dev-dash-inner { padding: 16px 13px 32px; }
+  .dev-dash-grid { grid-template-columns: 1fr; }
+  .dev-dashbtn { padding: 7px 11px; min-height: 38px; }
+}

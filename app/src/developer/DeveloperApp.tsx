@@ -1,8 +1,10 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.2.3）
-   構成: 左=プロジェクト/ファイルツリー、中央=Monacoエディター、右=AI開発チャット、
-   下部=ターミナル/プレビュー/問題。モバイルは下部タブで画面を切り替える。
-   ファイルは eluntra_dev_projects（localStorage）に実保存され、ターミナルと
-   開発サーバーは WebContainer（ブラウザ内Node.js）で実際に動く。
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2.4）
+   構成: 起動時はダッシュボード（プロジェクト一覧）。プロジェクトを開くと
+   ワークスペース（左=プロジェクト/ファイルツリー、中央=Monacoエディター、
+   右=AI開発チャット、下部=ターミナル/プレビュー/問題。モバイルは下部タブ切替）。
+   ファイルは eluntra_dev_projects（localStorage）に実保存され、AIチャットは
+   プロジェクトごとに eluntra_dev_chats へ分けて保存する。
+   ターミナルと開発サーバーは WebContainer（ブラウザ内Node.js）で実際に動く。
    このファイルは状態管理を担い、描画は panels.tsx に委ねる。 */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +14,10 @@ import {
   UndoManager, appendChangeLog, listPaths, loadProjects, saveProjects, writeFile,
   type DevProject,
 } from "./fs";
+import {
+  getProjectChat, loadChats, saveChats, withProjectChat, withoutProjectChat,
+  type DevChats, type ProjectChat,
+} from "./chatstore";
 import { ShellMain, type ShellProps } from "./panels";
 import { wcService } from "./webcontainer";
 
@@ -19,6 +25,7 @@ export type { ShellProps };
 
 export type BottomTab = "terminal" | "preview" | "problems" | "database";
 export type MobileTab = "files" | "editor" | "ai" | "preview" | "terminal";
+export type DevView = "dashboard" | "workspace";
 
 const ACTIVE_PROJECT_LS = "eluntra_dev_active_project";
 
@@ -38,6 +45,63 @@ export function DeveloperApp() {
     return saved && list.some((p) => p.id === saved) ? saved : list[0]?.id || "";
   });
   const project = projects.find((p) => p.id === activeId) || null;
+
+  /* ダッシュボード／ワークスペースの切り替え（起動時はダッシュボード） */
+  const [view, setView] = useState<DevView>("dashboard");
+  const [lastActiveId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_PROJECT_LS) || "";
+    } catch {
+      return "";
+    }
+  });
+
+  /* プロジェクト別チャット（eluntra_dev_chats へ保存） */
+  const [chats, setChats] = useState<DevChats>(() => loadChats());
+  const chatSaveTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (chatSaveTimerRef.current) window.clearTimeout(chatSaveTimerRef.current);
+    chatSaveTimerRef.current = window.setTimeout(() => saveChats(chats), 400);
+    return () => {
+      if (chatSaveTimerRef.current) window.clearTimeout(chatSaveTimerRef.current);
+    };
+  }, [chats]);
+  const onChatChange = useCallback((projectId: string, chat: ProjectChat) => {
+    setChats((prev) => withProjectChat(prev, projectId, chat, false));
+  }, []);
+
+  /* AI実行中はプロジェクト切替とダッシュボード復帰を無効化する */
+  const [agentRunning, setAgentRunningState] = useState(false);
+  const agentRunningRef = useRef(false);
+  const setAgentRunning = useCallback((b: boolean) => {
+    agentRunningRef.current = b;
+    setAgentRunningState(b);
+  }, []);
+
+  const enterProject = useCallback((id: string) => {
+    if (agentRunningRef.current) return;
+    setActiveId(id);
+    setView("workspace");
+  }, []);
+
+  const goDashboard = useCallback(() => {
+    if (agentRunningRef.current) return;
+    setView("dashboard");
+  }, []);
+
+  const deleteProject = useCallback(
+    (id: string) => {
+      if (agentRunningRef.current) return;
+      setProjects((prev) => {
+        const next = prev.filter((x) => x.id !== id);
+        saveProjects(next);
+        if (id === activeId) setActiveId(next[0]?.id || "");
+        return next;
+      });
+      setChats((prev) => withoutProjectChat(prev, id));
+    },
+    [activeId],
+  );
 
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -190,6 +254,17 @@ export function DeveloperApp() {
     project,
     activeId,
     setActiveId,
+    view,
+    setView,
+    enterProject,
+    goDashboard,
+    lastActiveId,
+    agentRunning,
+    setAgentRunning,
+    chats,
+    chatData: getProjectChat(chats, activeId),
+    onChatChange,
+    deleteProject,
     commitProjects,
     updateProject,
     applyFileChange,

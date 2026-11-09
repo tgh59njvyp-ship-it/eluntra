@@ -1,7 +1,7 @@
 /* Eluntra Developer: 描画層（ShellMain と各パネル）
    状態の正は DeveloperApp.tsx が持ち、ここは props 経由で描画と操作を行う。 */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { resolveAuto } from "../lib/auto";
 import { allProviders, getState, hasCredentials, modelListOf, providerDefOf, selectedModel, update } from "../lib/store";
 import type { AppConfig, ChatMessage, Effort } from "../lib/types";
@@ -10,7 +10,11 @@ import { Icon } from "../components/icons";
 import {
   DEV_MODES, READONLY_MODES, runDevAgent, type AgentEvent, type ChangeRecord, type DevMode,
 } from "./agent";
-import type { BottomTab, MobileTab } from "./DeveloperApp";
+import {
+  chatMessageCount, getProjectChat, interleaveChat, nextChatSeq, splitChatItems, trimChat,
+  type DevChatEvent, type DevChatItem, type DevChats, type ProjectChat,
+} from "./chatstore";
+import type { BottomTab, DevView, MobileTab } from "./DeveloperApp";
 import { Editor, type EditorApi, type MarkerInfo } from "./Editor";
 import {
   TEMPLATES, buildStaticPreview, createProject, deletePath, diffLines, diffStat, foldersOf, listPaths,
@@ -36,6 +40,7 @@ const DEV_PATHS: Record<string, React.ReactNode> = {
   branch: <><circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="8" r="2.5" /><path d="M6 8.5v7m12-5c0 4-5 4-8.5 5.5" /></>,
   db: <><ellipse cx="12" cy="5.5" rx="8" ry="3" /><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13" /><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>,
   back: <><path d="M15 5l-7 7 7 7" /></>,
+  grid: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></>,
   monitor: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6m-3-4v4" /></>,
   phone: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></>,
   tablet: <><rect x="5" y="2.5" width="14" height="19" rx="2" /><path d="M11 18.5h2" /></>,
@@ -53,6 +58,16 @@ export function fmtTime(at: number): string {
   return new Date(at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** ダッシュボード用: 更新日時の相対表記（古いものは日付） */
+export function fmtRelative(at: number): string {
+  const diff = Date.now() - at;
+  if (diff < 60_000) return "たった今";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}分前`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}時間前`;
+  if (diff < 86_400_000 * 30) return `${Math.floor(diff / 86_400_000)}日前`;
+  return new Date(at).toLocaleDateString("ja-JP");
+}
+
 /* ---------- 共有型 ---------- */
 
 export interface ShellProps {
@@ -62,6 +77,20 @@ export interface ShellProps {
   project: DevProject | null;
   activeId: string;
   setActiveId: (id: string) => void;
+  /* ダッシュボード／ワークスペース */
+  view: DevView;
+  setView: (v: DevView) => void;
+  enterProject: (id: string) => void;
+  goDashboard: () => void;
+  lastActiveId: string;
+  /* AI実行中フラグ（実行中は切替・削除・ダッシュボード復帰を無効化） */
+  agentRunning: boolean;
+  setAgentRunning: (b: boolean) => void;
+  /* プロジェクト別チャット */
+  chats: DevChats;
+  chatData: ProjectChat;
+  onChatChange: (projectId: string, chat: ProjectChat) => void;
+  deleteProject: (id: string) => void;
   commitProjects: (next: DevProject[]) => void;
   updateProject: (id: string, fn: (p: DevProject) => DevProject) => void;
   applyFileChange: (
@@ -189,8 +218,12 @@ export function ShellMain(p: ShellProps) {
     if (t === "terminal") p.setBottomTab("terminal");
   };
 
+  /* パネル・シート内でのプロジェクト選択は「開く」＝ワークスペースへ入る操作として扱う */
+  const sp: ShellProps = { ...p, setActiveId: p.enterProject };
+  const inDashboard = p.view === "dashboard";
+
   return (
-    <div className="dev-root" data-mobile={p.mobileTab}>
+    <div className="dev-root" data-mobile={p.mobileTab} data-view={p.view}>
       <header className="dev-header">
         <a className="dev-back" href="./index.html">
           <DIcon name="back" className="dev-ic sm" /> Eluntra
@@ -199,83 +232,100 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.3 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.4 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
-        {p.project ? (
-          <input
-            className="dev-projname"
-            value={p.project.name}
-            onChange={(e) => p.updateProject(p.project!.id, (pr) => ({ ...pr, name: e.target.value }))}
-            aria-label="プロジェクト名"
-          />
-        ) : (
-          <span className="dev-projname-none">プロジェクト未選択</span>
-        )}
+        <button
+          type="button"
+          className={`dev-dashbtn${inDashboard ? " on" : ""}`}
+          onClick={() => p.goDashboard()}
+          disabled={p.agentRunning}
+          title={p.agentRunning ? "AI実行中はダッシュボードへ戻れません" : "ダッシュボード（プロジェクト一覧）へ戻る"}
+        >
+          <DIcon name="grid" className="dev-ic sm" /> ダッシュボード
+        </button>
+        {!inDashboard &&
+          (p.project ? (
+            <input
+              className="dev-projname"
+              value={p.project.name}
+              onChange={(e) => p.updateProject(p.project!.id, (pr) => ({ ...pr, name: e.target.value }))}
+              aria-label="プロジェクト名"
+            />
+          ) : (
+            <span className="dev-projname-none">プロジェクト未選択</span>
+          ))}
+        {inDashboard && <span className="dev-projname-none">プロジェクト一覧</span>}
         <button type="button" className="dev-modelpill" onClick={() => setSheet("model")}>
           {modelLabel} <Icon name="chevron" className="ic sm" />
         </button>
       </header>
 
-      <div className="dev-main">
-        <LeftPanel {...p} askConfirm={askConfirm} onNewProject={() => setSheet("new")} onGitHub={() => setSheet("github")} />
-        <CenterPanel {...p} onNewProject={() => setSheet("new")} />
-        <RightPanel {...p} askConfirm={askConfirm} onOpenModel={() => setSheet("model")} />
-      </div>
+      {inDashboard ? (
+        <DashboardView {...sp} askConfirm={askConfirm} onNewProject={() => setSheet("new")} onGitHub={() => setSheet("github")} />
+      ) : (
+        <>
+          <div className="dev-main">
+            <LeftPanel {...sp} askConfirm={askConfirm} onNewProject={() => setSheet("new")} onGitHub={() => setSheet("github")} />
+            <CenterPanel {...sp} onNewProject={() => setSheet("new")} />
+            <RightPanel {...sp} askConfirm={askConfirm} onOpenModel={() => setSheet("model")} />
+          </div>
 
-      <BottomPanel {...p} />
+          <BottomPanel {...sp} />
 
-      <nav className="dev-mobiletabs" aria-label="画面切替">
-        <button type="button" className={p.mobileTab === "files" ? "on" : ""} onClick={() => goMobile("files")}>
-          <DIcon name="folder" className="dev-ic" />
-          <span>ファイル</span>
-        </button>
-        <button type="button" className={p.mobileTab === "editor" ? "on" : ""} onClick={() => goMobile("editor")}>
-          <Icon name="code" className="ic" />
-          <span>エディタ</span>
-        </button>
-        <button type="button" className={p.mobileTab === "ai" ? "on" : ""} onClick={() => goMobile("ai")}>
-          <Icon name="bot" className="ic" />
-          <span>AI</span>
-        </button>
-        <button type="button" className={p.mobileTab === "preview" ? "on" : ""} onClick={() => goMobile("preview")}>
-          <DIcon name="monitor" className="dev-ic" />
-          <span>プレビュー</span>
-        </button>
-        <button type="button" className={p.mobileTab === "terminal" ? "on" : ""} onClick={() => goMobile("terminal")}>
-          <DIcon name="terminal" className="dev-ic" />
-          <span>ターミナル</span>
-        </button>
-      </nav>
+          <nav className="dev-mobiletabs" aria-label="画面切替">
+            <button type="button" className={p.mobileTab === "files" ? "on" : ""} onClick={() => goMobile("files")}>
+              <DIcon name="folder" className="dev-ic" />
+              <span>ファイル</span>
+            </button>
+            <button type="button" className={p.mobileTab === "editor" ? "on" : ""} onClick={() => goMobile("editor")}>
+              <Icon name="code" className="ic" />
+              <span>エディタ</span>
+            </button>
+            <button type="button" className={p.mobileTab === "ai" ? "on" : ""} onClick={() => goMobile("ai")}>
+              <Icon name="bot" className="ic" />
+              <span>AI</span>
+            </button>
+            <button type="button" className={p.mobileTab === "preview" ? "on" : ""} onClick={() => goMobile("preview")}>
+              <DIcon name="monitor" className="dev-ic" />
+              <span>プレビュー</span>
+            </button>
+            <button type="button" className={p.mobileTab === "terminal" ? "on" : ""} onClick={() => goMobile("terminal")}>
+              <DIcon name="terminal" className="dev-ic" />
+              <span>ターミナル</span>
+            </button>
+          </nav>
 
-      <div className="dev-desktopbar">
-        <button type="button" className={p.bottomTab === "terminal" ? "on" : ""} onClick={() => goBottom("terminal")}>
-          <DIcon name="terminal" className="dev-ic sm" /> ターミナル
-        </button>
-        <button type="button" className={p.bottomTab === "preview" ? "on" : ""} onClick={() => goBottom("preview")}>
-          <DIcon name="monitor" className="dev-ic sm" /> プレビュー
-        </button>
-        <button type="button" className={p.bottomTab === "problems" ? "on" : ""} onClick={() => goBottom("problems")}>
-          <Icon name="alert" className="ic sm" /> 問題{p.markers.length ? `（${p.markers.length}）` : ""}
-        </button>
-        <button type="button" className={p.bottomTab === "database" ? "on" : ""} onClick={() => goBottom("database")}>
-          <DIcon name="db" className="dev-ic sm" /> データベース
-        </button>
-        <span className="dev-desktopbar-note">実行環境はブラウザ内です（Node.js=WebContainer / Python=Pyodide / DB=SQLite・PostgreSQL）。</span>
-      </div>
+          <div className="dev-desktopbar">
+            <button type="button" className={p.bottomTab === "terminal" ? "on" : ""} onClick={() => goBottom("terminal")}>
+              <DIcon name="terminal" className="dev-ic sm" /> ターミナル
+            </button>
+            <button type="button" className={p.bottomTab === "preview" ? "on" : ""} onClick={() => goBottom("preview")}>
+              <DIcon name="monitor" className="dev-ic sm" /> プレビュー
+            </button>
+            <button type="button" className={p.bottomTab === "problems" ? "on" : ""} onClick={() => goBottom("problems")}>
+              <Icon name="alert" className="ic sm" /> 問題{p.markers.length ? `（${p.markers.length}）` : ""}
+            </button>
+            <button type="button" className={p.bottomTab === "database" ? "on" : ""} onClick={() => goBottom("database")}>
+              <DIcon name="db" className="dev-ic sm" /> データベース
+            </button>
+            <span className="dev-desktopbar-note">実行環境はブラウザ内です（Node.js=WebContainer / Python=Pyodide / DB=SQLite・PostgreSQL）。</span>
+          </div>
+        </>
+      )}
 
       {sheet === "new" && (
         <NewProjectSheet
           onClose={() => setSheet(null)}
           onCreate={(name, tpl) => {
             const pr = createProject(name, tpl);
-            p.commitProjects([pr, ...p.projects]);
-            p.setActiveId(pr.id);
+            sp.commitProjects([pr, ...sp.projects]);
+            sp.setActiveId(pr.id);
             setSheet(null);
           }}
         />
       )}
-      {sheet === "github" && <GitHubSheet {...p} onClose={() => setSheet(null)} askConfirm={askConfirm} />}
+      {sheet === "github" && <GitHubSheet {...sp} onClose={() => setSheet(null)} askConfirm={askConfirm} />}
       {sheet === "model" && <ModelSheet onClose={() => setSheet(null)} />}
 
       {confirmDesc && (
@@ -297,6 +347,167 @@ export function ShellMain(p: ShellProps) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------- ダッシュボード（プロジェクトのホーム） ---------- */
+
+function DashboardView(props: ShellProps & { askConfirm: AskConfirm; onNewProject: () => void; onGitHub: () => void }) {
+  const p = props;
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const importJson = (file: File) => {
+    void file.text().then((text) => {
+      try {
+        const j = JSON.parse(text) as Partial<DevProject>;
+        if (!j.files || typeof j.files !== "object") throw new Error("files がありません");
+        const pr = createProject(typeof j.name === "string" && j.name ? j.name : "読み込んだプロジェクト", "empty");
+        pr.files = j.files as Record<string, string>;
+        p.commitProjects([pr, ...p.projects]);
+        p.setActiveId(pr.id);
+      } catch {
+        window.alert("プロジェクトJSONを読み込めませんでした。形式を確認してください。");
+      }
+    });
+  };
+
+  const startRename = (pr: DevProject) => {
+    setRenamingId(pr.id);
+    setRenameValue(pr.name);
+  };
+  const saveRename = (pr: DevProject) => {
+    const name = renameValue.trim();
+    setRenamingId(null);
+    if (!name || name === pr.name) return;
+    p.updateProject(pr.id, (x) => ({ ...x, name }));
+  };
+
+  return (
+    <main className="dev-dash">
+      <div className="dev-dash-inner">
+        <div className="dev-dash-head">
+          <div>
+            <h2 className="dev-dash-title">プロジェクト</h2>
+            <p className="dev-dash-sub">
+              プロジェクトを選んで開発を始めてください。AIチャットはプロジェクトごとに分かれて保存されます。
+            </p>
+          </div>
+          <div className="dev-dash-actions">
+            <button type="button" className="btn primary" onClick={props.onNewProject} disabled={p.agentRunning}>
+              <Icon name="plus" className="ic sm" /> 新規プロジェクト
+            </button>
+            <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={p.agentRunning}>
+              <Icon name="download" className="ic sm" /> JSON読み込み
+            </button>
+            <button type="button" className="btn" onClick={props.onGitHub} disabled={p.agentRunning}>
+              <img src="./logos/conn-github.svg" alt="" width={16} height={16} /> GitHubから開く
+            </button>
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importJson(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        </div>
+
+        {p.projects.length === 0 && (
+          <div className="dev-dash-empty">
+            まだプロジェクトがありません。「新規プロジェクト」から作成するか、GitHubのリポジトリを開いてください。
+          </div>
+        )}
+
+        <div className="dev-dash-grid">
+          {p.projects.map((pr) => {
+            const chatCount = chatMessageCount(getProjectChat(p.chats, pr.id));
+            const isLast = pr.id === p.lastActiveId && p.projects.length > 0;
+            return (
+              <article key={pr.id} className={`dev-card${isLast ? " last" : ""}`}>
+                <div className="dev-card-head">
+                  <DIcon name="folder" className="dev-ic" />
+                  {renamingId === pr.id ? (
+                    <input
+                      className="dev-card-rename"
+                      value={renameValue}
+                      autoFocus
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRename(pr);
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      aria-label="プロジェクト名"
+                    />
+                  ) : (
+                    <h3 className="dev-card-name">{pr.name}</h3>
+                  )}
+                  {isLast && <span className="dev-card-badge">前回開いた</span>}
+                </div>
+                <div className="dev-card-meta">
+                  <span>{Object.keys(pr.files).length} ファイル</span>
+                  <span>最終更新 {fmtRelative(pr.updatedAt)}</span>
+                  <span>チャット {chatCount} 件</span>
+                </div>
+                {pr.github && (
+                  <div className="dev-card-gh">
+                    <DIcon name="branch" className="dev-ic sm" />
+                    <span>
+                      {pr.github.owner}/{pr.github.repo} @ {pr.github.branch}
+                    </span>
+                  </div>
+                )}
+                <div className="dev-card-btns">
+                  {renamingId === pr.id ? (
+                    <>
+                      <button type="button" className="btn primary sm" onClick={() => saveRename(pr)}>
+                        保存
+                      </button>
+                      <button type="button" className="btn sm" onClick={() => setRenamingId(null)}>
+                        取消
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn primary sm"
+                        onClick={() => p.enterProject(pr.id)}
+                        disabled={p.agentRunning}
+                        title={p.agentRunning ? "AI実行中は切り替えできません" : undefined}
+                      >
+                        開く
+                      </button>
+                      <button type="button" className="btn sm" onClick={() => startRename(pr)}>
+                        名前変更
+                      </button>
+                      <button
+                        type="button"
+                        className="btn sm danger"
+                        disabled={p.agentRunning}
+                        title={p.agentRunning ? "AI実行中は削除できません" : undefined}
+                        onClick={() => {
+                          void props.askConfirm(`プロジェクト「${pr.name}」を削除しますか？チャット履歴も一緒に削除されます。この操作は取り消せません。`).then((ok) => {
+                            if (ok) p.deleteProject(pr.id);
+                          });
+                        }}
+                      >
+                        削除
+                      </button>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -483,7 +694,7 @@ function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: (
       <div className="dev-sec">
         <div className="dev-sec-head">
           <span>プロジェクト</span>
-          <button type="button" className="btn primary sm" onClick={props.onNewProject}>
+          <button type="button" className="btn primary sm" onClick={props.onNewProject} disabled={p.agentRunning} title={p.agentRunning ? "AI実行中は切り替えできません" : undefined}>
             <Icon name="plus" className="ic sm" /> 新規
           </button>
         </div>
@@ -495,6 +706,8 @@ function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: (
               type="button"
               className={`dev-proj-item${pr.id === p.activeId ? " on" : ""}`}
               onClick={() => p.setActiveId(pr.id)}
+              disabled={p.agentRunning && pr.id !== p.activeId}
+              title={p.agentRunning && pr.id !== p.activeId ? "AI実行中は切り替えできません" : undefined}
             >
               <span className="t">{pr.name}</span>
               <span className="sub">{Object.keys(pr.files).length} ファイル</span>
@@ -506,18 +719,17 @@ function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: (
             <button type="button" className="btn sm" onClick={exportJson}>
               <Icon name="download" className="ic sm" /> JSONで書き出し
             </button>
-            <button type="button" className="btn sm" onClick={() => importRef.current?.click()}>
+            <button type="button" className="btn sm" onClick={() => importRef.current?.click()} disabled={p.agentRunning} title={p.agentRunning ? "AI実行中は切り替えできません" : undefined}>
               読み込み
             </button>
             <button
               type="button"
               className="btn sm danger"
+              disabled={p.agentRunning}
+              title={p.agentRunning ? "AI実行中は削除できません" : undefined}
               onClick={() => {
-                void props.askConfirm(`プロジェクト「${project.name}」を削除しますか？この操作は取り消せません。`).then((ok) => {
-                  if (!ok) return;
-                  const next = p.projects.filter((x) => x.id !== project.id);
-                  p.commitProjects(next);
-                  p.setActiveId(next[0]?.id || "");
+                void props.askConfirm(`プロジェクト「${project.name}」を削除しますか？チャット履歴も一緒に削除されます。この操作は取り消せません。`).then((ok) => {
+                  if (ok) p.deleteProject(project.id);
                 });
               }}
             >
@@ -536,7 +748,7 @@ function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: (
             />
           </div>
         )}
-        <button type="button" className="dev-github-entry" onClick={props.onGitHub}>
+        <button type="button" className="dev-github-entry" onClick={props.onGitHub} disabled={p.agentRunning} title={p.agentRunning ? "AI実行中は切り替えできません" : undefined}>
           <img src="./logos/conn-github.svg" alt="" width={18} height={18} />
           <span>GitHub</span>
           <span className="sub">{githubConnected() ? "接続済み" : "未接続"}</span>
@@ -733,415 +945,451 @@ onMarkers={p.setMarkers}
 
 /* ---------- AIパネル ---------- */
 
-interface StreamMsg {
-type: "msg";
-id: string;
-role: "user" | "assistant" | "system";
-content: string;
-}
-interface StreamEvent {
-type: "event";
-id: string;
-item: TimelineItem;
-}
-type StreamItem = StreamMsg | StreamEvent;
-
-interface TimelineItem {
-id: string;
-kind: string;
-label: string;
-detail?: string;
-output?: string;
-change?: ChangeRecord;
-step?: number;
-max?: number;
-at: number;
-}
+/** イベントの入力形（seq は pushEvent が採番する） */
+type TimelineItem = Omit<DevChatEvent, "seq">;
+type StreamItem = DevChatItem;
 
 let wcMountedProjectId = "";
 
 export async function ensureWcMounted(project: DevProject | null): Promise<void> {
-await wcService.ensureBoot();
-if (project && wcMountedProjectId!== project.id) {
-await wcService.mountProject(project.files);
-wcMountedProjectId = project.id;
-}
-}
-
-function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: () => void}) {
-const p = props;
-const [mode, setMode] = useState<DevMode>("auto");
-const [input, setInput] = useState("");
-const [stream, setStream] = useState<StreamItem[]>([]);
-const [running, setRunning] = useState(false);
-const [undone, setUndone] = useState<Set<string>>(new Set());
-const abortRef = useRef<AbortController | null>(null);
-const projectRef = useRef(p.project);
-projectRef.current = p.project;
-const streamRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-const el = streamRef.current;
-if (el) el.scrollTop = el.scrollHeight;
-}, [stream, running]);
-
-const pushMsg = useCallback((role: StreamMsg["role"], content: string) => {
-setStream((prev) => [...prev, { type: "msg", id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, content}]);
-}, []);
-
-const pushEvent = useCallback((item: TimelineItem) => {
-setStream((prev) => [...prev.slice(-300), { type: "event", id: item.id, item}]);
-}, []);
-
-const stop = useCallback(() => {
-abortRef.current?.abort();
-wcService.stopCurrent();
-}, []);
-
-const send = useCallback(async () => {
-const text = input.trim();
-if (!text || running) return;
-const project = projectRef.current;
-if (!project) {
-pushMsg("system", "プロジェクトが選択されていません。左のパネルでプロジェクトを作成・選択してください。");
-return;
-}
-setInput("");
-pushMsg("user", text);
-
-const confNow = p.getConf();
-let provider: import("../lib/types").ProviderDef | null = null;
-let model = "";
-if (confNow.provider === "auto") {
-const choice = resolveAuto(text);
-if (!choice) {
-pushMsg("system", "接続済みのAIがありません。本体（Eluntra）の設定でAPIキーを設定してから、もう一度お試しください。");
-return;
-}
-provider = choice.provider;
-model = choice.model;
-pushEvent({ id: `e${Date.now()}`, kind: "note", label: `Eluntra Auto: ${choice.reason}`, at: Date.now()});
-} else {
-provider = providerDefOf(confNow.provider) || null;
-model = selectedModel(confNow.provider);
-if (!provider) {
-pushMsg("system", "選択中のプロバイダーが見つかりません。本体の設定で選び直してください。");
-return;
-}
-if (!hasCredentials(provider.id)) {
-pushMsg(
-"system",
-`${provider.name} のAPIキーが未設定です。本体（Eluntra）の「設定 → APIプロバイダー」でキーを設定してから、もう一度お試しください。`,
-);
-return;
-}
+  await wcService.ensureBoot();
+  if (project && wcMountedProjectId !== project.id) {
+    await wcService.mountProject(project.files);
+    wcMountedProjectId = project.id;
+  }
 }
 
-const history: ChatMessage[] = stream
-.filter((s): s is StreamMsg => s.type === "msg" && (s.role === "user" || s.role === "assistant"))
-.map((s) => ({ role: s.role as "user" | "assistant", content: s.content}));
+function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: () => void }) {
+  const p = props;
+  const [mode, setMode] = useState<DevMode>("auto");
+  const [input, setInput] = useState("");
+  /* チャットはプロジェクトごとに保持する。owner は items が属するプロジェクトID */
+  const [streamState, setStreamState] = useState<{ owner: string; items: StreamItem[] }>({ owner: "", items: [] });
+  const stream = streamState.items;
+  const [running, setRunning] = useState(false);
+  const [undone, setUndone] = useState<Set<string>>(new Set());
+  const abortRef = useRef<AbortController | null>(null);
+  const projectRef = useRef(p.project);
+  projectRef.current = p.project;
+  const streamRef = useRef<HTMLDivElement>(null);
+  const seqRef = useRef(1);
+  const runningRef = useRef(false);
+  runningRef.current = running;
+  const chatDataRef = useRef(p.chatData);
+  chatDataRef.current = p.chatData;
+  const onChatChangeRef = useRef(p.onChatChange);
+  onChatChangeRef.current = p.onChatChange;
+  const setAgentRunning = p.setAgentRunning;
 
-const ctl = new AbortController();
-abortRef.current = ctl;
-setRunning(true);
-try {
-const result = await runDevAgent({
-provider,
-model,
-mode,
-history,
-userText: text,
-ctx: {
-getFiles: () => projectRef.current?.files || {},
-applyFiles: (nextFiles, change) => {
-const cur = projectRef.current;
-if (!cur) return;
-p.updateProject(cur.id, (pr) => {
-let next: DevProject = {...pr, files: nextFiles, updatedAt: Date.now()};
-if (change) {
-next = {
-...next,
-changeLog: [
-{ at: Date.now(), path: change.path, kind: change.kind, source: "ai" as const},
-...(next.changeLog || []),
-].slice(0, 100),
-};
-}
-return next;
-});
-},
-confirm: props.askConfirm,
-termExec: async (command: string) => {
-const parsedPy = parsePythonCommand(command);
-if (parsedPy.kind !== "other") {
-if (parsedPy.kind === "python-repl") {
-return "対話モード（python単体）はエージェントからは使えません。python -c \"...\" か、ファイルを作成して python file.py で実行してください。";
-}
-try {
-const filesNow = projectRef.current?.files || {};
-if (parsedPy.kind === "pip-install") {
-const r = await pyService.pipInstall(parsedPy.packages);
-return [`$ ${command}（Python / Pyodide）`, r.error? `micropip エラー: ${r.error}`: r.output.trim() || "インストールしました"].join("\n");
-}
-const res =
-parsedPy.kind === "python-file"
-? await pyService.runFile(filesNow, parsedPy.path, parsedPy.args)
-: await pyService.runCode(filesNow, parsedPy.kind === "python-code"? parsedPy.code: "");
-if (res.changes.length) {
-const cur = projectRef.current;
-if (cur) {
-const applied = applyPyChanges(cur.files, res.changes);
-if (applied.touched.length) {
-p.updateProject(cur.id, (pr) => ({
-...pr,
-files: applied.files,
-changeLog: [
-{ at: Date.now(), path: applied.touched[0], kind: "edit" as const, source: "ai" as const, detail: `Python実行で${applied.touched.length}件変更` },
-...(pr.changeLog || []),
-].slice(0, 100),
-}));
-}
-}
-}
-return [
-`$ ${command}（Python / Pyodide）`,
-res.output.trim()? res.output.trim().slice(-6000): "（出力なし）",
-res.error? `エラー: ${res.error.slice(0, 2000)}`: "（終了コード: 0）",
-].join("\n");
-} catch (e) {
-return `Pythonは利用できません: ${pyService.errorReason || (e instanceof Error? e.message: String(e))}`;
-}
-}
-try {
-await ensureWcMounted(projectRef.current);
-} catch (e) {
-return `ターミナル（Node.js）は利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}。Pythonコマンド（python file.py 等）は Pyodide で実行できます。`;
-}
-const res = await wcService.exec(command, { timeoutMs: 120_000});
-const out = res.output.trim();
-return [
-`$ ${command}`,
-out? out.slice(-6000): "（出力なし）",
-res.timedOut? "（120秒でタイムアウトし、停止しました）": `（終了コード: ${res.code?? "不明"}）`,
-].join("\n");
-},
-previewInfo: () => {
-if (wcService.previewUrl) return `開発サーバーが起動しています。プレビューURL: ${wcService.previewUrl}`;
-const cur = projectRef.current;
-if (cur && "index.html" in cur.files) return "開発サーバーは未起動です。静的プレビュー（index.html）が利用できます。";
-return "プレビューは未起動です。ターミナルで開発サーバー（npm run dev）を起動するとURLが発行されます（WebContainerが必要）";
-},
-dbList: async () => {
-const cur = projectRef.current;
-if (!cur) return "プロジェクトが選択されていません";
-const metas = await dbService.listDbs(cur.id);
-if (!metas.length) return "このプロジェクトにはデータベースがまだありません。データベースはユーザーが下部パネルの「データベース」タブで作成します（あなたは作成できません）。必要なら最終報告で作成を依頼してください。";
-return metas.map((m) => `${m.name}（${m.engine === "sqlite"? "SQLite": "PostgreSQL"}）`).join("\n");
-},
-dbSchema: async (name: string) => {
-const cur = projectRef.current;
-if (!cur) return "プロジェクトが選択されていません";
-const metas = await dbService.listDbs(cur.id);
-const meta = metas.find((m) => m.name === name);
-if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
-const tables = await dbService.schema(meta);
-return formatSchemaForAgent(tables);
-},
-dbQuery: async (name: string, sql: string) => {
-const cur = projectRef.current;
-if (!cur) return "プロジェクトが選択されていません";
-const metas = await dbService.listDbs(cur.id);
-const meta = metas.find((m) => m.name === name);
-if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
-const outcome = await dbService.execSql(meta, sql);
-return formatOutcomeForAgent(outcome, meta.name);
-},
-contextNote: () => {
-const cur = projectRef.current;
-const dbs: DbMeta[] = cur? dbService.cachedList(cur.id): [];
-return [
-"実行環境: Node.js は WebContainer、Python は Pyodide（CPython のWASM版）で実際に実行できます。python file.py / python -c / pip install（純Pythonのみ）が使えます。",
-dbs.length
-? `利用可能なデータベース: ${dbs.map((m) => `${m.name}（${m.engine === "sqlite"? "SQLite": "PostgreSQL"}）`).join("、")}。db_list / db_schema / db_query ツールで操作できます。`
-: "データベースはまだ作成されていません（作成はユーザー操作です）。",
-].join("\n");
-},
-sessionFiles: p.sessionFilesRef.current,
-signal: ctl.signal,
-onEvent: (e: AgentEvent) => {
-if (e.kind === "change") {
-pushEvent({ id: e.change.id, kind: "change", label: e.change.path, change: e.change, at: e.change.at});
-} else if (e.kind === "tool") {
-pushEvent({
-id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-kind: "tool",
-label: e.tool,
-detail: e.detail,
-output: e.output || undefined,
-at: Date.now(),
-});
-} else if (e.kind === "step") {
-pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, step: e.step, max: e.max, at: Date.now()});
-} else if (e.kind === "note") {
-pushEvent({ id: `n${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "note", label: e.label, at: Date.now()});
-}
-},
-},
-});
-const body = [result.text, result.stopped? `${result.stopped}`: ""].filter(Boolean).join("\n\n");
-pushMsg("assistant", body || "（報告がありませんでした）");
-} catch (e) {
-if (e instanceof DOMException && e.name === "AbortError") {
-pushMsg("system", "停止しました。");
-} else {
-pushMsg("system", `実行できませんでした: ${e instanceof Error? e.message: String(e)}`);
-}
-} finally {
-setRunning(false);
-abortRef.current = null;
-}
-}, [input, running, mode, p, props.askConfirm, pushMsg, pushEvent, stream]);
+  const setStream = useCallback((updater: (prev: StreamItem[]) => StreamItem[]) => {
+    setStreamState((prev) => ({ owner: prev.owner, items: updater(prev.items) }));
+  }, []);
 
-const undoChange = (change: ChangeRecord) => {
-const cur = projectRef.current;
-if (!cur) return;
-const next = revertChange(cur.files, change);
-p.updateProject(cur.id, (pr) => ({
-...pr,
-files: next,
-changeLog: [
-{ at: Date.now(), path: change.path, kind: "edit" as const, source: "user" as const, detail: "AIの変更を元に戻した"},
-...(pr.changeLog || []),
-].slice(0, 100),
-}));
-setUndone((prev) => new Set(prev).add(change.id));
-};
+  /* 保存: 実行中は切り捨てず、終了後に上限で切り捨てる */
+  const persist = useCallback((owner: string, items: StreamItem[]) => {
+    if (!owner) return;
+    const data = splitChatItems(items);
+    onChatChangeRef.current(owner, runningRef.current ? data : trimChat(data));
+  }, []);
 
-return (
-<aside className="dev-right">
-<div className="dev-sec-head" style={{ padding: "10px 12px 0"}}>
-<span>AI Developer</span>
-<button type="button" className="btn sm" onClick={props.onOpenModel}>
-モデル変更
-</button>
-</div>
-<div className="dev-modes" role="tablist" aria-label="開発モード">
-{DEV_MODES.map((m) => (
-<button
-key={m.id}
-type="button"
-role="tab"
-aria-selected={mode === m.id}
-className={`dev-mode${mode === m.id? " on": ""}`}
-title={m.desc}
-onClick={() => setMode(m.id)}
->
-{m.label}
-</button>
-))}
-</div>
-<div className="dev-mode-desc">
-{DEV_MODES.find((m) => m.id === mode)?.desc}
-{READONLY_MODES.has(mode)? "（このモードではファイルを変更しません）": ""}
-</div>
-<div className="dev-stream" ref={streamRef}>
-{stream.length === 0 && (
-<div className="dev-empty-note" style={{ padding: 12}}>
-作りたいものを伝えてください。プロジェクトを調査し、計画・実装・動作確認まで進めます。実行していない作業を完了とは表示しません。
-</div>
-)}
-{stream.map((s) => {
-if (s.type === "msg") {
-return (
-<div key={s.id} className={`dev-msg ${s.role}`}>
-<div className="dev-msg-role">{s.role === "user"? "あなた": s.role === "assistant"? "AI Developer": "案内"}</div>
-<div className="dev-msg-body">{s.content}</div>
-</div>
-);
-}
-const it = s.item;
-if (it.kind === "change" && it.change) {
-const st = diffStat(it.change.before?? "", it.change.after?? "");
-const done = undone.has(it.change.id);
-return (
-<div key={s.id} className="dev-changecard">
-<div className="dev-changecard-head">
-<Icon name="doc" className="ic sm" />
-<span className="path">{it.change.path}</span>
-<span className="kind">
-{it.change.kind === "create"? "作成": it.change.kind === "delete"? "削除": "編集"}
-</span>
-<span className="stat">
-+{st.added} / −{st.removed}
-</span>
-</div>
-<div className="dev-changecard-btns">
-<button
-type="button"
-className="btn sm"
-onClick={() =>
-p.setDiffPair({
-title: `${it.change!.path} の変更`,
-before: it.change!.before?? "",
-after: it.change!.after?? "",
-})
-}
->
-差分を見る
-</button>
-<button type="button" className="btn sm" disabled={done} onClick={() => undoChange(it.change!)}>
-{done? "元に戻し済み": "この変更を元に戻す"}
-</button>
-</div>
-</div>
-);
-}
-if (it.kind === "tool") {
-return (
-<details key={s.id} className="dev-tool">
-<summary>
-<DIcon name="terminal" className="dev-ic sm" /> {it.label}
-{it.detail? ` — ${it.detail}`: ""}
-</summary>
-{it.output && <pre>{it.output}</pre>}
-</details>
-);
-}
-return (
-<div key={s.id} className="dev-step">
-<span className="time">{fmtTime(it.at)}</span>
-{it.step? <span className="time">{it.step}/{it.max?? ""}</span>: null} {it.label}
-</div>
-);
-})}
-{running && <div className="dev-running">実行中…（実際に実行した手順だけが上に表示されます）</div>}
-</div>
-<div className="dev-composer">
-<textarea
-value={input}
-onChange={(e) => setInput(e.target.value)}
-placeholder={p.project? "作りたいもの・直したいことを入力": "プロジェクトを選んでください"}
-rows={3}
-onKeyDown={(e) => {
-if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
-}}
-aria-label="AIへの指示"
-/>
-<div className="dev-composer-btns">
-<span className="dev-composer-note">Ctrl+Enterで送信</span>
-{running? (
-<button type="button" className="btn danger sm" onClick={stop}>
-<Icon name="stop" className="ic sm" /> 停止
-</button>
-): (
-<button type="button" className="btn primary sm" onClick={() => void send()} disabled={!input.trim()}>
-送信
-</button>
-)}
-</div>
-</div>
-</aside>
-);
+  const activeProjectId = p.project?.id || "";
+
+  /* プロジェクト切替時: 前のプロジェクトの最終状態を保存し、そのプロジェクトのチャットを読み込む */
+  useLayoutEffect(() => {
+    if (streamState.owner === activeProjectId) return;
+    if (streamState.owner) persist(streamState.owner, streamState.items);
+    const data = chatDataRef.current;
+    seqRef.current = nextChatSeq(data);
+    setStreamState({ owner: activeProjectId, items: interleaveChat(data) });
+    setUndone(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId]);
+
+  /* チャットの変更をプロジェクト別に保存する */
+  useEffect(() => {
+    if (!streamState.owner) return;
+    persist(streamState.owner, streamState.items);
+  }, [streamState, running, persist]);
+
+  /* 実行中フラグをシェルへ伝える（切替・ダッシュボード復帰の無効化に使う） */
+  useEffect(() => {
+    setAgentRunning(running);
+  }, [running, setAgentRunning]);
+
+  useEffect(() => {
+    const el = streamRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [stream, running]);
+
+  const pushMsg = useCallback(
+    (role: "user" | "assistant" | "system", content: string) => {
+      const id = `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const seq = seqRef.current++;
+      setStream((prev) => [...prev, { type: "msg", msg: { id, role, content, seq } }]);
+    },
+    [setStream],
+  );
+
+  const pushEvent = useCallback(
+    (item: TimelineItem) => {
+      const seq = seqRef.current++;
+      setStream((prev) => [...prev.slice(-500), { type: "event", event: { ...item, seq } }]);
+    },
+    [setStream],
+  );
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    wcService.stopCurrent();
+  }, []);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || running) return;
+    const project = projectRef.current;
+    if (!project) {
+      pushMsg("system", "プロジェクトが選択されていません。左のパネルでプロジェクトを作成・選択してください。");
+      return;
+    }
+    setInput("");
+    pushMsg("user", text);
+
+    const confNow = p.getConf();
+    let provider: import("../lib/types").ProviderDef | null = null;
+    let model = "";
+    if (confNow.provider === "auto") {
+      const choice = resolveAuto(text);
+      if (!choice) {
+        pushMsg("system", "接続済みのAIがありません。本体（Eluntra）の設定でAPIキーを設定してから、もう一度お試しください。");
+        return;
+      }
+      provider = choice.provider;
+      model = choice.model;
+      pushEvent({ id: `e${Date.now()}`, kind: "note", label: `Eluntra Auto: ${choice.reason}`, at: Date.now() });
+    } else {
+      provider = providerDefOf(confNow.provider) || null;
+      model = selectedModel(confNow.provider);
+      if (!provider) {
+        pushMsg("system", "選択中のプロバイダーが見つかりません。本体の設定で選び直してください。");
+        return;
+      }
+      if (!hasCredentials(provider.id)) {
+        pushMsg(
+          "system",
+          `${provider.name} のAPIキーが未設定です。本体（Eluntra）の「設定 → APIプロバイダー」でキーを設定してから、もう一度お試しください。`,
+        );
+        return;
+      }
+    }
+
+    const history: ChatMessage[] = stream
+      .filter((s): s is Extract<StreamItem, { type: "msg" }> => s.type === "msg" && (s.msg.role === "user" || s.msg.role === "assistant"))
+      .map((s) => ({ role: s.msg.role as "user" | "assistant", content: s.msg.content }));
+
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setRunning(true);
+    try {
+      const result = await runDevAgent({
+        provider,
+        model,
+        mode,
+        history,
+        userText: text,
+        ctx: {
+          getFiles: () => projectRef.current?.files || {},
+          applyFiles: (nextFiles, change) => {
+            const cur = projectRef.current;
+            if (!cur) return;
+            p.updateProject(cur.id, (pr) => {
+              let next: DevProject = { ...pr, files: nextFiles, updatedAt: Date.now() };
+              if (change) {
+                next = {
+                  ...next,
+                  changeLog: [
+                    { at: Date.now(), path: change.path, kind: change.kind, source: "ai" as const },
+                    ...(next.changeLog || []),
+                  ].slice(0, 100),
+                };
+              }
+              return next;
+            });
+          },
+          confirm: props.askConfirm,
+          termExec: async (command: string) => {
+            const parsedPy = parsePythonCommand(command);
+            if (parsedPy.kind !== "other") {
+              if (parsedPy.kind === "python-repl") {
+                return "対話モード（python単体）はエージェントからは使えません。python -c \"...\" か、ファイルを作成して python file.py で実行してください。";
+              }
+              try {
+                const filesNow = projectRef.current?.files || {};
+                if (parsedPy.kind === "pip-install") {
+                  const r = await pyService.pipInstall(parsedPy.packages);
+                  return [`$ ${command}（Python / Pyodide）`, r.error ? `micropip エラー: ${r.error}` : r.output.trim() || "インストールしました"].join("\n");
+                }
+                const res =
+                  parsedPy.kind === "python-file"
+                    ? await pyService.runFile(filesNow, parsedPy.path, parsedPy.args)
+                    : await pyService.runCode(filesNow, parsedPy.kind === "python-code" ? parsedPy.code : "");
+                if (res.changes.length) {
+                  const cur = projectRef.current;
+                  if (cur) {
+                    const applied = applyPyChanges(cur.files, res.changes);
+                    if (applied.touched.length) {
+                      p.updateProject(cur.id, (pr) => ({
+                        ...pr,
+                        files: applied.files,
+                        changeLog: [
+                          { at: Date.now(), path: applied.touched[0], kind: "edit" as const, source: "ai" as const, detail: `Python実行で${applied.touched.length}件変更` },
+                          ...(pr.changeLog || []),
+                        ].slice(0, 100),
+                      }));
+                    }
+                  }
+                }
+                return [
+                  `$ ${command}（Python / Pyodide）`,
+                  res.output.trim() ? res.output.trim().slice(-6000) : "（出力なし）",
+                  res.error ? `エラー: ${res.error.slice(0, 2000)}` : "（終了コード: 0）",
+                ].join("\n");
+              } catch (e) {
+                return `Pythonは利用できません: ${pyService.errorReason || (e instanceof Error ? e.message : String(e))}`;
+              }
+            }
+            try {
+              await ensureWcMounted(projectRef.current);
+            } catch (e) {
+              return `ターミナル（Node.js）は利用できません: ${wcService.errorReason || (e instanceof Error ? e.message : String(e))}。Pythonコマンド（python file.py 等）は Pyodide で実行できます。`;
+            }
+            const res = await wcService.exec(command, { timeoutMs: 120_000 });
+            const out = res.output.trim();
+            return [
+              `$ ${command}`,
+              out ? out.slice(-6000) : "（出力なし）",
+              res.timedOut ? "（120秒でタイムアウトし、停止しました）" : `（終了コード: ${res.code ?? "不明"}）`,
+            ].join("\n");
+          },
+          previewInfo: () => {
+            if (wcService.previewUrl) return `開発サーバーが起動しています。プレビューURL: ${wcService.previewUrl}`;
+            const cur = projectRef.current;
+            if (cur && "index.html" in cur.files) return "開発サーバーは未起動です。静的プレビュー（index.html）が利用できます。";
+            return "プレビューは未起動です。ターミナルで開発サーバー（npm run dev）を起動するとURLが発行されます（WebContainerが必要）";
+          },
+          dbList: async () => {
+            const cur = projectRef.current;
+            if (!cur) return "プロジェクトが選択されていません";
+            const metas = await dbService.listDbs(cur.id);
+            if (!metas.length) return "このプロジェクトにはデータベースがまだありません。データベースはユーザーが下部パネルの「データベース」タブで作成します（あなたは作成できません）。必要なら最終報告で作成を依頼してください。";
+            return metas.map((m) => `${m.name}（${m.engine === "sqlite" ? "SQLite" : "PostgreSQL"}）`).join("\n");
+          },
+          dbSchema: async (name: string) => {
+            const cur = projectRef.current;
+            if (!cur) return "プロジェクトが選択されていません";
+            const metas = await dbService.listDbs(cur.id);
+            const meta = metas.find((m) => m.name === name);
+            if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
+            const tables = await dbService.schema(meta);
+            return formatSchemaForAgent(tables);
+          },
+          dbQuery: async (name: string, sql: string) => {
+            const cur = projectRef.current;
+            if (!cur) return "プロジェクトが選択されていません";
+            const metas = await dbService.listDbs(cur.id);
+            const meta = metas.find((m) => m.name === name);
+            if (!meta) return `データベース「${name}」がありません。db_list で確認してください。`;
+            const outcome = await dbService.execSql(meta, sql);
+            return formatOutcomeForAgent(outcome, meta.name);
+          },
+          contextNote: () => {
+            const cur = projectRef.current;
+            const dbs: DbMeta[] = cur ? dbService.cachedList(cur.id) : [];
+            return [
+              "実行環境: Node.js は WebContainer、Python は Pyodide（CPython のWASM版）で実際に実行できます。python file.py / python -c / pip install（純Pythonのみ）が使えます。",
+              dbs.length
+                ? `利用可能なデータベース: ${dbs.map((m) => `${m.name}（${m.engine === "sqlite" ? "SQLite" : "PostgreSQL"}）`).join("、")}。db_list / db_schema / db_query ツールで操作できます。`
+                : "データベースはまだ作成されていません（作成はユーザー操作です）。",
+            ].join("\n");
+          },
+          sessionFiles: p.sessionFilesRef.current,
+          signal: ctl.signal,
+          onEvent: (e: AgentEvent) => {
+            if (e.kind === "change") {
+              pushEvent({ id: e.change.id, kind: "change", label: e.change.path, change: e.change, at: e.change.at });
+            } else if (e.kind === "tool") {
+              pushEvent({
+                id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                kind: "tool",
+                label: e.tool,
+                detail: e.detail,
+                output: e.output || undefined,
+                at: Date.now(),
+              });
+            } else if (e.kind === "step") {
+              pushEvent({ id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "step", label: e.label, step: e.step, max: e.max, at: Date.now() });
+            } else if (e.kind === "note") {
+              pushEvent({ id: `n${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind: "note", label: e.label, at: Date.now() });
+            }
+          },
+        },
+      });
+      const body = [result.text, result.stopped ? `${result.stopped}` : ""].filter(Boolean).join("\n\n");
+      pushMsg("assistant", body || "（報告がありませんでした）");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        pushMsg("system", "停止しました。");
+      } else {
+        pushMsg("system", `実行できませんでした: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    } finally {
+      setRunning(false);
+      abortRef.current = null;
+    }
+  }, [input, running, mode, p, props.askConfirm, pushMsg, pushEvent, stream]);
+
+  const undoChange = (change: ChangeRecord) => {
+    const cur = projectRef.current;
+    if (!cur) return;
+    const next = revertChange(cur.files, change);
+    p.updateProject(cur.id, (pr) => ({
+      ...pr,
+      files: next,
+      changeLog: [
+        { at: Date.now(), path: change.path, kind: "edit" as const, source: "user" as const, detail: "AIの変更を元に戻した" },
+        ...(pr.changeLog || []),
+      ].slice(0, 100),
+    }));
+    setUndone((prev) => new Set(prev).add(change.id));
+  };
+
+  return (
+    <aside className="dev-right">
+      <div className="dev-sec-head" style={{ padding: "10px 12px 0" }}>
+        <span>AI Developer</span>
+        <button type="button" className="btn sm" onClick={props.onOpenModel}>
+          モデル変更
+        </button>
+      </div>
+      <div className="dev-chat-proj">
+        {p.project ? `「${p.project.name}」のチャット（プロジェクトごとに保存されます）` : "プロジェクト未選択"}
+      </div>
+      <div className="dev-modes" role="tablist" aria-label="開発モード">
+        {DEV_MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            role="tab"
+            aria-selected={mode === m.id}
+            className={`dev-mode${mode === m.id ? " on" : ""}`}
+            title={m.desc}
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="dev-mode-desc">
+        {DEV_MODES.find((m) => m.id === mode)?.desc}
+        {READONLY_MODES.has(mode) ? "（このモードではファイルを変更しません）" : ""}
+      </div>
+      <div className="dev-stream" ref={streamRef}>
+        {stream.length === 0 && (
+          <div className="dev-empty-note" style={{ padding: 12 }}>
+            作りたいものを伝えてください。プロジェクトを調査し、計画・実装・動作確認まで進めます。実行していない作業を完了とは表示しません。
+          </div>
+        )}
+        {stream.map((s) => {
+          if (s.type === "msg") {
+            return (
+              <div key={s.msg.id} className={`dev-msg ${s.msg.role}`}>
+                <div className="dev-msg-role">{s.msg.role === "user" ? "あなた" : s.msg.role === "assistant" ? "AI Developer" : "案内"}</div>
+                <div className="dev-msg-body">{s.msg.content}</div>
+              </div>
+            );
+          }
+          const it = s.event;
+          if (it.kind === "change" && it.change) {
+            const st = diffStat(it.change.before ?? "", it.change.after ?? "");
+            const done = undone.has(it.change.id);
+            return (
+              <div key={s.event.id} className="dev-changecard">
+                <div className="dev-changecard-head">
+                  <Icon name="doc" className="ic sm" />
+                  <span className="path">{it.change.path}</span>
+                  <span className="kind">
+                    {it.change.kind === "create" ? "作成" : it.change.kind === "delete" ? "削除" : "編集"}
+                  </span>
+                  <span className="stat">
+                    +{st.added} / −{st.removed}
+                  </span>
+                </div>
+                <div className="dev-changecard-btns">
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() =>
+                      p.setDiffPair({
+                        title: `${it.change!.path} の変更`,
+                        before: it.change!.before ?? "",
+                        after: it.change!.after ?? "",
+                      })
+                    }
+                  >
+                    差分を見る
+                  </button>
+                  <button type="button" className="btn sm" disabled={done} onClick={() => undoChange(it.change!)}>
+                    {done ? "元に戻し済み" : "この変更を元に戻す"}
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          if (it.kind === "tool") {
+            return (
+              <details key={s.event.id} className="dev-tool">
+                <summary>
+                  <DIcon name="terminal" className="dev-ic sm" /> {it.label}
+                  {it.detail ? ` — ${it.detail}` : ""}
+                </summary>
+                {it.output && <pre>{it.output}</pre>}
+              </details>
+            );
+          }
+          return (
+            <div key={s.event.id} className="dev-step">
+              <span className="time">{fmtTime(it.at)}</span>
+              {it.step ? <span className="time">{it.step}/{it.max ?? ""}</span> : null} {it.label}
+            </div>
+          );
+        })}
+        {running && <div className="dev-running">実行中…（実際に実行した手順だけが上に表示されます）</div>}
+      </div>
+      <div className="dev-composer">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={p.project ? "作りたいもの・直したいことを入力" : "プロジェクトを選んでください"}
+          rows={3}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
+          }}
+          aria-label="AIへの指示"
+        />
+        <div className="dev-composer-btns">
+          <span className="dev-composer-note">Ctrl+Enterで送信</span>
+          {running ? (
+            <button type="button" className="btn danger sm" onClick={stop}>
+              <Icon name="stop" className="ic sm" /> 停止
+            </button>
+          ) : (
+            <button type="button" className="btn primary sm" onClick={() => void send()} disabled={!input.trim()}>
+              送信
+            </button>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
 }
 
 /* ---------- 下部パネル ---------- */
