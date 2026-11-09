@@ -75,6 +75,41 @@ function BubbleIcon() {
   );
 }
 
+/** 処理中メッセージの経過秒数（実時計。pending の間だけ1秒ごとに進む） */
+function useElapsedSeconds(active: boolean): number {
+  const [sec, setSec] = useState(0);
+  const startRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      startRef.current = null;
+      setSec(0);
+      return;
+    }
+    if (startRef.current === null) startRef.current = Date.now();
+    const id = window.setInterval(() => {
+      if (startRef.current !== null) setSec(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return sec;
+}
+
+/** 処理中インジケーター：3点パルス＋現在の作業ラベル＋経過秒数（v7.2.7） */
+function PendingStatus({ label, sec }: { label: string; sec: number }) {
+  return (
+    <div className="proc-status" role="status">
+      <span className="proc-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      <span>
+        {label}… {sec}秒
+      </span>
+    </div>
+  );
+}
+
 function MessageItem({
   m, isLast, onRegenerate, onEdit, toast, onPreview,
 }: {
@@ -85,6 +120,7 @@ function MessageItem({
   toast: (msg: string) => void;
   onPreview: (code: string, lang: string) => void;
 }) {
+  const elapsed = useElapsedSeconds(!!m.pending);
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -120,12 +156,17 @@ function MessageItem({
       </div>
       {m.steps && m.steps.length > 0 && (
         <div className="msg-steps">
-          {m.steps.map((st, i) => (
-            <div className="step" key={i}>
-              <Icon name="check" className="ic sm" />
-              <span>{st}</span>
-            </div>
-          ))}
+          {m.steps.map((st, i) => {
+            const isLastStep = i === m.steps!.length - 1;
+            const active = !!m.pending && isLastStep;
+            const done = !!m.pending && !isLastStep;
+            return (
+              <div className={`step${active ? " active" : ""}${done ? " done" : ""}`} key={i}>
+                {active ? <span className="pulse-dot" aria-hidden="true" /> : <Icon name="check" className="ic sm" />}
+                <span>{st}</span>
+              </div>
+            );
+          })}
         </div>
       )}
       {(m.attachments || []).map((a, i) =>
@@ -141,7 +182,16 @@ function MessageItem({
         ),
       )}
       {m.pending && !m.content ? (
-        <div className="typing">考え中…</div>
+        <PendingStatus
+          label={
+            m.steps && m.steps.length
+              ? m.steps[m.steps.length - 1]
+              : m.model === "画像生成"
+                ? "画像を生成中"
+                : "回答を作成中"
+          }
+          sec={elapsed}
+        />
       ) : (
         <div
           className="msg-body"
@@ -163,6 +213,7 @@ function MessageItem({
           <Markdown text={m.content} />
         </div>
       )}
+      {m.pending && !!m.content && <PendingStatus label="回答を作成中" sec={elapsed} />}
       {m.metaNote && <div className="msg-note">{m.metaNote}</div>}
       {m.sources && m.sources.length > 0 && (
         <div className="msg-sources">

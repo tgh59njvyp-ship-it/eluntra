@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.2.5）
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2.7）
    構成: 起動時はダッシュボード（プロジェクト一覧）。プロジェクトを開くと
    ワークスペース（左=プロジェクト/ファイルツリー、中央=Monacoエディター、
    右=AI開発チャット、下部=ターミナル/プレビュー/問題。モバイルは下部タブ切替）。
@@ -105,6 +105,8 @@ export function DeveloperApp() {
 
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
+  /* AIチャットの拡大表示（v7.2.7：デスクトップ=集中レイアウト、モバイル=タブバーを隠して全画面化） */
+  const [chatWide, setChatWide] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("files");
   const [showDiff, setShowDiff] = useState(false);
@@ -270,6 +272,8 @@ export function DeveloperApp() {
     applyFileChange,
     openTabs,
     activePath,
+    chatWide,
+    setChatWide,
     openFile,
     closeTab,
     setActivePath,

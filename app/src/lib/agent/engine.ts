@@ -111,7 +111,10 @@ export function runSandboxedJs(code: string): Promise<string> {
   });
 }
 
-async function execTool(call: ToolCall, progress: AgentProgress): Promise<string> {
+/** 長時間ツールの進捗通知（経過秒数）。Supabaseプロジェクト作成のポーリング等で使う */
+export type ToolProgressNote = (elapsedSec: number) => void;
+
+async function execTool(call: ToolCall, progress: AgentProgress, onProgressNote?: ToolProgressNote): Promise<string> {
   const a = call.args;
   switch (call.tool) {
     case "web_search": {
@@ -192,7 +195,7 @@ async function execTool(call: ToolCall, progress: AgentProgress): Promise<string
       return supabaseOrgs();
     case "supabase_create_project":
       progress.steps.push("Supabaseプロジェクトを作成中");
-      return supabaseCreateProjectTool(a);
+      return supabaseCreateProjectTool(a, onProgressNote);
     case "supabase_project_setup":
       progress.steps.push("Supabaseプロジェクトを確認中");
       return supabaseProjectSetupTool(a);
@@ -219,6 +222,21 @@ const STEP_LABEL: Record<string, string> = {
   supabase_project_setup: "Supabaseプロジェクトを確認中",
   browser: "ブラウザで確認中",
 };
+
+/**
+ * 本体エージェントのツール群を、他のエージェント（Eluntra Developer 等）から
+ * そのまま再利用するための公開実行口。実装は execTool と完全に同一で、
+ * 進捗（steps / sources）の収集だけ呼び出し側の責務として切り離している。
+ * 未接続チェックや Supabase の接続情報の読み取りも execTool 側の実装どおりに動く。
+ */
+export async function runSharedTool(
+  tool: string,
+  args: Record<string, string>,
+  onProgressNote?: ToolProgressNote,
+): Promise<string> {
+  const progress: AgentProgress = { steps: [], sources: [] };
+  return execTool({ tool, args }, progress, onProgressNote);
+}
 
 /** エージェントループを実行する。onProgress で手順表示を随時更新する。
     opts.webSearchFirst: コンポーザーの「検索」ピル用。最初に必ず web_search するよう指示を足す */

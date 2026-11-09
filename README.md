@@ -255,3 +255,20 @@ v7.1で「対応していないもの」として明示していた項目のう�
 - 前提: sbp_ アクセストークン、またはログイン式（OAuth）接続が必要。URL＋サービスロールキーだけの接続ではプロジェクト作成はできない（その旨を案内する）
 - 制限: 無料プランでは組織あたりのプロジェクト数に上限がある。作成は1回につき1プロジェクトのみ
 - 検証: 新規テスト `app/tests/supabase-create.test.mjs` 30件（fetch スタブで Management API を再現し、作成→ポーリング→キー取得→コネクタ保存、組織複数の分岐、トークン無しの案内、準備中→setup の仕上げ、422 上限エラーの伝播、runAgent 経由の完走）を全通過。既存の agent-main 29件・dev-agent 76件・dev-chat 26件も全通過。実アカウントでの作成は未検証（利用者のトークンは端末側にのみ存在するため）
+
+## v7.2.6（Developerエージェントに本体エージェントのツール群を追加）
+- Eluntra Developer のAIエージェントが、本体チャットのエージェントと同じツール群を使えるようになった。実行は本体と同一実装（`app/src/lib/agent/engine.ts` の `runSharedTool`）へ委譲し、APIロジックは複製していない。Developer 側は「接続状態に応じた提示」「モード別の書き込み拒否」「重要な操作の確認」「タイムライン表示」を担う
+- 追加ツール（名称は本体と同一）: 常時 = `web_search` / `fetch_page` / `browser` / `run_javascript` / `get_datetime` / `save_note` / `search_notes`（メモは本体と共有の保存先）。コネクタ接続時 = `github_repos` / `youtube_search` / `notion_search` / Supabase 全式（`supabase_tables` / `supabase_select` / `supabase_insert` / `supabase_update` / `supabase_delete` / `supabase_sql` / `supabase_auth_users` / `supabase_orgs` / `supabase_create_project` / `supabase_project_setup`）
+- 動的提示: ツール一覧は実行開始時点の接続状態で組み立てる。未接続サービスのコネクタツールはプロンプトに含めず、「接続すると使える」旨を1行で伝える（モデルが存在しないツールを呼ばないようにするため）
+- モード制限: PLAN / REVIEW / ASK では書き込み系をツール層で拒否する（`supabase_insert` / `supabase_update` / `supabase_delete`、書き込みSQL（`supabase_sql`。判定はローカルDBと同じ `isReadOnlySql` を再利用）、`supabase_create_project`、`supabase_project_setup`、`supabase_auth_users` の create/delete、`save_note`）。読み取り系（検索・select・テーブル一覧・組織一覧・認証ユーザー一覧・Web・日時・メモ検索・JS実行）は全モードで使える
+- 確認: BUILD / AUTO / DEBUG では `supabase_delete`、書き込みSQL、`supabase_create_project` の実行前に、既存のインライン確認（ファイル上書きと同じ仕組み）を1回挟む。`supabase_insert` / `supabase_update` はファイル編集と同様に確認なしで実行する。プロジェクト作成は、本体と同じくユーザーが明示的に依頼したときだけ使うようプロンプトにも明記した
+- 進捗・上限との関係: 共有の読み取りツールは v7.2.1 の探索予算・重複判定の対象に含める。共有の書き込みが成功すると停滞カウンタをリセットする（ファイル変更と同じ「前進」扱い）。タイムラインには「Supabase: SQL実行」「Supabase: プロジェクト作成」等の日本語ラベルで表示する
+- Supabase の接続先は従来どおりグローバル（プロジェクト別ではない）。Developer のプロジェクトを切り替えても接続先は変わらない
+- 検証: 新規テスト `app/tests/dev-exttools.test.mjs` 42件（BUILD での tables→SQL(SELECT) 完走とタイムライン表示、PLAN での insert 拒否・select 許可、未接続時にガイドから Supabase ツールが消えること、delete の確認1回と拒否時の未実行、create_project の確認→作成→自動接続と PLAN 拒否、web_search の動作）を全通過。既存の dev-agent 76件・agent-main 29件・dev-chat 26件・supabase-create 30件も全通過。実アカウント（利用者のトークン）での往復は未検証
+
+## v7.2.7（処理中表示の改善＋Developerチャットの拡大）
+- 「いま処理をしているのかしていないのか分かりにくい」への対策。本体チャット: 処理中の回答メッセージに3点パルス＋現在の作業ラベル＋経過秒数（実時計、1秒更新）を表示する。エージェントの手順リストは、完了した手順をチェック＋淡色、最新の手順をパルスドットで「いまここ」と分かるようにした。生成中の送信ボタンは従来どおり停止ボタン（エージェント実行時も同じ）
+- Developer: AIパネル上部に実行中ステータスバーを常設した（スピナー＋手順 n/25＋現在の作業＋経過秒数）。イベントが届かない間も1秒ごとに経過が進むため、固まっているかどうかが見分けられる。レート制限の待機は「残り約n秒」のカウントダウン表示。実行中のツールはタイムライン上でスピナー＋「実行中…」と表示する。Supabaseプロジェクト作成のポーリング中は「プロジェクト作成の完了を待っています（n秒経過）」のノートが随時届く（進捗コールバックを `runSharedTool` 経由で接続）
+- Developer のAIチャット拡大: パネル見出しに「広げる／戻す」ボタンを追加。デスクトップではチャットが画面の約62%幅になる集中レイアウト（左パネルは畳む）、モバイルのAIタブでは下部タブバーを隠して全画面化する（ヘッダーのダッシュボードボタンと「戻す」ボタンは残る）。通常時の右パネル幅も 368px → 380px に拡大
+- モバイルのAIタブでは、モード選択を1行（横スクロール）に圧縮し、モード説明とプロジェクト名行を畳んで、メッセージ領域に高さを割り当てる。入力欄は最小高＋自動伸縮（最大140px）に変更
+- 新しいアニメーションは `prefers-reduced-motion` で停止する。経過秒数はすべて実際の処理時間の実時計で、進捗率のような見せかけの数値は出さない

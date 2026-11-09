@@ -344,13 +344,19 @@ function pollCfg(): { intervalMs: number; timeoutMs: number } {
 
 const sleepMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function waitUntilReady(ref: string): Promise<SupabaseProjectInfo & { ready: boolean }> {
+async function waitUntilReady(
+  ref: string,
+  onProgress?: (elapsedSec: number) => void,
+): Promise<SupabaseProjectInfo & { ready: boolean }> {
   const { intervalMs, timeoutMs } = pollCfg();
-  const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
   for (;;) {
     const p = await supabaseGetProject(ref);
     if (p.status === "ACTIVE_HEALTHY") return { ...p, ready: true };
     if (Date.now() + intervalMs > deadline) return { ...p, ready: false };
+    /* 待機が長いと「止まっている」ように見えるため、経過秒数を呼び出し側へ知らせる（v7.2.7） */
+    onProgress?.(Math.max(1, Math.round((Date.now() - startedAt) / 1000)));
     await sleepMs(intervalMs);
   }
 }
@@ -567,11 +573,14 @@ export async function supabaseOrgs(): Promise<string> {
  * 組織の解決 → 作成 → 準備完了を待つ → APIキーを取得してコネクタへ保存、までを行う。
  * DBパスワードはこの結果で1回だけ提示する。
  */
-export async function supabaseCreateProjectTool(args: {
-  name?: string;
-  orgId?: string;
-  region?: string;
-}): Promise<string> {
+export async function supabaseCreateProjectTool(
+  args: {
+    name?: string;
+    orgId?: string;
+    region?: string;
+  },
+  onProgress?: (elapsedSec: number) => void,
+): Promise<string> {
   requireMgmtCreds();
   const name = (args.name || "").trim();
   if (!name) return "name（プロジェクト名）を指定してください";
@@ -596,7 +605,7 @@ export async function supabaseCreateProjectTool(args: {
   const passNote =
     `データベースパスワード: ${dbPass}\n` +
     "このパスワードはデータベース直接接続用です。保存してください（再表示できません）";
-  const st = await waitUntilReady(ref);
+  const st = await waitUntilReady(ref, onProgress);
   if (!st.ready) {
     return [
       `プロジェクト「${name}」を作成しましたが、まだ準備中です（状態: ${st.status || "不明"}）。`,

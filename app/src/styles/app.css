@@ -124,6 +124,27 @@ a { color: var(--accent); }
 .gen-dl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--accent); text-decoration: none; margin-top: 2px; }
 .typing { color: var(--text-3); font-size: 14px; padding: 6px 0; }
 
+/* 処理中インジケーター（v7.2.7：3点パルス＋経過秒数。「いま処理しているか」を明確にする） */
+.proc-status { display: flex; align-items: center; gap: 9px; color: var(--text-2); font-size: 13.5px; padding: 6px 0; }
+.proc-dots { display: inline-flex; gap: 4px; flex: none; }
+.proc-dots span {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  animation: procPulse 1.2s ease-in-out infinite;
+}
+.proc-dots span:nth-child(2) { animation-delay: 0.15s; }
+.proc-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes procPulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.75); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.step.done { color: var(--text-3); }
+.step.done .ic { color: var(--text-3); }
+.step.active { color: var(--ink); font-weight: 600; }
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; margin: 0 4px;
+  animation: procPulse 1.2s ease-in-out infinite;
+}
+
 .banner {
   display: flex; gap: 10px; border: 1px solid var(--line); border-left: 3px solid var(--error);
   background: var(--error-bg); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 20px; font-size: 14px;
@@ -415,6 +436,7 @@ textarea.text-input { resize: vertical; min-height: 64px; line-height: 1.6; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+  .proc-dots span, .pulse-dot { animation: none !important; opacity: 0.85; }
 }
 
 /* コネクタ：ログイン式接続パネル（v6.2） */

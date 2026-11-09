@@ -42,6 +42,8 @@ const DEV_PATHS: Record<string, React.ReactNode> = {
   back: <><path d="M15 5l-7 7 7 7" /></>,
   grid: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></>,
   monitor: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6m-3-4v4" /></>,
+  expand: <><path d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5" /></>,
+  shrink: <><path d="M4 9h5V4m6 5h5V4M4 15h5v5m6-5h5v5" /></>,
   phone: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></>,
   tablet: <><rect x="5" y="2.5" width="14" height="19" rx="2" /><path d="M11 18.5h2" /></>,
 };
@@ -99,6 +101,9 @@ export interface ShellProps {
   ) => void;
   openTabs: string[];
   activePath: string | null;
+  /* AIチャットの拡大表示（v7.2.7） */
+  chatWide: boolean;
+  setChatWide: (b: boolean) => void;
   openFile: (path: string) => void;
   closeTab: (path: string) => void;
   setActivePath: (p: string | null) => void;
@@ -223,7 +228,7 @@ export function ShellMain(p: ShellProps) {
   const inDashboard = p.view === "dashboard";
 
   return (
-    <div className="dev-root" data-mobile={p.mobileTab} data-view={p.view}>
+    <div className="dev-root" data-mobile={p.mobileTab} data-view={p.view} data-chatwide={p.chatWide ? "1" : undefined}>
       <header className="dev-header">
         <a className="dev-back" href="./index.html">
           <DIcon name="back" className="dev-ic sm" /> Eluntra
@@ -232,7 +237,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.5 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.7 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         <button
@@ -967,6 +972,15 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
   const [streamState, setStreamState] = useState<{ owner: string; items: StreamItem[] }>({ owner: "", items: [] });
   const stream = streamState.items;
   const [running, setRunning] = useState(false);
+  /* 実行中ステータスバー用：開始時刻＋1秒ティック（イベントが来なくても経過秒数が進む。v7.2.7） */
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    setNowTs(Date.now());
+    const id = window.setInterval(() => setNowTs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
   const [undone, setUndone] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
   const projectRef = useRef(p.project);
@@ -1088,6 +1102,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
 
     const ctl = new AbortController();
     abortRef.current = ctl;
+    setRunStartedAt(Date.now());
     setRunning(true);
     try {
       const result = await runDevAgent({
@@ -1243,9 +1258,44 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
       }
     } finally {
       setRunning(false);
+      setRunStartedAt(null);
       abortRef.current = null;
     }
   }, [input, running, mode, p, props.askConfirm, pushMsg, pushEvent, stream]);
+
+  /* 実行中ステータスバーの表示内容（最新の手順・待機カウントダウン・実行中ツール） */
+  const runElapsed = running && runStartedAt ? Math.max(0, Math.floor((nowTs - runStartedAt) / 1000)) : 0;
+  let lastStepEv: { label: string; step?: number; max?: number } | null = null;
+  for (const s of stream) {
+    if (s.type === "event" && s.event.kind === "step") {
+      lastStepEv = { label: s.event.label, step: s.event.step, max: s.event.max };
+    }
+  }
+  let waitRemain: number | null = null;
+  let runLabel = lastStepEv?.label || "タスクを分析中";
+  {
+    const lastItem = stream[stream.length - 1];
+    if (running && lastItem?.type === "event" && lastItem.event.kind === "note") {
+      const mm = lastItem.event.label.match(/レート制限のため待機中（約(\d+)秒）/);
+      if (mm) {
+        const remain = parseInt(mm[1], 10) - Math.floor((nowTs - lastItem.event.at) / 1000);
+        if (remain > 0) waitRemain = remain;
+      } else if (!lastStepEv) {
+        runLabel = lastItem.event.label;
+      }
+    }
+  }
+  /* 結果がまだ届いていないツール開始エントリ（同じ呼び出しの変更カードは読み飛ばす） */
+  let activeToolId: string | null = null;
+  if (running) {
+    for (let i = stream.length - 1; i >= 0; i--) {
+      const s = stream[i];
+      if (s.type !== "event") break;
+      if (s.event.kind === "change") continue;
+      if (s.event.kind === "tool" && !s.event.output) activeToolId = s.event.id;
+      break;
+    }
+  }
 
   const undoChange = (change: ChangeRecord) => {
     const cur = projectRef.current;
@@ -1266,9 +1316,20 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
     <aside className="dev-right">
       <div className="dev-sec-head" style={{ padding: "10px 12px 0" }}>
         <span>AI Developer</span>
-        <button type="button" className="btn sm" onClick={props.onOpenModel}>
-          モデル変更
-        </button>
+        <span className="dev-head-btns">
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => p.setChatWide(!p.chatWide)}
+            aria-pressed={p.chatWide}
+            title={p.chatWide ? "チャットを通常の幅に戻す" : "チャットを広げて使う"}
+          >
+            <DIcon name={p.chatWide ? "shrink" : "expand"} className="dev-ic sm" /> {p.chatWide ? "戻す" : "広げる"}
+          </button>
+          <button type="button" className="btn sm" onClick={props.onOpenModel}>
+            モデル変更
+          </button>
+        </span>
       </div>
       <div className="dev-chat-proj">
         {p.project ? `「${p.project.name}」のチャット（プロジェクトごとに保存されます）` : "プロジェクト未選択"}
@@ -1292,6 +1353,20 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
         {DEV_MODES.find((m) => m.id === mode)?.desc}
         {READONLY_MODES.has(mode) ? "（このモードではファイルを変更しません）" : ""}
       </div>
+      {running && (
+        <div className="dev-runbar" role="status" aria-live="polite">
+          <span className="dev-spinner" aria-hidden="true" />
+          {lastStepEv?.step ? (
+            <span className="dev-runbar-step">
+              {lastStepEv.step}/{lastStepEv.max ?? 25}
+            </span>
+          ) : null}
+          <span className="dev-runbar-label">
+            {waitRemain !== null ? `レート制限のため待機中（残り約${waitRemain}秒）` : runLabel}
+          </span>
+          <span className="dev-runbar-time">{runElapsed}秒</span>
+        </div>
+      )}
       <div className="dev-stream" ref={streamRef}>
         {stream.length === 0 && (
           <div className="dev-empty-note" style={{ padding: 12 }}>
@@ -1345,11 +1420,13 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
             );
           }
           if (it.kind === "tool") {
+            const activeTool = it.id === activeToolId;
             return (
-              <details key={s.event.id} className="dev-tool">
+              <details key={s.event.id} className={`dev-tool${activeTool ? " active" : ""}`}>
                 <summary>
-                  <DIcon name="terminal" className="dev-ic sm" /> {it.label}
+                  {activeTool ? <span className="dev-spinner sm" aria-hidden="true" /> : <DIcon name="terminal" className="dev-ic sm" />} {it.label}
                   {it.detail ? ` — ${it.detail}` : ""}
+                  {activeTool ? <span className="dev-tool-active-label">実行中…</span> : null}
                 </summary>
                 {it.output && <pre>{it.output}</pre>}
               </details>
@@ -1362,14 +1439,18 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
             </div>
           );
         })}
-        {running && <div className="dev-running">実行中…（実際に実行した手順だけが上に表示されます）</div>}
       </div>
       <div className="dev-composer">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onInput={(e) => {
+            const ta = e.currentTarget;
+            ta.style.height = "auto";
+            ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`;
+          }}
           placeholder={p.project ? "作りたいもの・直したいことを入力" : "プロジェクトを選んでください"}
-          rows={3}
+          rows={1}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
           }}

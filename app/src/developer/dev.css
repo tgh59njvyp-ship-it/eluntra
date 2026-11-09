@@ -190,8 +190,32 @@ input, select, textarea { font-family: inherit; }
 
 /* 右パネル（AI） */
 .dev-right {
-  width: 368px; flex: none; border-left: 1px solid var(--line);
+  width: 380px; flex: none; border-left: 1px solid var(--line);
   display: flex; flex-direction: column; min-height: 0; background: var(--surface);
+}
+.dev-head-btns { display: inline-flex; gap: 6px; align-items: center; }
+
+/* 実行中ステータスバー（v7.2.7：スピナー＋手順＋現在の作業＋経過秒数。イベントが無くても毎秒進む） */
+.dev-runbar {
+  display: flex; align-items: center; gap: 8px; margin: 0 12px 8px;
+  background: var(--accent-soft); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 11px; font-size: 12.5px; color: var(--ink);
+}
+.dev-runbar-step { font-weight: 800; color: var(--accent); flex: none; }
+.dev-runbar-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-runbar-time { flex: none; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.dev-spinner {
+  width: 15px; height: 15px; flex: none; border-radius: 50%;
+  border: 2px solid var(--line-strong); border-top-color: var(--accent);
+  animation: devSpin 0.8s linear infinite;
+}
+.dev-spinner.sm { width: 12px; height: 12px; border-width: 2px; }
+@keyframes devSpin { to { transform: rotate(360deg); } }
+.dev-tool.active { border-color: var(--accent); }
+.dev-tool.active summary { color: var(--accent); }
+.dev-tool-active-label { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent); flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dev-spinner { animation: none; }
 }
 .dev-modes { display: flex; gap: 5px; flex-wrap: wrap; padding: 10px 12px 4px; }
 .dev-mode {
@@ -225,7 +249,7 @@ input, select, textarea { font-family: inherit; }
 .dev-composer { border-top: 1px solid var(--line); padding: 10px 12px; }
 .dev-composer textarea {
   width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-md); padding: 10px 12px;
-  font-size: 14px; resize: vertical; background: var(--surface); color: var(--ink); min-height: 64px;
+  font-size: 14px; resize: none; background: var(--surface); color: var(--ink); min-height: 46px; max-height: 140px;
 }
 .dev-composer-btns { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
 .dev-composer-note { font-size: 11.5px; color: var(--text-3); margin-right: auto; }
@@ -366,6 +390,9 @@ input, select, textarea { font-family: inherit; }
   .dev-sheet-back { align-items: center; padding: 20px; }
   .dev-sheet { border-radius: var(--radius-lg); }
   .dev-pane-close { display: none; }
+  /* チャット拡大（v7.2.7）：チャットを画面の約62%幅にする集中レイアウト。左パネルは畳む */
+  .dev-root[data-chatwide="1"] .dev-right { width: min(62vw, 1150px); }
+  .dev-root[data-chatwide="1"] .dev-left { display: none; }
 }
 
 /* モバイル（<1024px）: 下部タブで1画面ずつ表示 */
@@ -395,6 +422,15 @@ input, select, textarea { font-family: inherit; }
   .dev-header { gap: 8px; padding: 8px 10px; }
   .dev-projname { flex: 1 1 120px; min-width: 100px; }
   .dev-title-text .dev-version { display: none; }
+  /* AIタブではメッセージ領域を最大化する（v7.2.7）：モードは1行に圧縮し、説明とプロジェクト名行は畳む */
+  .dev-modes { flex-wrap: nowrap; overflow-x: auto; padding: 6px 12px 6px; scrollbar-width: none; }
+  .dev-modes::-webkit-scrollbar { display: none; }
+  .dev-mode { flex: none; min-height: 32px; padding: 5px 10px; }
+  .dev-mode-desc { display: none; }
+  .dev-chat-proj { display: none; }
+  .dev-composer { padding: 8px 10px; }
+  /* チャット拡大時は下部タブバーを隠して全画面化する（ヘッダーと「戻す」ボタンは残る） */
+  .dev-root[data-chatwide="1"][data-mobile="ai"] .dev-mobiletabs { display: none; }
 }
 
 /* v7.2: サブタブ（ターミナル/データベース切替） */
