@@ -173,6 +173,38 @@ const TERMINAL_DEAD_FOLLOWUP =
 const TERMINAL_DEAD_RESULT =
 "ターミナル（Node.js）はこの実行では利用できません（先ほど環境レベルの失敗が判明したため、再試行はしません）。term_exec はもう呼ばないでください。ファイルの作成・編集は続けられます。実行確認ができない項目は、最終報告に「未確認」と明記してください。";
 
+/* ツール呼び出しの解釈に失敗した応答を、最終回答と誤認しないための修復ループ（v7.2.11）。
+   大きなファイルほどツールJSONが壊れたり、モデルがコードを本文へ貼ったりしやすく、
+   従来はそのまま「最終回答」として流れ、ファイルが作られないまま終わっていた */
+/** 連続で許す修復（再送依頼）の回数。これを超えたら正直に止める */
+export const REPAIR_LIMIT = 2;
+
+/** 修復を依頼する差し戻し指示 */
+const REPAIR_INSTRUCTION =
+"ツール呼び出しとして解釈できませんでした。コードをチャット本文に貼らず、fs_write / fs_write_many のJSONで再送してください。長いファイルは分割して複数回に分けるか、1ファイルずつ送ってください。作成するファイルがもう無い場合は、コードブロックを含まない文章で最終報告を書いてください。";
+
+/** 修復上限を超えたときの正直な停止メッセージ（コードの貼り付けは最終文に含めない） */
+const REPAIR_STOPPED_MESSAGE =
+"ファイルの作成データを正しく受け取れなかったため、そのファイルは保存できていません。もう一度送ると作成から再開できます。";
+
+/** 応答が「ツール呼び出しのつもりで失敗したもの」かどうか。
+    ```json フェンスや "tool" キーの断片があればツール試行の失敗として扱う。
+    大きなコードブロックが本文を占める形は、書き込み系モードでのみ
+    「ファイルをチャットに貼った」失敗として扱う。読み取り専用モード（PLAN/REVIEW/ASK）の
+    コード付き回答は正規の最終回答なので素通しする */
+function looksLikeFailedToolAttempt(text: string, mode: DevMode): boolean {
+if (/```json/i.test(text)) return true;
+if (/"tool"\s*:/.test(text)) return true;
+if (READONLY_MODES.has(mode)) return false;
+let codeLines = 0;
+const fenceRe = /```[a-zA-Z0-9#+._-]*\n([\s\S]*?)(?:```|$)/g;
+let m: RegExpExecArray | null;
+while ((m = fenceRe.exec(text)) !== null) {
+codeLines += m[1].split("\n").length;
+}
+return codeLines >= 30;
+}
+
 /* レート制限（RPM）対策: 429 では即失敗せず、待ってから同じ手順を再試行する（v7.2.3）。
    待機は最大 maxWaits 回まで。baseMs はテストで差し替えられるよう export する */
 export const DEV_AGENT_BACKOFF = { baseMs: 15000, maxMs: 60000, maxWaits: 3 };
@@ -302,6 +334,9 @@ lines.push(
 "- プロジェクトのファイルツリーと package.json は、この指示の末尾にすでに含まれています。存在確認のために fs_list を繰り返す必要はありません",
 "- 編集対象ファイルの現在の内容が必要な場合だけ fs_read / fs_read_many で確認してから編集する",
 "- ファイルの作成・読み取りは、まとめられるものは fs_write_many / fs_read_many で1回にまとめる（1ファイルごとに呼び出しを分けるとレート制限に当たりやすい）",
+"- ファイルの内容は、必ずツール（fs_write / fs_write_many）のJSONで送ること。チャット本文にファイルのコードを貼らない（貼ってもファイルは作られない）",
+"- 1ファイルが非常に長い場合は、1回の大きな呼び出しにせず、分割して複数回に分けるか、1ファイルずつ送ること",
+"- JSONの文字列の中では、引用符（\"）とバックスラッシュ（\\）を必ずエスケープすること",
 "- BUILD / AUTO / DEBUG では、調査は必要最小限にし、最初の数手順以内にファイルの作成・編集またはターミナル実行を始めること。確認だけを繰り返さない",
 "- 変更は小さく確実に。大きな新規ファイルは fs_write、小さな修正は fs_edit を使う",
 "- term_exec が使えない環境では、実行確認ができない旨を最終報告に明記する（実行したことにしない）。その場合でもファイルの作成・編集は最後まで続けること。ターミナルの失敗だけで作業を終了しない",
@@ -364,21 +399,158 @@ if (Array.isArray(arr)) call.paths = arr.map((x) => String(x)).filter(Boolean);
 return call;
 }
 
-/** 応答からツール呼び出しを取り出す。単体オブジェクト・JSON配列・{"calls":[...]} の3形式に対応する */
-function parseToolCalls(text: string): ToolCall[] {
-const m = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\[[\s\S]*\]|\{[\s\S]*"tool"[\s\S]*\})/);
-if (!m) return [];
-try {
-const j = JSON.parse(m[1]) as unknown;
+/** 文字列リテラルとエスケープを意識しながら、text[start]（{ または [）から始まる
+    JSON値の本当の終端を探す。ファイル内容など文字列の中に ``` や波括弧があっても
+    早期に切れない。閉じられていない（途中で切れた）場合は null を返す（v7.2.11） */
+function scanJsonSpan(text: string, start: number): string | null {
+let depth = 0;
+let inStr = false;
+let escaped = false;
+for (let i = start; i < text.length; i++) {
+const ch = text[i];
+if (inStr) {
+if (escaped) escaped = false;
+else if (ch === "\\") escaped = true;
+else if (ch === '"') inStr = false;
+continue;
+}
+if (ch === '"') inStr = true;
+else if (ch === "{" || ch === "[") depth++;
+else if (ch === "}" || ch === "]") {
+depth--;
+if (depth === 0) return text.slice(start, i + 1);
+if (depth < 0) return null;
+}
+}
+return null;
+}
+
+/** JSON修復（1）: 文字列リテラル内にある生の制御文字（改行・タブ等）をエスケープする。
+    エスケープ後のパース結果は元の生文字列と一致するため、ファイル内容は変わらない */
+function escapeRawControlCharsInStrings(src: string): string {
+let out = "";
+let inStr = false;
+let escaped = false;
+for (let i = 0; i < src.length; i++) {
+const ch = src[i];
+if (!inStr) {
+out += ch;
+if (ch === '"') inStr = true;
+continue;
+}
+if (escaped) {
+out += ch;
+escaped = false;
+continue;
+}
+if (ch === "\\") {
+out += ch;
+escaped = true;
+continue;
+}
+if (ch === '"') {
+out += ch;
+inStr = false;
+continue;
+}
+const code = src.charCodeAt(i);
+if (code < 0x20) {
+if (ch === "\n") out += "\\n";
+else if (ch === "\r") out += "\\r";
+else if (ch === "\t") out += "\\t";
+else out += "\\u" + code.toString(16).padStart(4, "0");
+continue;
+}
+out += ch;
+}
+return out;
+}
+
+/** JSON修復（2）: } や ] の直前にある末尾カンマを取り除く（文字列内は触らない） */
+function dropTrailingCommas(src: string): string {
+let out = "";
+let inStr = false;
+let escaped = false;
+for (let i = 0; i < src.length; i++) {
+const ch = src[i];
+if (inStr) {
+out += ch;
+if (escaped) escaped = false;
+else if (ch === "\\") escaped = true;
+else if (ch === '"') inStr = false;
+continue;
+}
+if (ch === '"') {
+inStr = true;
+out += ch;
+continue;
+}
+if (ch === ",") {
+let j = i + 1;
+while (j < src.length && /\s/.test(src[j])) j++;
+if (src[j] === "}" || src[j] === "]") continue;
+}
+out += ch;
+}
+return out;
+}
+
+/** 修復は文字列の外側の構造と、文字列内の生の制御文字だけを直す。ファイル内容は書き換えない */
+function repairJsonText(src: string): string {
+return dropTrailingCommas(escapeRawControlCharsInStrings(src));
+}
+
+function firstBracketFrom(text: string, from: number): number {
+const a = text.indexOf("{", from);
+const b = text.indexOf("[", from);
+if (a < 0) return b;
+if (b < 0) return a;
+return Math.min(a, b);
+}
+
+/** ツール呼び出しJSONの候補開始位置を優先順に返す:
+    1) ```json フェンスの直後 2) "tool" キーの手前にある { 3) 本文の最初の { / [ */
+function jsonCandidateStarts(text: string): number[] {
+const starts: number[] = [];
+const add = (i: number) => {
+if (i >= 0 && !starts.includes(i)) starts.push(i);
+};
+const fenceIdx = text.search(/```json/i);
+if (fenceIdx >= 0) add(firstBracketFrom(text, fenceIdx + 7));
+const toolIdx = text.indexOf('"tool"');
+if (toolIdx >= 0) add(text.lastIndexOf("{", toolIdx));
+add(firstBracketFrom(text, 0));
+return starts;
+}
+
+function toolCallsFromJson(j: unknown): ToolCall[] {
 if (Array.isArray(j)) return j.map(toToolCall).filter((c): c is ToolCall => !!c);
 if (j && typeof j === "object" && Array.isArray((j as { calls?: unknown}).calls)) {
 return ((j as { calls: unknown[]}).calls).map(toToolCall).filter((c): c is ToolCall => !!c);
 }
 const one = toToolCall(j);
 return one? [one]: [];
-} catch {
-return [];
 }
+
+/** 応答からツール呼び出しを取り出す。単体オブジェクト・JSON配列・{"calls":[...]} の3形式に対応する。
+    従来の正規表現抽出は、ファイル内容に ``` が含まれる大きなファイルでJSONが途中で
+    切れて失敗した。文字列を意識した走査で終端を特定し、失敗時は1回だけ修復を試す（v7.2.11） */
+function parseToolCalls(text: string): ToolCall[] {
+for (const start of jsonCandidateStarts(text)) {
+const span = scanJsonSpan(text, start);
+if (!span) continue;
+for (const candidate of [span, repairJsonText(span)]) {
+let j: unknown;
+try {
+j = JSON.parse(candidate) as unknown;
+} catch {
+continue;
+}
+const calls = toolCallsFromJson(j);
+if (calls.length) return calls;
+}
+}
+return [];
 }
 
 function projectContext(files: Record<string, string>): string {
@@ -589,6 +761,8 @@ let budgetWarned = false;
 let finalText = "";
 /* ターミナルが環境レベルで使えないことが判明したら、この実行では term_exec を実行しない（v7.2.9） */
 let terminalUnavailable = false;
+/* ツール呼び出しの解釈失敗が連続した回数（成功したツール呼び出しでリセットする。v7.2.11） */
+let repairStreak = 0;
 
 // ファイル変更と共有ツールの書き込みを数えるラッパー（execTool の進捗判定用）
 let changeCount = 0;
@@ -648,9 +822,23 @@ throw e;
 }
 const calls = parseToolCalls(r.text);
 if (!calls.length) {
+if (looksLikeFailedToolAttempt(r.text, mode)) {
+/* ツール呼び出しの失敗を最終回答と誤認しない。コードをチャットへ流さず、
+   形式を直して再送させる。修復手順は停滞カウンタを進めない（探索予算の
+   初回警告と同じ扱い）。直らなければ修復上限で正直に止まる（v7.2.11） */
+repairStreak++;
+if (repairStreak > REPAIR_LIMIT) {
+return { text: finalText, stopped: REPAIR_STOPPED_MESSAGE };
+}
+ctx.onEvent({ kind: "note", label: "ファイル作成の形式を読み取れなかったため、再送を依頼しました"});
+convo.push({ role: "assistant", content: r.text});
+convo.push({ role: "user", content: REPAIR_INSTRUCTION});
+continue;
+}
 finalText = r.text;
 break;
 }
+repairStreak = 0;
 
 // 1手順（= LLM 1リクエスト）で返された複数ツールをまとめて実行する。
 // 探索予算・重複判定は呼び出し単位で効かせるが、停滞カウントは手順単位で最大1だけ進める
