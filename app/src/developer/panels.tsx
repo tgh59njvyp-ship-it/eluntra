@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { resolveAuto } from "../lib/auto";
+import { downloadZip, zipFileNameForProject } from "../lib/files";
 import { allProviders, getState, hasCredentials, modelListOf, providerDefOf, selectedModel, update } from "../lib/store";
 import type { AppConfig, ChatMessage, Effort } from "../lib/types";
 import { Logo } from "../components/Logo";
@@ -54,6 +55,15 @@ export function DIcon({ name, className = "dev-ic" }: { name: string; className?
       {DEV_PATHS[name]}
     </svg>
   );
+}
+
+/** プロジェクト全体を1つのZIPでダウンロードする（v7.2.8。空なら案内のみ） */
+export function downloadProjectZip(pr: DevProject): void {
+  if (Object.keys(pr.files).length === 0) {
+    window.alert("このプロジェクトにはファイルがありません。");
+    return;
+  }
+  downloadZip(pr.files, zipFileNameForProject(pr.name));
 }
 
 export function fmtTime(at: number): string {
@@ -237,7 +247,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.7 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.8 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         <button
@@ -491,6 +501,9 @@ function DashboardView(props: ShellProps & { askConfirm: AskConfirm; onNewProjec
                       <button type="button" className="btn sm" onClick={() => startRename(pr)}>
                         名前変更
                       </button>
+                      <button type="button" className="btn sm" onClick={() => downloadProjectZip(pr)}>
+                        <Icon name="download" className="ic sm" /> ZIPでダウンロード
+                      </button>
                       <button
                         type="button"
                         className="btn sm danger"
@@ -723,6 +736,9 @@ function LeftPanel(props: ShellProps & { askConfirm: AskConfirm; onNewProject: (
           <div className="dev-proj-acts">
             <button type="button" className="btn sm" onClick={exportJson}>
               <Icon name="download" className="ic sm" /> JSONで書き出し
+            </button>
+            <button type="button" className="btn sm" onClick={() => downloadProjectZip(project)}>
+              <Icon name="download" className="ic sm" /> ZIPでダウンロード
             </button>
             <button type="button" className="btn sm" onClick={() => importRef.current?.click()} disabled={p.agentRunning} title={p.agentRunning ? "AI実行中は切り替えできません" : undefined}>
               読み込み

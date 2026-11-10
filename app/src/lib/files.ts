@@ -40,8 +40,20 @@ export async function readPickedFiles(files: FileList | File[]): Promise<PickRes
   return { attachments: out, warnings };
 }
 
-/** ZIP生成（store方式・無圧縮、外部ライブラリなし）でコードを保存する */
-export function downloadZip(files: Record<string, string>, zipName: string): void {
+/** プロジェクト名から安全なZIPファイル名を作る（パス区切り・使用不可文字を除去） */
+export function zipFileNameForProject(name: string): string {
+  const cleaned = (name || "")
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, "")
+    .replace(/^\.+/, "")
+    .replace(/\.+$/, "")
+    .trim()
+    .slice(0, 80)
+    .trim();
+  return `${cleaned || "project"}.zip`;
+}
+
+/** ZIPバイト列を生成する（store方式・無圧縮、外部ライブラリなし。ファイル名はUTF-8フラグ付き） */
+export function buildZipBytes(files: Record<string, string>): Uint8Array {
   const enc = new TextEncoder();
   const chunks: Uint8Array[] = [];
   const central: Uint8Array[] = [];
@@ -98,6 +110,12 @@ export function downloadZip(files: Record<string, string>, zipName: string): voi
     buf.set(b, pos);
     pos += b.length;
   });
+  return buf;
+}
+
+/** ZIP生成でコードを保存する（本体チャット／Developer 共用） */
+export function downloadZip(files: Record<string, string>, zipName: string): void {
+  const buf = buildZipBytes(files);
   const blob = new Blob([buf.buffer as ArrayBuffer], { type: "application/zip" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
