@@ -68,7 +68,7 @@ group("A: fs_list を引数を変えて繰り返すループが早期に止ま�
   ok(st.calls <= 8, `A4: 25手順上限より十分早く停止（LLM呼び出し ${st.calls} 回）`);
   ok(st.results.some((r) => r.includes("この結果は取得済みです")), "A5: 重複結果の要約通知がモデルに届いた");
   const stepEvents = events.filter((e) => e.kind === "step" && typeof e.step === "number");
-  ok(stepEvents.length > 0 && stepEvents[0].step === 1 && stepEvents[0].max === 25, "A6: ステップ番号 (n/25) がイベントに含まれる");
+  ok(stepEvents.length > 0 && stepEvents[0].step === 1 && stepEvents[0].max === undefined, "A6: ステップ番号だけがイベントに含まれ、分母（max）は付かない（v7.2.9で25手順固定を撤廃）");
 }
 
 /* ============ B: 異なるファイルの連続読み取りで探索上限の拒否が届く ============ */

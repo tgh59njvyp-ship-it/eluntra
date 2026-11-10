@@ -25,7 +25,7 @@ import {
   ghChangedFiles, ghCreateBranch, ghCreatePR, ghCreateRepo, ghHeadSha, ghListBranches, ghListBranchesDetailed, ghListRepos, ghOpenRepo, ghPush,
   ghViewer, githubConnected, type GhBranch, type GhRepo,
 } from "./github";
-import { wcService } from "./webcontainer";
+import { TERMINAL_UNAVAILABLE_PREFIX, WC_TIMEOUTS, isDevServerCommand, wcService } from "./webcontainer";
 import { applyPyChanges, parsePythonCommand, pyService, type ParsedTermCommand, type PyChange } from "./python";
 import { dbService, formatOutcomeForAgent, formatSchemaForAgent, type DbMeta } from "./db";
 import { termBus } from "./term";
@@ -247,7 +247,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.8 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.9 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         <button
@@ -972,11 +972,22 @@ type StreamItem = DevChatItem;
 
 let wcMountedProjectId = "";
 
+/* Nodeターミナルの環境レベルの失敗（起動・マウント・開始の失敗）は、このページセッション中は
+   回復不能として固定する（v7.2.9）。失敗した起動を毎回やり直して数十秒ずつ止まるのを防ぎ、
+   以後の呼び出しは理由を即座に返す。再試行はページの再読み込みで行う */
+let nodeTermFailure = "";
+
 export async function ensureWcMounted(project: DevProject | null): Promise<void> {
-  await wcService.ensureBoot();
-  if (project && wcMountedProjectId !== project.id) {
-    await wcService.mountProject(project.files);
-    wcMountedProjectId = project.id;
+  if (nodeTermFailure) throw new Error(nodeTermFailure);
+  try {
+    await wcService.ensureBoot();
+    if (project && wcMountedProjectId !== project.id) {
+      await wcService.mountProject(project.files);
+      wcMountedProjectId = project.id;
+    }
+  } catch (e) {
+    nodeTermFailure = wcService.errorReason || (e instanceof Error ? e.message : String(e));
+    throw e;
   }
 }
 
@@ -1188,12 +1199,59 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
                 return `Pythonは利用できません: ${pyService.errorReason || (e instanceof Error ? e.message : String(e))}`;
               }
             }
+            const unavailable = (reason: string) =>
+              `${TERMINAL_UNAVAILABLE_PREFIX}: ${reason}。Pythonコマンド（python file.py 等）は Pyodide で実行できます。`;
+            /* 環境レベルの失敗が固定済みなら、起動を試さず即座に返す（v7.2.9） */
+            if (nodeTermFailure) return unavailable(nodeTermFailure);
             try {
               await ensureWcMounted(projectRef.current);
             } catch (e) {
-              return `ターミナル（Node.js）は利用できません: ${wcService.errorReason || (e instanceof Error ? e.message : String(e))}。Pythonコマンド（python file.py 等）は Pyodide で実行できます。`;
+              return unavailable(wcService.errorReason || (e instanceof Error ? e.message : String(e)));
             }
-            const res = await wcService.exec(command, { timeoutMs: 120_000 });
+            /* 開発サーバー系のコマンドは終了しないため exec には渡さず、サーバー起動へ回す（v7.2.9） */
+            if (isDevServerCommand(command)) {
+              try {
+                const started = await wcService.startDevServer(() => undefined, command);
+                if (started.url) {
+                  return [
+                    `$ ${command}`,
+                    "開発サーバーを起動しました（バックグラウンドで実行中です。停止はプレビュータブから行えます）",
+                    `プレビューURL: ${started.url}`,
+                    started.log.trim() ? `起動ログ:\n${started.log.trim().slice(-3000)}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n");
+                }
+                if (started.exitCode !== null) {
+                  return [
+                    `$ ${command}`,
+                    `開発サーバーは起動直後に終了しました（終了コード: ${started.exitCode}）`,
+                    started.log.trim() ? `出力:\n${started.log.trim().slice(-4000)}` : "（出力なし）",
+                  ].join("\n");
+                }
+                return [
+                  `$ ${command}`,
+                  `開発サーバーを起動しました（バックグラウンドで実行中）。${Math.round(WC_TIMEOUTS.serverReadyMs / 1000)}秒以内にURLは発行されませんでしたが、起動は続いています。preview_info で状態を確認できます`,
+                  started.log.trim() ? `起動ログ:\n${started.log.trim().slice(-3000)}` : "",
+                ]
+                  .filter(Boolean)
+                  .join("\n");
+              } catch (e) {
+                const reason = wcService.errorReason || (e instanceof Error ? e.message : String(e));
+                nodeTermFailure = reason;
+                return unavailable(reason);
+              }
+            }
+            let res;
+            try {
+              res = await wcService.exec(command, { timeoutMs: 120_000 });
+            } catch (e) {
+              /* コマンド開始（spawn）の失敗は環境レベルの失敗として固定する。
+                 コマンド自体の終了コード非0は exec が結果として返すため、ここには来ない */
+              const reason = e instanceof Error ? e.message : String(e);
+              nodeTermFailure = reason;
+              return unavailable(reason);
+            }
             const out = res.output.trim();
             return [
               `$ ${command}`,
@@ -1372,11 +1430,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
       {running && (
         <div className="dev-runbar" role="status" aria-live="polite">
           <span className="dev-spinner" aria-hidden="true" />
-          {lastStepEv?.step ? (
-            <span className="dev-runbar-step">
-              {lastStepEv.step}/{lastStepEv.max ?? 25}
-            </span>
-          ) : null}
+          {lastStepEv?.step ? <span className="dev-runbar-step">手順 {lastStepEv.step}</span> : null}
           <span className="dev-runbar-label">
             {waitRemain !== null ? `レート制限のため待機中（残り約${waitRemain}秒）` : runLabel}
           </span>
@@ -1451,7 +1505,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
           return (
             <div key={s.event.id} className="dev-step">
               <span className="time">{fmtTime(it.at)}</span>
-              {it.step ? <span className="time">{it.step}/{it.max ?? ""}</span> : null} {it.label}
+              {it.step ? <span className="time">手順 {it.step}</span> : null} {it.label}
             </div>
           );
         })}
@@ -1665,6 +1719,24 @@ try {
 await ensureWcMounted(projectRef.current);
 } catch (e) {
 append(`ターミナル（Node.js）を利用できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+runningRef.current = false;
+setRunning(false);
+return;
+}
+if (isDevServerCommand(command)) {
+/* 開発サーバーは終了しないため exec で待たず、バックグラウンド起動に切り替える（v7.2.9） */
+try {
+const started = await wcService.startDevServer(append, command);
+append(
+started.url
+? `\n[開発サーバーを起動しました: ${started.url}（バックグラウンドで実行中。停止はプレビュータブから）]\n`
+: started.exitCode !== null
+? ""
+: "\n[開発サーバーを起動しました。URLが発行されるとプレビュータブに表示されます]\n",
+);
+} catch (e) {
+append(`開発サーバーを起動できません: ${wcService.errorReason || (e instanceof Error? e.message: String(e))}\n`);
+}
 runningRef.current = false;
 setRunning(false);
 return;

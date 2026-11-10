@@ -13,6 +13,17 @@ export interface ExecResult {
   timedOut?: boolean;
 }
 
+export interface DevServerStartResult {
+  /** URL が発行されたらその URL。発行されなかったら "" */
+  url: string;
+  /** 起動中に集まった出力ログ（末尾） */
+  log: string;
+  /** 待ち時間内に URL が発行されたか */
+  ready: boolean;
+  /** 待ち時間内にサーバープロセスが終了していたらその終了コード */
+  exitCode: number | null;
+}
+
 type OutputListener = (chunk: string) => void;
 type StateListener = () => void;
 
@@ -20,6 +31,68 @@ const ANSI_RE = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[a-zA-Z]|" + St
 
 export function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
+}
+
+/* ---------- タイムアウト基盤（v7.2.9） ----------
+   ターミナル経路の各段階（読み込み／起動／マウント／コマンド開始）に上限を付け、
+   「応答しないまま固まる」状態を作らない。値はテストから差し替え可能にする。 */
+export const WC_TIMEOUTS = {
+  /** @webcontainer/api の動的 import */
+  importMs: 60_000,
+  /** WebContainer の起動（boot 本体は裏で続くことがあるため呼び出し側のレース上限） */
+  bootMs: 60_000,
+  /** プロジェクトのマウント */
+  mountMs: 60_000,
+  /** コマンド／開発サーバーの spawn */
+  spawnMs: 30_000,
+  /** 1コマンドの実行上限 */
+  execMs: 120_000,
+  /** 開発サーバーの URL 発行を待つ上限（過ぎてもサーバーは裏で起動を続ける） */
+  serverReadyMs: 15_000,
+};
+
+/** 段階名つきのタイムアウトエラー。どの段階で止まったかをユーザーへ正直に伝えるために使う */
+export class PhaseTimeoutError extends Error {
+  readonly phase: string;
+  readonly timeoutMs: number;
+  constructor(phase: string, timeoutMs: number) {
+    super(`${phase}が${Math.max(1, Math.round(timeoutMs / 1000))}秒でタイムアウトしました。`);
+    this.name = "PhaseTimeoutError";
+    this.phase = phase;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/** promise に上限時間を付ける。元の処理は裏で続くことがあるため、呼び出し側は再入に注意する */
+export function withTimeout<T>(promise: Promise<T>, ms: number, phase: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new PhaseTimeoutError(phase, ms)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+/** エージェントへ返す「ターミナルが環境レベルで使えない」結果の接頭辞。
+    panels が生成し、agent がこの接頭辞で「再試行しても無駄な失敗」を判別する */
+export const TERMINAL_UNAVAILABLE_PREFIX = "ターミナル（Node.js）は利用できません";
+
+/** term_exec の結果が「環境レベルでターミナル不可」（起動・マウント・開始の失敗）かどうか。
+    コマンド自体のタイムアウトや終了コード非0は、ここには含めない */
+export function isTerminalEnvUnavailable(result: string): boolean {
+  return result.startsWith(TERMINAL_UNAVAILABLE_PREFIX);
+}
+
+/** 開発サーバー系コマンドかどうか（終了しないため exec ではなくサーバー起動へ回す）。
+    複合コマンド（&& や ; 等）は対象外とし、通常の exec に任せる */
+export function isDevServerCommand(command: string): boolean {
+  const c = command.trim().replace(/\s+/g, " ");
+  if (!c || /[|&;<>`$()]/.test(c)) return false;
+  if (/^(npm|pnpm|yarn|bun)\s+(run\s+)?(dev|start|serve|preview)(\s|$)/.test(c)) return true;
+  if (/^(npx\s+)?vite(\s+dev)?(\s|$)/.test(c)) return true;
+  if (/^npx\s+(next|nuxt|astro|remix)\s+dev(\s|$)/.test(c)) return true;
+  return false;
 }
 
 /** Record<path, content> を WebContainer の FileSystemTree に変換する */
@@ -56,6 +129,10 @@ class WcService {
   errorReason = "";
   private wc: WebContainer | null = null;
   private bootPromise: Promise<WebContainer> | null = null;
+  /** WebContainer.boot() を実際に呼んだか（boot はページ内で1回しか呼べない） */
+  private bootCalled = false;
+  /** このページセッションでは回復不能と判断した起動失敗（再試行で boot を二重に呼ばないため固定する） */
+  private bootError = "";
   private current: WebContainerProcess | null = null;
   private devServer: WebContainerProcess | null = null;
   previewUrl = "";
@@ -83,58 +160,70 @@ class WcService {
     return this.state === "ready";
   }
 
-  /** 起動する（未起動なら boot、失敗なら理由を保持して例外） */
+  /** 起動本体。boot() はページ内で1回しか呼べないため、この promise は作り直さない */
+  private async doBoot(): Promise<WebContainer> {
+    if (typeof window === "undefined" || !window.crossOriginIsolated) {
+      throw new Error(
+        "このページが crossOriginIsolated になっていないため、WebContainer を起動できません（サーバーの COOP/COEP ヘッダーが必要です）。",
+      );
+    }
+    const { WebContainer } = await withTimeout(
+      import("@webcontainer/api"),
+      WC_TIMEOUTS.importMs,
+      "WebContainerライブラリの読み込み",
+    );
+    this.bootCalled = true;
+    const wc = await WebContainer.boot();
+    wc.on("server-ready", (_port, url) => {
+      this.previewUrl = url;
+      this.previewListeners.forEach((fn) => fn(url));
+    });
+    wc.on("error", (err) => {
+      this.setState("error", `WebContainer エラー: ${err.message}`);
+    });
+    this.wc = wc;
+    /* タイムアウトで「失敗」として扱った後に裏で起動が完了したら、使える状態へ戻す */
+    if (this.state === "error" && this.bootError) this.bootError = "";
+    this.setState("ready");
+    return wc;
+  }
+
+  /** 起動する（未起動なら boot、失敗なら理由を保持して例外）。
+      タイムアウトしても boot 本体は裏で続いている可能性があるため、bootPromise は保持し続け、
+      boot を二重に呼ばない。タイムアウト／boot 後の失敗はこのセッションでは回復不能として固定し、
+      呼び出し直後に失敗を返す（毎回60秒待たせない）。読み込み段階の失敗だけは再試行できる */
   async ensureBoot(): Promise<WebContainer> {
     if (this.wc) return this.wc;
-    if (this.bootPromise) return this.bootPromise;
-    this.setState("booting");
-    this.bootPromise = (async () => {
-      if (typeof window === "undefined" || !window.crossOriginIsolated) {
-        throw new Error(
-          "このページが crossOriginIsolated になっていないため、WebContainer を起動できません（サーバーの COOP/COEP ヘッダーが必要です）。",
-        );
-      }
-      const { WebContainer } = await import("@webcontainer/api");
-      // 起動が応答しない環境（CDN到達不可など）で「起動中」のまま固まらないよう60秒で打ち切る
-      const wc = await Promise.race([
-        WebContainer.boot(),
-        new Promise<never>((_, reject) =>
-          window.setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "WebContainerの起動が60秒でタイムアウトしました。ネットワーク接続（WebContainerの配信元へアクセスできること）を確認してください。",
-                ),
-              ),
-            60_000,
-          ),
-        ),
-      ]);
-      wc.on("server-ready", (_port, url) => {
-        this.previewUrl = url;
-        this.previewListeners.forEach((fn) => fn(url));
-      });
-      wc.on("error", (err) => {
-        this.setState("error", `WebContainer エラー: ${err.message}`);
-      });
-      this.wc = wc;
-      this.setState("ready");
-      return wc;
-    })();
+    if (this.bootError) throw new Error(this.bootError);
+    if (!this.bootPromise) {
+      this.setState("booting");
+      this.bootPromise = this.doBoot();
+      /* レース負け後に doBoot が遅れて失敗しても未処理 rejection にしない */
+      this.bootPromise.catch(() => undefined);
+    }
     try {
-      return await this.bootPromise;
+      return await withTimeout(this.bootPromise, WC_TIMEOUTS.bootMs, "WebContainerの起動");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const timedOut = e instanceof PhaseTimeoutError;
+      const base = e instanceof Error ? e.message : String(e);
+      const msg = timedOut
+        ? `${base}起動が応答しないため、このページを開いている間はターミナルを利用できません。ページを再読み込みすると再試行できます。`
+        : base;
       this.setState("error", msg);
-      this.bootPromise = null;
-      throw e;
+      if (timedOut || this.bootCalled) {
+        this.bootError = msg;
+      } else {
+        /* ライブラリ読み込み等の boot 前の失敗は、次回の呼び出しで再試行できる */
+        this.bootPromise = null;
+      }
+      throw new Error(msg);
     }
   }
 
-  /** プロジェクト全体をコンテナへマウントする */
+  /** プロジェクト全体をコンテナへマウントする（応答しない場合は段階名つきでタイムアウトさせる） */
   async mountProject(files: Record<string, string>): Promise<void> {
     const wc = await this.ensureBoot();
-    await wc.mount(toFileSystemTree(files));
+    await withTimeout(wc.mount(toFileSystemTree(files)), WC_TIMEOUTS.mountMs, "プロジェクトの読み込み（マウント）");
   }
 
   /** 1ファイルをコンテナへ書き込む（エディタ編集の追随用） */
@@ -199,45 +288,78 @@ class WcService {
     return { code: exitCode, output, timedOut };
   }
 
+  /** spawn に上限時間を付ける（spawn 自体が応答しない環境で固まらないため） */
+  private async spawnBounded(wc: WebContainer, command: string): Promise<WebContainerProcess> {
+    const trimmed = command.trim();
+    let sp: Promise<WebContainerProcess>;
+    if (SHELL_META.test(trimmed)) {
+      sp = wc.spawn("jsh", ["-c", trimmed]);
+    } else {
+      const parsed = splitCommand(trimmed);
+      if (!parsed) throw new Error("コマンドが空です");
+      sp = wc.spawn(parsed.cmd, parsed.args);
+    }
+    return withTimeout(sp, WC_TIMEOUTS.spawnMs, "コマンドの開始");
+  }
+
   /** コマンドを実行する。シェル記法が含まれる場合は jsh -c、なければ直接 spawn */
   async exec(command: string, opts: { timeoutMs?: number; onOutput?: OutputListener } = {}): Promise<ExecResult> {
     const wc = await this.ensureBoot();
     const trimmed = command.trim();
     if (!trimmed) return { code: 0, output: "" };
-    let proc: WebContainerProcess;
-    if (SHELL_META.test(trimmed)) {
-      proc = await wc.spawn("jsh", ["-c", trimmed]);
-    } else {
-      const parsed = splitCommand(trimmed);
-      if (!parsed) return { code: 0, output: "" };
-      proc = await wc.spawn(parsed.cmd, parsed.args);
-    }
+    const proc = await this.spawnBounded(wc, trimmed);
     this.current = proc;
     try {
-      return await this.collect(proc, opts.onOutput, opts.timeoutMs ?? 180_000);
+      return await this.collect(proc, opts.onOutput, opts.timeoutMs ?? WC_TIMEOUTS.execMs);
     } finally {
       if (this.current === proc) this.current = null;
     }
   }
 
-  /** 開発サーバーを起動する（終了を待たない。URLは server-ready で通知される） */
-  async startDevServer(onOutput: OutputListener): Promise<void> {
+  /** 開発サーバーを起動する。終了は待たず、URL発行か終了か上限時間までだけ待って結果を返す。
+      上限を過ぎてもプロセスは殺さない（裏で起動を続け、URLは発行され次第プレビューに届く） */
+  async startDevServer(onOutput: OutputListener, command = "npm run dev"): Promise<DevServerStartResult> {
     const wc = await this.ensureBoot();
     await this.stopDevServer();
-    const proc = await wc.spawn("npm", ["run", "dev"]);
+    this.previewUrl = "";
+    const proc = await this.spawnBounded(wc, command.trim() || "npm run dev");
     this.devServer = proc;
+    let log = "";
+    const collect = (chunk: string) => {
+      const clean = stripAnsi(chunk);
+      log = (log + clean).slice(-8_000);
+      onOutput(clean);
+    };
     void (async () => {
       const reader = proc.output.getReader();
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        onOutput(stripAnsi(value));
+        collect(value);
       }
     })().catch(() => undefined);
     void proc.exit.then((code) => {
       onOutput(`\n[開発サーバーが終了しました（code ${code}）]\n`);
       if (this.devServer === proc) this.devServer = null;
     });
+    const outcome = await new Promise<{ url: string; exitCode: number | null }>((resolve) => {
+      let done = false;
+      let offPreview: () => void = () => undefined;
+      const finish = (v: { url: string; exitCode: number | null }) => {
+        if (done) return;
+        done = true;
+        offPreview();
+        resolve(v);
+      };
+      offPreview = this.onPreview((url) => finish({ url, exitCode: null }));
+      if (this.previewUrl) {
+        finish({ url: this.previewUrl, exitCode: null });
+        return;
+      }
+      void proc.exit.then((code) => finish({ url: "", exitCode: code }));
+      setTimeout(() => finish({ url: this.previewUrl, exitCode: null }), WC_TIMEOUTS.serverReadyMs);
+    });
+    return { url: outcome.url, log, ready: !!outcome.url, exitCode: outcome.exitCode };
   }
 
   async stopDevServer(): Promise<void> {
