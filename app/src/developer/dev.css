@@ -34,7 +34,7 @@ input, select, textarea { font-family: inherit; }
 .ic.sm, .dev-ic.sm { width: 16px; height: 16px; }
 
 /* 全体レイアウト */
-.dev-root { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+.dev-root { display: flex; flex-direction: column; height: var(--dev-viewport-height, 100dvh); overflow: hidden; }
 .dev-header {
   display: flex; align-items: center; gap: 12px; padding: 8px 14px;
   border-bottom: 1px solid var(--line); flex-wrap: wrap;
@@ -524,4 +524,124 @@ input, select, textarea { font-family: inherit; }
   .dev-dash-inner { padding: 16px 13px 32px; }
   .dev-dash-grid { grid-template-columns: 1fr; }
   .dev-dashbtn { padding: 7px 11px; min-height: 38px; }
+}
+
+/* v7.2.10: スマホの入力ズーム防止・可読性・タップしやすさ（デスクトップには効かせない） */
+@media (max-width: 1023.98px) {
+  /* すべての文字入力を16pxにして iOS Safari の自動ズームを防ぐ（チェックボックス等は対象外） */
+  .dev-root input:not([type="checkbox"]):not([type="radio"]),
+  .dev-root textarea,
+  .dev-root select {
+    font-size: 16px !important;
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+  .dev-root textarea { line-height: 1.55; }
+  .dev-root .btn,
+  .dev-header .dev-dashbtn,
+  .dev-header .dev-modelpill,
+  .dev-mode,
+  .dev-tab,
+  .dev-subtabs button,
+  .dev-preview-toggle button {
+    min-height: 44px;
+  }
+  .dev-header {
+    padding-top: max(8px, env(safe-area-inset-top));
+    align-items: center;
+  }
+  .dev-back { min-height: 44px; }
+  .dev-modelpill {
+    order: 10;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+    text-align: left;
+    justify-content: space-between;
+  }
+  .dev-projname { min-width: 0; flex: 1 1 150px; }
+  .dev-mode { flex: none; padding: 9px 12px; font-size: 13px; }
+  .dev-mobiletabs button { min-height: 56px; font-size: 11.5px; }
+  .dev-pane-head { row-gap: 8px; }
+  .dev-pane-head > span,
+  .dev-pane-state { min-width: 0; overflow-wrap: anywhere; }
+  .dev-pane-state { font-size: 13px; line-height: 1.5; }
+  .dev-composer { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .dev-composer-note { font-size: 12.5px; color: var(--text-2); }
+
+  /* 本文と作業状況を読みやすくする */
+  .dev-msg { font-size: 15px; line-height: 1.65; }
+  .dev-msg.system { font-size: 14.5px; }
+  .dev-msg-role { font-size: 12.5px; }
+  .dev-step { font-size: 13px; line-height: 1.55; }
+  .dev-step .time { font-size: 12.5px; }
+  .dev-tool { font-size: 13px; }
+  .dev-tool pre { font-size: 13px; line-height: 1.55; }
+  .dev-tool-active-label { font-size: 12.5px; }
+  .dev-runbar { font-size: 13px; line-height: 1.5; padding: 9px 11px; }
+  .dev-running { font-size: 13px; }
+  .dev-term-out,
+  .dev-preview-log { font-size: 13px; line-height: 1.6; }
+  .dev-db-result table { font-size: 13px; }
+  .dev-db-msg,
+  .dev-db-notables,
+  .dev-db-col { font-size: 13px; }
+  .dev-db-rowcount,
+  .dev-db-footnote { font-size: 12.5px; color: var(--text-2); }
+  .dev-problem-row { font-size: 13px; min-height: 44px; align-items: center; }
+  .dev-problem-row .loc { font-size: 12.5px; }
+
+  /* ファイル・プロジェクトまわり */
+  .dev-tree { font-size: 14px; }
+  .dev-tree-row { min-height: 44px; }
+  .dev-tree-name { min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .dev-tree-acts button { min-width: 36px; min-height: 36px; justify-content: center; }
+  .dev-sec-head { font-size: 14px; }
+  .dev-proj-item .t { font-size: 14px; }
+  .dev-proj-item .sub { font-size: 12.5px; color: var(--text-2); }
+  .dev-github-entry { font-size: 14px; }
+  .dev-github-entry .sub { font-size: 12.5px; color: var(--text-2); }
+  .dev-target { font-size: 12.5px; color: var(--text-2); }
+  .dev-empty-note { font-size: 13.5px; line-height: 1.6; color: var(--text-2); }
+  .dev-editorpath { flex: 1 1 100%; min-width: 0; font-size: 13px; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .dev-search-hit .loc { font-size: 12.5px; }
+  .dev-search-hit .tx { font-size: 13px; }
+  .dev-changecard-head { flex-wrap: wrap; }
+  .dev-changecard-head .path { flex: 1 1 170px; min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .dev-changecard-head .stat { margin-left: 0; }
+  .dev-preview-url { flex: 1 1 170px; max-width: 100%; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+  /* ダッシュボードの長い名前を省略せず折り返し、カード自体も画面幅に収める */
+  .dev-dash { width: 100%; min-width: 0; overflow-x: hidden; }
+  .dev-dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dev-dash-sub { font-size: 14px; line-height: 1.65; }
+  .dev-card { min-width: 0; overflow: hidden; }
+  .dev-card-head { flex-wrap: wrap; }
+  .dev-card-name {
+    flex: 1 1 170px;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+  .dev-card-badge { margin-left: 0; }
+  .dev-card-meta,
+  .dev-card-gh { font-size: 13px; }
+  .dev-card-gh { min-width: 0; }
+  .dev-card-gh span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .dev-card-btns .btn { flex: 1 1 118px; justify-content: center; }
+  .dev-db-create input,
+  .dev-db-create select { flex: 1 1 130px; }
+  .dev-db-main { align-items: stretch; }
+  .dev-db-console { width: 100%; }
+  .dev-db-console textarea { width: 100%; }
+  .dev-card-head { align-items: flex-start; }
+  .dev-card-badge { margin-top: 2px; }
 }

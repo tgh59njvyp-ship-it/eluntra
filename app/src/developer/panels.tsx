@@ -247,7 +247,7 @@ export function ShellMain(p: ShellProps) {
           <Logo size={30} />
           <div className="dev-title-text">
             <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.2.9 ・ AIソフトウェア開発環境</span>
+            <span className="dev-version">v7.2.10 ・ AIソフトウェア開発環境</span>
           </div>
         </div>
         <button

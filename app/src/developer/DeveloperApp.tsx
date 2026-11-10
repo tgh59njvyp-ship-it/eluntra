@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIソフトウェア開発環境（v7.2.9）
+/* Eluntra Developer: AIソフトウェア開発環境（v7.2.10）
    構成: 起動時はダッシュボード（プロジェクト一覧）。プロジェクトを開くと
    ワークスペース（左=プロジェクト/ファイルツリー、中央=Monacoエディター、
    右=AI開発チャット、下部=ターミナル/プレビュー/問題。モバイルは下部タブ切替）。
@@ -32,6 +32,24 @@ const ACTIVE_PROJECT_LS = "eluntra_dev_active_project";
 export function DeveloperApp() {
   const theme = useStore((s) => s.theme);
   const conf = useStore((s) => s.conf);
+
+  /* ソフトウェアキーボード表示時もコンポーザーが見えるよう、見えている高さへ追随する */
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      root.style.setProperty("--dev-viewport-height", `${Math.round(vv.height)}px`);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      root.style.removeProperty("--dev-viewport-height");
+    };
+  }, []);
 
   const [projects, setProjects] = useState<DevProject[]>(() => loadProjects());
   const [activeId, setActiveId] = useState<string>(() => {

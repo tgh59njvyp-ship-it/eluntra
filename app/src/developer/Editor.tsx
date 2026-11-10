@@ -37,6 +37,12 @@ const EXT_LANG: Record<string, string> = {
   toml: "ini", ini: "ini", dockerfile: "dockerfile",
 };
 
+const EDITOR_MOBILE_QUERY = "(max-width: 1023.98px)";
+
+function editorFontSize(): number {
+  return typeof window !== "undefined" && window.matchMedia(EDITOR_MOBILE_QUERY).matches ? 16 : 13;
+}
+
 export function langOf(path: string): string {
   const base = path.split("/").pop() || "";
   if (base === "Dockerfile") return "dockerfile";
@@ -157,7 +163,7 @@ export function Editor({ path, value, dark, onChange, onReady, onMarkers }: Prop
           language: "plaintext",
           theme: "vs",
           automaticLayout: true,
-          fontSize: 13,
+          fontSize: editorFontSize(),
           minimap: { enabled: false },
           lineNumbers: "on",
           folding: true,
@@ -214,6 +220,16 @@ export function Editor({ path, value, dark, onChange, onReady, onMarkers }: Prop
     const monaco = monacoRef.current;
     if (monaco) monaco.editor.setTheme(dark ? "vs-dark" : "vs");
   }, [dark, readyTick]);
+
+  /* スマホ幅では16px、デスクトップでは13px。開いたまま幅が変わっても追随する */
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(EDITOR_MOBILE_QUERY);
+    const update = () => editorRef.current?.updateOptions({ fontSize: mq.matches ? 16 : 13 });
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [readyTick]);
 
   if (failed) {
     return (
