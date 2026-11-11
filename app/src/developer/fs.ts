@@ -329,10 +329,30 @@ export function runFsTool(files: Record<string, string>, tool: string, args: Rec
       const p = normalizePath(args.path || "");
       const content = args.content ?? "";
       const before = p in files ? files[p] : null;
+      if (before !== null && before === content) {
+        // 現在の内容とバイト単位で同一の再送: 変更として記録せず、保存済みであることだけを返す。
+        // fs_write_many 経由でも同じ扱いになり、同一アイテムだけが自動でスキップされる（v7.2.13）
+        return { files, output: `${p} はすでに同じ内容で保存済みです（変更はありませんでした）` };
+      }
       return {
         files: writeFile(files, p, content),
         output: before === null ? `作成しました: ${p}（${content.length} 文字）` : `上書きしました: ${p}（${content.length} 文字）`,
         change: { path: p, kind: before === null ? "create" : "edit", before, after: content },
+      };
+    }
+    case "fs_append": {
+      // 末尾への追記。無ければ新規作成として扱う。長いファイルを分割して送るための土台（v7.2.12）
+      const p = normalizePath(args.path || "");
+      const content = args.content ?? "";
+      const before = p in files ? files[p] : null;
+      const after = (before ?? "") + content;
+      return {
+        files: writeFile(files, p, after),
+        output:
+          before === null
+            ? `作成しました（追記）: ${p}（${content.length} 文字）`
+            : `追記しました: ${p}（${content.length} 文字追記、全 ${after.length} 文字）`,
+        change: { path: p, kind: before === null ? "create" : "edit", before, after },
       };
     }
     case "fs_edit": {
