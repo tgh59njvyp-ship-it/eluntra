@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPane } from "./components/ChatPane";
 import { CodePreview } from "./components/CodeMode";
 import { Icon } from "./components/icons";
-import { Logo } from "./components/Logo";
 import { extractHtml } from "./components/Markdown";
 import { ModelSheet } from "./components/ModelSheet";
 import { SearchSheet } from "./components/SearchSheet";
@@ -395,10 +394,6 @@ export default function App() {
           <button type="button" className="iconbtn only-sp" aria-label="メニュー" onClick={() => setSidebarOpen(true)}>
             <Icon name="menu" />
           </button>
-          <span className="brand">
-            <Logo size={34} />
-            <span className="brand-name">Eluntra</span>
-          </span>
           <span className="spacer" />
           {conf.mode === "code" && (
             <button type="button" className="btn secondary sm only-sp" onClick={() => setCodeShow(true)}>

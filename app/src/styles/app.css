@@ -80,15 +80,14 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 .iconbtn:hover { background: var(--bg-sub); }
 .iconbtn:active { background: var(--accent-soft); transform: scale(0.94); }
 
-/* 上部バー（v7.3.1：Apple系の骨格に寄せた、細く静かなバー。地色＋極薄の下罫線のみで区切る） */
+/* 上部バー（v7.3.1：Apple系の骨格に寄せた、細く静かなバー。地色＋極薄の下罫線のみで区切る）
+   v7.3.2：ブランドロゴは上部バーに置かない（サイドバーとヒーローに集約）。バーは操作だけに使う */
 .topbar {
   display: flex; align-items: center; gap: 6px; padding: 0 12px;
   height: 52px; flex: none; position: relative; z-index: 2;
   background: var(--bg); border-bottom: 1px solid var(--line);
 }
 .topbar .spacer { flex: 1; }
-.brand { display: inline-flex; align-items: center; gap: 6px; flex: none; }
-.brand-name { font-family: var(--font-head); font-size: 18px; font-weight: 800; letter-spacing: 0.01em; color: var(--ink); }
 .accountbtn {
   width: 40px; height: 40px; border-radius: 999px; border: none; flex: none;
   background: transparent; color: var(--ink);
