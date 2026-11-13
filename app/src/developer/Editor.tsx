@@ -1,4 +1,4 @@
-/* Eluntra Developer: コードエディター
+/* Playgrounds: コードエディター
    Monaco Editor（npmパッケージ同梱）を遅延読み込みする。読み込みに失敗した場合は
    プレーンな textarea にフォールバックし、その旨を表示する（空白画面にはしない）。 */
 
@@ -196,7 +196,7 @@ export function Editor({ path, value, dark, onChange, onReady, onMarkers }: Prop
         });
         setReadyTick((n) => n + 1);
       } catch (e) {
-        console.warn("[Eluntra Developer] Monacoの初期化に失敗したため簡易エディターに切り替えます", e);
+        console.warn("[Playgrounds] Monacoの初期化に失敗したため簡易エディターに切り替えます", e);
         if (!disposed) setFailed(true);
       }
     })();

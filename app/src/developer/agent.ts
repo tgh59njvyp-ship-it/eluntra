@@ -1,4 +1,4 @@
-/* Eluntra Developer: AI開発エージェント
+/* Playgrounds: AI開発エージェント
 既存エージェントと同じ「JSONでツールを1つ選ぶ」方式で全プロバイダー共通に動かす。
 モードによる書き込み禁止・確認・回数上限はプロンプトではなくコードで強制する。 */
 
@@ -14,13 +14,14 @@ import { TERMINAL_UNAVAILABLE_PREFIX, isTerminalEnvUnavailable, withTimeout } fr
 
 export type DevMode = "plan" | "build" | "debug" | "review" | "ask" | "auto";
 
+/* v8.0.0：モードの表示名は平易な日本語にした（内部IDは不変） */
 export const DEV_MODES: Array<{ id: DevMode; label: string; desc: string}> = [
-{ id: "plan", label: "PLAN", desc: "分析と実装計画のみ（ファイルは変更しません）"},
-{ id: "build", label: "BUILD", desc: "計画に沿って実装します"},
-{ id: "debug", label: "DEBUG", desc: "エラーを調査して修正します"},
-{ id: "review", label: "REVIEW", desc: "品質・セキュリティ・設計を確認します（変更しません）"},
-{ id: "ask", label: "ASK", desc: "コードや技術の質問に答えます（変更しません）"},
-{ id: "auto", label: "AUTO", desc: "分析→実装→実行確認→修正まで自動で進めます"},
+{ id: "plan", label: "相談", desc: "作り方を一緒に考えます。計画だけを立て、ファイルは変更しません"},
+{ id: "build", label: "作成", desc: "計画に沿って、実際にファイルを作成・編集します"},
+{ id: "debug", label: "デバッグ", desc: "エラーの原因を調べて直します"},
+{ id: "review", label: "レビュー", desc: "品質や安全性をチェックします（変更しません）"},
+{ id: "ask", label: "質問", desc: "コードや技術の質問に答えます（変更しません）"},
+{ id: "auto", label: "おまかせ", desc: "調査→作成→動作確認→修正まで、自動で進めます"},
 ];
 
 export const READONLY_MODES: ReadonlySet<DevMode> = new Set(["plan", "review", "ask"]);
@@ -297,7 +298,7 @@ export const STALL_LIMIT = 6;
     （モデルが存在しないツールを幻覚で呼ばないようにするため） */
 export function buildDevToolGuide(avail: SharedToolAvailability): string {
 const lines = [
-"あなたは Eluntra Developer のAIソフトウェアエンジニアです。ユーザーのプロジェクト内で、実際にファイルを読み書きし、ターミナルで確認しながら開発を進めてください。",
+"あなたは Playgrounds（Eluntra のAIコード生成環境）のAIソフトウェアエンジニアです。ユーザーのプロジェクト内で、実際にファイルを読み書きし、ターミナルで確認しながら開発を進めてください。",
 "各回の応答は、次のどちらか一方だけにしてください。",
 "1) ツールを使う場合: ```json ブロックで {\"tool\":\"ツール名\",\"args\":{...}} を返す。互いに依存しないツールは、JSON配列 [ {...}, {...} ] で複数まとめて返してよい（結果はまとめて返る）",
 "2) 最終回答の場合: 普通の文章で結果を報告する（JSONにしない）",
@@ -1125,7 +1126,7 @@ const top = [...toolUseCounts.entries()]
 .join("、");
 const bullets = ["・そのまま「もう一度送る」"];
 if (mode !== "build" && mode !== "auto") {
-bullets.push("・BUILD または AUTO モードに切り替えて送り直す（現在のモードではファイルを変更しません）");
+bullets.push("・「作成」または「おまかせ」モードに切り替えて送り直す（現在のモードではファイルを変更しません）");
 }
 bullets.push("・指示を具体的にする（例:「src/App.tsx に〇〇の機能を追加して」）");
 return [

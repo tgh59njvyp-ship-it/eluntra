@@ -1,4 +1,4 @@
-/* Eluntra Developer: AIチャットのプロジェクト別保存（純粋関数層）
+/* Playgrounds: AIチャットのプロジェクト別保存（純粋関数層）
    DOM・Reactに依存しない。単体テスト（node）から直接駆動できる。
    チャットはプロジェクトごとに分け、eluntra_dev_chats（localStorage）へ
    { [projectId]: { messages, events } } の形で保存する。

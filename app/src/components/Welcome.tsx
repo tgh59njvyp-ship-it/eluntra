@@ -1,7 +1,6 @@
 import { loginWith, type OAuthProvider } from "../lib/auth";
 import { PROVIDERS } from "../lib/providers/registry";
 import { ProviderTile } from "./icons";
-import { Logo } from "./Logo";
 
 const BRAND: Record<OAuthProvider, { label: string; path: string }> = {
   github: {
@@ -23,7 +22,6 @@ export function Welcome({ onGuest }: { onGuest: () => void }) {
     <div className="welcome">
       <div className="welcome-inner">
         <div className="welcome-hero">
-          <Logo size={92} />
           <div className="welcome-brand">Eluntra</div>
         </div>
         <h1>30社のAIを、<br />自分のキーで。</h1>

@@ -88,6 +88,9 @@ function defaultConf(): AppConfig {
 
 function initialState(): AppState {
   const conf: AppConfig = { ...defaultConf(), ...readJSON<Partial<AppConfig>>(LS.conf, {}) };
+  /* v8.0.0：コードモード廃止に伴い、旧設定の mode:"code" は "chat" へ寄せる。
+     セッションやコード保存データ（eluntra_codes 等）自体は消さず、そのまま保持する */
+  conf.mode = "chat";
   PROVIDERS.forEach((p) => {
     if (!conf.models[p.id]) conf.models[p.id] = p.defaultModel;
   });
@@ -370,14 +373,17 @@ export function currentSession(): ChatSession | null {
 }
 
 export function sessionKindOf(s: ChatSession): "chat" | "code" {
-  return s.kind === "code" ? "code" : "chat";
+  /* v8.0.0：チャット一本化。旧コードモードのセッションもチャットとして扱い、
+     サイドバーの一覧から到達できるようにする（データ自体は消さない） */
+  void s;
+  return "chat";
 }
 
 export function createSession(): ChatSession {
   const s: ChatSession = {
     id: uid(),
     title: "新しいチャット",
-    kind: state.conf.mode,
+    kind: "chat",
     provider: state.conf.provider,
     model: selectedModel(state.conf.provider === "auto" ? "gemini" : state.conf.provider),
     messages: [],

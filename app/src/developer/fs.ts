@@ -1,4 +1,4 @@
-/* Eluntra Developer: プロジェクトファイルシステム（純粋関数層）
+/* Playgrounds: プロジェクトファイルシステム（純粋関数層）
    DOM・Reactに依存しない。単体テスト（node）から直接駆動できる。
    永続化は eluntra_dev_projects（localStorage）にプロジェクト配列をJSONで保存する。 */
 

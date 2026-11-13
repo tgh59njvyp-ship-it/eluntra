@@ -80,35 +80,38 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 .iconbtn:hover { background: var(--bg-sub); }
 .iconbtn:active { background: var(--accent-soft); transform: scale(0.94); }
 
-/* 上部バー（v7.3.1：Apple系の骨格に寄せた、細く静かなバー。地色＋極薄の下罫線のみで区切る）
-   v7.3.2：ブランドロゴは上部バーに置かない（サイドバーとヒーローに集約）。バーは操作だけに使う
-   v7.3.3：左／中央／右の3ゾーン構成（左右は等幅グリッド）にし、モデル選択をバーの幾何学的な中央に置く */
+/* 上部バー（v8.0.0：画面端に張り付かせず、要素ごとに浮かせる構成に変更）
+   バー自体は透明な受け皿で、左=丸ボタン（メニュー）、中央=モデル選択ピル、
+   右=丸ボタン群（新規・検索・アカウント）がそれぞれ半透明＋ぼかしの浮いた面になる。
+   3ゾーン構成（左右は等幅グリッド）でモデル選択を幾何学的な中央に置く点は v7.3.3 から維持 */
 .topbar {
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center; gap: 6px; padding: 0 12px;
-  height: 52px; flex: none; position: relative; z-index: 2;
-  background: var(--bg); border-bottom: 1px solid var(--line);
+  align-items: center; gap: 6px; padding: 10px 12px 4px;
+  flex: none; position: relative; z-index: 2;
+  background: transparent;
 }
-.tb-zone { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tb-zone { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .tb-zone.tb-center { justify-content: center; }
 .tb-zone.tb-right { justify-content: flex-end; }
-/* コードモードのプレビューボタンは、狭幅でアイコン類を押し潰さないよう縮小・省略を許可する */
-.tb-zone .btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.accountbtn {
-  width: 40px; height: 40px; border-radius: 999px; border: none; flex: none;
-  background: transparent; color: var(--ink);
+/* 浮いた丸ボタン（上部バー内のアイコンボタン共通） */
+.topbar .iconbtn, .accountbtn {
+  width: 44px; height: 44px; border-radius: 999px; flex: none;
+  background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-float);
+  color: var(--ink);
   display: inline-flex; align-items: center; justify-content: center;
   transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.accountbtn:hover { background: var(--bg-sub); }
-.accountbtn:active { background: var(--accent-soft); transform: scale(0.94); }
+.topbar .iconbtn:hover, .accountbtn:hover { background: var(--glass-bg-strong); }
+.topbar .iconbtn:active, .accountbtn:active { background: var(--accent-soft); transform: scale(0.94); }
 .modelpill {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px; max-width: 27vw; min-width: 0; min-height: 44px;
-  border: none; background: transparent; border-radius: 999px;
-  padding: 8px 10px; color: var(--ink); font-size: 13.5px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; max-width: 40vw; min-width: 0; min-height: 44px;
+  background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); box-shadow: var(--shadow-float); border-radius: 999px;
+  padding: 8px 16px; color: var(--ink); font-size: 13.5px; font-weight: 600;
 }
 .modelpill { transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease); }
-.modelpill:hover { background: var(--bg-sub); }
+.modelpill:hover { background: var(--glass-bg-strong); }
 .modelpill:active { background: var(--accent-soft); transform: scale(0.98); }
 .modelpill .mp-name { font-weight: 600; white-space: nowrap; }
 .modelpill .mp-model { color: var(--ink); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -128,7 +131,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 /* 会話 */
 .chat-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; position: relative; z-index: 1; }
 .chat-col { max-width: 780px; margin: 0 auto; padding: 20px 12px 24px; }
-.chat-col.wide { max-width: 1080px; }
 .msg { margin-bottom: 26px; content-visibility: auto; contain-intrinsic-size: auto 120px; }
 /* メッセージの出現（v7.3.1）：末尾の新規メッセージだけが、僅かに浮き上がって現れる */
 .chat-col > .msg:last-child { animation: msg-in var(--motion) var(--ease-out); }
@@ -185,59 +187,39 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
   background: var(--error-bg); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 20px; font-size: 14px;
 }
 
-/* 空状態（コードモード用の簡易版） */
-.empty { text-align: center; padding: 9vh 16px 24px; }
-.empty h1 { font-family: var(--font-head); font-weight: 800; font-size: clamp(24px, 5.4vw, 34px); line-height: 1.5; margin: 0 0 10px; }
-.empty p { color: var(--text-2); margin: 0 0 22px; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.chip {
-  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
-  border-radius: var(--radius-pill); padding: 8px 14px; font-size: var(--text-md);
-  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
-}
-.chip:hover { background: var(--bg-sub); border-color: var(--accent); }
-.chip:active { background: var(--accent-soft); transform: scale(0.97); }
-.steps-hint { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-.steps-hint span { font-size: 12.5px; color: var(--text-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+/* （v8.0.0：ヒーローと旧・空状態のCSSは廃止。空チャットは提案チップ列のみ） */
 
-/* ヒーロー（v7.0・チャットの空状態） */
-.hero-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.hero-waves { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 47%; display: block; }
-.hero { text-align: center; padding: 6vh 0 8px; position: relative; }
-.hero-logo { margin: 8px auto 2px; }
-.hero-name {
-  font-family: var(--font-head); font-size: 58px; font-weight: 800; line-height: 1.15;
-  letter-spacing: -0.01em; color: var(--ink);
-}
-.hero-tag { font-size: 17px; font-weight: 600; color: var(--ink); margin-top: 16px; }
-.hero-tag b { font-weight: 800; }
-.hero-sub { font-size: 14px; color: var(--text-2); margin-top: 9px; }
-/* 提案（v7.3.1：箱型カードをやめ、罫線で区切る行にした。区切りは線と余白だけ。
-   Desktop は2列の行グリッド、スマホは1列。1列だとヒーローが縦に溢れて頭が切れるため） */
-.sugg-grid {
-  display: grid; grid-template-columns: 1fr 1fr; column-gap: 36px;
-  max-width: 680px; margin: 30px auto 0;
-  border-top: 1px solid var(--line); text-align: left;
-}
-.sugg-card {
-  display: flex; align-items: center; gap: 12px; min-height: 62px; width: 100%;
-  background: transparent; border: none; border-bottom: 1px solid var(--line); border-radius: 0;
-  padding: 10px 8px; color: var(--ink); text-align: left;
-  transition: background var(--motion-fast) var(--ease);
-}
-.sugg-card:hover { background: var(--bg-sub); }
-.sugg-card:active { background: var(--accent-soft); }
-.sugg-ic {
-  width: 26px; height: 26px; background: transparent;
-  display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--accent);
-}
-.sugg-tx { flex: 1; font-size: 14px; font-weight: 500; line-height: 1.5; }
-.sugg-chev { width: 15px; height: 15px; color: var(--text-3); flex: none; }
 
-/* 入力欄（v7.0：ピル型コンポーザー＋青い送信円） */
-.composer-wrap { padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); position: relative; z-index: 1; }
-.composer-inner { max-width: 780px; margin: 0 auto; }
-.composer-inner.wide { max-width: 1080px; }
+/* 入力欄（v8.0.0：下端から浮いた半透明カード型コンポーザー）
+   カード自体が半透明＋ぼかしの浮いた面で、中にピル型の入力行とピル行を収める。
+   透明感はこのカードとチップ列などフローティング要素に限定する（全面ガラス化はしない） */
+.composer-wrap { padding: 6px 12px calc(12px + env(safe-area-inset-bottom)); position: relative; z-index: 1; }
+.composer-inner {
+  max-width: 780px; margin: 0 auto;
+  background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); border-radius: 28px;
+  box-shadow: var(--shadow-float);
+  padding: 8px;
+}
+.composer-inner:focus-within { border-color: var(--line-strong); }
+
+/* 空チャットの提案チップ（v8.0.0：ヒーローを廃し、コンポーザーの上に横スクロールのピル列だけを残す） */
+.sugg-chips {
+  display: flex; gap: 8px; max-width: 780px; margin: 0 auto 10px; padding: 2px;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain;
+}
+.sugg-chips::-webkit-scrollbar { display: none; }
+.sugg-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px;
+  border-radius: var(--radius-pill); border: 1px solid var(--glass-border);
+  background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-float);
+  font-size: var(--text-md); color: var(--ink); white-space: nowrap; flex: none;
+  transition: background var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+.sugg-chip:hover { background: var(--glass-bg-strong); }
+.sugg-chip:active { transform: scale(0.97); }
+.sugg-chip .ic { color: var(--accent); }
 .composer-tools { display: flex; align-items: center; gap: 6px; padding: 0 2px 6px; flex-wrap: wrap; }
 .tool-toggle {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
@@ -257,10 +239,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 }
 .box {
   display: flex; align-items: flex-end; gap: 4px;
-  border: 1px solid var(--line); border-radius: 30px; padding: 6px;
-  background: var(--surface); box-shadow: var(--shadow-composer);
+  border: none; border-radius: 22px; padding: 2px;
+  background: transparent;
 }
-.box:focus-within { border-color: var(--line-strong); }
 .box textarea {
   flex: 1; border: none; outline: none; resize: none; background: transparent; color: var(--ink);
   font-size: 16px; line-height: 1.55; max-height: 180px; padding: 10px 4px;
@@ -304,14 +285,18 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 }
 .sheet-back.on { opacity: 1; pointer-events: auto; }
 .sheet {
-  position: fixed; z-index: 41; background: var(--surface); color: var(--ink);
+  position: fixed; z-index: 41; color: var(--ink);
+  /* v8.0.0：シートも浮く半透明の質感に統一（文字の下地として不透明寄りの面を使う） */
+  background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--sheet-shadow); display: flex; flex-direction: column;
   transform: translateY(28px); opacity: 0; pointer-events: none;
   transition: transform var(--motion-slow) var(--ease-sheet), opacity var(--motion) var(--ease);
 }
 .sheet.on { transform: none; opacity: 1; pointer-events: auto; }
 @media (max-width: 760px) {
-  .sheet { left: 0; right: 0; bottom: 0; max-height: 88dvh; border-radius: 24px 24px 0 0; }
+  /* v8.0.0：モバイルのシートは下端から少し浮かせ、全周に角丸を持つカードにする */
+  .sheet { left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); max-height: 88dvh; border-radius: 24px; }
 }
 @media (min-width: 761px) {
   .sheet { left: 50%; top: 50%; translate: -50% -50%; width: min(680px, 92vw); max-height: 86dvh; border-radius: var(--radius-lg); }
@@ -433,23 +418,7 @@ textarea.text-input { resize: vertical; min-height: 64px; line-height: 1.6; }
 .preview-caption { padding: 8px 16px; font-size: 12.5px; color: var(--text-3); border-bottom: 1px solid var(--line); }
 .preview-iframe { flex: 1; width: 100%; min-height: 0; border: none; background: #fff; }
 
-/* コードモード */
-.code-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.code-split { flex: 1; display: flex; min-height: 0; }
-.code-chat { width: 420px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--line); min-height: 0; }
-.code-preview { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg-sub); }
-.code-preview-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.widthbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; color: var(--text-2); }
-.widthbtn.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.preview-frame-wrap { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 12px; }
-.preview-frame { border: 1px solid var(--line-strong); background: #fff; height: 100%; transition: width var(--motion) var(--ease-out); }
-.code-view { flex: 1; overflow: auto; padding: 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; white-space: pre; background: var(--surface); color: var(--ink); }
-@media (max-width: 900px) {
-  .code-split { flex-direction: column; }
-  .code-chat { width: auto; flex: 1; border-right: none; }
-  .code-preview { display: none; }
-  .code-preview.show { display: flex; position: fixed; inset: 0; z-index: 30; background: var(--bg); }
-}
+/* （v8.0.0：コードモードのCSSは廃止） */
 
 /* ウェルカム */
 .welcome { overflow-y: auto; padding: 40px 20px 48px; }
@@ -489,9 +458,14 @@ textarea.text-input { resize: vertical; min-height: 64px; line-height: 1.6; }
 .only-pc { display: inline-flex; }
 .only-sp { display: none; }
 @media (max-width: 760px) {
+  /* スマホでは上部バーの検索を畳む（ドロワー内の検索欄で代替）。
+     右側を2ボタンに抑え、中央のモデルピルの幾何学的中央と幅を確保するため */
+  .topbar .iconbtn.tb-search { display: none; }
   .sidebar {
     position: fixed; z-index: 36; left: 0; top: 0; bottom: 0; width: 84vw; max-width: 320px;
     transform: translateX(-105%); transition: transform var(--motion-slow) var(--ease-sheet);
+    /* v8.0.0：ドロワーも浮く半透明の質感に統一 */
+    background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
   }
   .sidebar.open { transform: none; box-shadow: var(--sheet-shadow); }
   .only-pc { display: none; }
@@ -518,16 +492,6 @@ textarea.text-input { resize: vertical; min-height: 64px; line-height: 1.6; }
   }
   textarea.text-input { font-size: 16px; }
 
-  /* ヒーローはスマホでは控えめにし、最初の画面で提案と入力欄が見えるようにする */
-  .hero { padding: 3vh 0 4px; }
-  .hero-logo { width: 104px; height: auto; margin-top: 0; }
-  .hero-name { font-size: 40px; }
-  .hero-tag { font-size: 15.5px; margin-top: 10px; }
-  .hero-sub { font-size: 13.5px; margin-top: 6px; }
-  .sugg-grid { grid-template-columns: 1fr; margin-top: 24px; }
-  .sugg-card { min-height: 56px; padding: 8px 4px; }
-  .sugg-tx { font-size: 14px; }
-  .sugg-ic { width: 24px; height: 24px; }
   .composer-note { font-size: 12.5px; }
 }
 

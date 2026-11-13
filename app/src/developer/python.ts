@@ -1,4 +1,4 @@
-/* Eluntra Developer: Python実行（Pyodide / CPython の WASM 版）
+/* Playgrounds: Python実行（Pyodide / CPython の WASM 版）
    ランタイムは自サイトの /pyodide/ から読み込む（外部CDNに依存しない）。
    プロジェクトファイルを Pyodide の FS（/project）へ同期してから実行し、
    実行後に作成・変更・削除されたファイルをプロジェクトへ反映する。

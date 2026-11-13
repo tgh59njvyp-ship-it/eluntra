@@ -1,4 +1,4 @@
-/* Eluntra Developer: GitHub連携
+/* Playgrounds: GitHub連携
    本体のGitHubコネクタ（eluntra_connectors）のトークンを使い、api.github.com へ直接アクセスする。
    プッシュは Git Data API（blob→tree→commit→ref更新）で全ファイルをコミットする。 */
 

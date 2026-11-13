@@ -1,4 +1,4 @@
-/* Eluntra Developer（v7.2）スタイル
+/* Playgrounds（v8.0.0）スタイル
    v7トークン（tokens.css）を前提に、開発環境のレイアウトだけを定義する。
    白基調・ネイビー文字・青アクセント・線描きアイコン・柔らかい影。 */
 
@@ -56,6 +56,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-header {
   display: flex; align-items: center; gap: 12px; padding: 6px 14px;
   border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  /* v8.0.0：ヘッダーは半透明＋ぼかしの質感（IDEの密度は保ち、面だけ浮かせる） */
+  background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
 }
 .dev-back { display: inline-flex; align-items: center; gap: 2px; color: var(--text-2); text-decoration: none; font-size: 13px; min-height: 44px; }
 .dev-back:hover { color: var(--accent); }
@@ -348,15 +350,21 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-sheet-back, .dev-confirm-back {
   position: fixed; inset: 0; background: var(--scrim); z-index: 60;
   display: flex; align-items: flex-end; justify-content: center;
+  /* v8.0.0：シートを下端から浮かせるための余白（確認カード側は自前の padding で上書き） */
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
   animation: dev-fade-in var(--motion) var(--ease);
 }
 @keyframes dev-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .dev-sheet {
-  background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 90dvh; overflow-y: auto;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--sheet-shadow); padding: 16px;
+  /* v8.0.0：シートは浮く半透明の質感。下端から少し浮かせ、全周に角丸を持たせる */
+  background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  color: var(--ink); width: 100%; max-width: 560px; max-height: 90dvh; overflow-y: auto;
+  border-radius: var(--radius-lg); box-shadow: var(--sheet-shadow); padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
   animation: dev-sheet-in var(--motion-slow) var(--ease-sheet);
 }
+.dev-sheet-note { font-size: 12.5px; color: var(--text-2); line-height: 1.7; margin: 0; }
 @keyframes dev-sheet-in {
   from { opacity: 0; transform: translateY(26px); }
   to { opacity: 1; transform: none; }
@@ -379,7 +387,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-tpl .d { color: var(--text-2); font-size: 12px; }
 .dev-confirm-back { z-index: 80; align-items: center; padding: 16px; }
 .dev-confirm-card {
-  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--sheet-shadow);
+  background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); box-shadow: var(--sheet-shadow);
   padding: 18px; max-width: 440px; width: 100%;
   animation: dev-pop-in var(--motion) var(--ease-out);
 }
@@ -546,7 +556,30 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   border: 1px dashed var(--line-strong); border-radius: var(--radius-lg);
   padding: 26px 18px; color: var(--text-2); font-size: 13.5px; text-align: center; background: var(--surface);
 }
+.dev-dash-empty-title { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--ink); }
+.dev-dash-steps { margin: 0 auto 16px; padding-left: 22px; text-align: left; max-width: 460px; line-height: 1.9; }
 .dev-dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+/* ダッシュボード先頭の大きな新規作成カード（v8.0.0：「プロジェクトを作る」を一目で分かる入口に） */
+.dev-card-new {
+  align-items: center; justify-content: center; text-align: center; gap: 6px;
+  border: 1.5px dashed var(--line-strong); background: var(--bg-sub); color: var(--ink);
+  cursor: pointer; min-height: 168px; font-family: inherit;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+}
+.dev-card-new:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dev-card-new:active { transform: scale(0.99); }
+.dev-card-new:disabled { opacity: 0.5; cursor: default; }
+.dev-card-new-plus {
+  width: 46px; height: 46px; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dev-card-new-title { font-size: 16px; font-weight: 800; }
+.dev-card-new-sub { font-size: 12.5px; color: var(--text-2); }
+/* カードの「次にやること」行（v8.0.0） */
+.dev-card-next {
+  font-size: 12.5px; color: var(--text-2); line-height: 1.65;
+  border-top: 1px solid var(--line); padding-top: 8px;
+}
 .dev-card {
   border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card); padding: 15px 16px; display: flex; flex-direction: column; gap: 9px;

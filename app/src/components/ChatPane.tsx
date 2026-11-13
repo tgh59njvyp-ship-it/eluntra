@@ -3,7 +3,6 @@ import { readPickedFiles } from "../lib/files";
 import { getState, providerDefOf, update, useStore } from "../lib/store";
 import type { Attachment, ChatMessage, ChatSession, Effort } from "../lib/types";
 import { Icon, ProviderTile } from "./icons";
-import { Logo } from "./Logo";
 import { CodePreviewSheet } from "./CodePreviewSheet";
 import { Markdown } from "./Markdown";
 
@@ -22,57 +21,12 @@ interface Props {
   placeholder?: string;
 }
 
-const SUGGESTIONS = ["今日の出来事を調べて要約して", "TypeScriptのジェネリクスを例つきで教えて", "3日分の献立を考えて", "短い物語を書いて"];
-
 const EFFORTS: Array<{ id: Effort; label: string }> = [
   { id: "low", label: "Low" },
   { id: "medium", label: "Medium" },
   { id: "high", label: "High" },
   { id: "super", label: "Super high" },
 ];
-
-/** ヒーローの背景：淡いブルーの波（下部のみ。v7.3.0で右上の光のにじみは装飾過剰として除去） */
-function HeroBackground() {
-  return (
-    <div className="hero-bg" aria-hidden="true">
-      <svg className="hero-waves" viewBox="0 0 1440 620" preserveAspectRatio="none" focusable="false">
-        <path
-          style={{ fill: "var(--wave-1)" }}
-          d="M0,350 C240,290 430,420 720,398 C1010,376 1200,290 1440,345 L1440,620 L0,620 Z"
-        />
-        <path
-          style={{ fill: "var(--wave-2)", opacity: 0.55 }}
-          d="M0,455 C260,398 520,508 820,478 C1100,450 1280,392 1440,438 L1440,620 L0,620 Z"
-        />
-        <path
-          style={{ fill: "var(--wave-3)", opacity: 0.32 }}
-          d="M0,540 C300,492 560,580 900,550 C1150,528 1330,492 1440,522 L1440,620 L0,620 Z"
-        />
-      </svg>
-    </div>
-  );
-}
-
-/** 提案カード1枚目の吹き出しアイコン（青→紫グラデーション＋白い3点） */
-function BubbleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
-      <defs>
-        <linearGradient id="sugg-bubble" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#38BDF8" />
-          <stop offset="1" stopColor="#A855F7" />
-        </linearGradient>
-      </defs>
-      <path
-        fill="url(#sugg-bubble)"
-        d="M12 3.5C6.2 3.5 1.8 7.3 1.8 11.9c0 2.6 1.4 4.9 3.7 6.4-.2 1.1-.8 2.3-1.6 3.2 0 .1 3 .1 5.2-1.3.9.2 1.9.3 2.9.3 5.8 0 10.2-3.8 10.2-8.6S17.8 3.5 12 3.5Z"
-      />
-      <circle cx="7.8" cy="11.9" r="1.35" fill="#fff" />
-      <circle cx="12" cy="11.9" r="1.35" fill="#fff" />
-      <circle cx="16.2" cy="11.9" r="1.35" fill="#fff" />
-    </svg>
-  );
-}
 
 /** 処理中メッセージの経過秒数（実時計。pending の間だけ1秒ごとに進む） */
 function useElapsedSeconds(active: boolean): number {
@@ -309,96 +263,59 @@ export function ChatPane({
   };
 
   const provider = providerDefOf(targetLabel.providerId) ?? null;
-  const isHero = messages.length === 0 && conf.mode === "chat";
-  const moreActive = conf.agent || conf.mode === "code" || conf.effort !== "medium";
+  const moreActive = conf.agent || conf.effort !== "medium";
+  const isEmpty = messages.length === 0;
 
   return (
     <>
-      {isHero && <HeroBackground />}
       <div className="chat-scroll" ref={scrollRef}>
-        <div className={`chat-col${conf.mode === "code" ? " wide" : ""}`}>
-          {messages.length === 0 ? (
-            conf.mode === "code" ? (
-              <div className="empty">
-                <h1>作りたいものを、言葉で。</h1>
-                <p>完成コードを受け取って、その場でプレビューできます。</p>
-                <div className="steps-hint">
-                  <span>1 会社を選ぶ</span>
-                  <span>2 キーを設定する</span>
-                  <span>3 質問する</span>
-                </div>
-                <div className="chips">
-                  {SUGGESTIONS.map((s) => (
-                    <button key={s} type="button" className="chip" onClick={() => onSend(s, [])}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="hero">
-                <Logo size={172} className="hero-logo" />
-                <div className="hero-name">Eluntra</div>
-                <div className="hero-tag">
-                  あなたの想像を、もっと<b>先へ</b>――
-                </div>
-                <div className="hero-sub">最高のAIと、無限の可能性を。</div>
-                <div className="sugg-grid">
-                  <button type="button" className="sugg-card" onClick={() => onSend("今日のおすすめを教えて", [])}>
-                    <span className="sugg-ic"><BubbleIcon /></span>
-                    <span className="sugg-tx">今日のおすすめを教えて</span>
-                    <Icon name="chevR" className="sugg-chev" />
-                  </button>
-                  <button
-                    type="button"
-                    className="sugg-card"
-                    onClick={() => {
-                      setInput("このコードを解説して：");
-                      requestAnimationFrame(() => taRef.current?.focus());
-                    }}
-                  >
-                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="codeB" /></span>
-                    <span className="sugg-tx">このコードを解説して</span>
-                    <Icon name="chevR" className="sugg-chev" />
-                  </button>
-                  <button
-                    type="button"
-                    className="sugg-card"
-                    onClick={() => {
-                      analyzeAfterPick.current = true;
-                      fileRef.current?.click();
-                    }}
-                  >
-                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="img" /></span>
-                    <span className="sugg-tx">この画像を分析して</span>
-                    <Icon name="chevR" className="sugg-chev" />
-                  </button>
-                  <button type="button" className="sugg-card" onClick={() => onSend("勉強のコツを教えて", [])}>
-                    <span className="sugg-ic" style={{ color: "var(--accent)" }}><Icon name="bulb" /></span>
-                    <span className="sugg-tx">勉強のコツを教えて</span>
-                    <Icon name="chevR" className="sugg-chev" />
-                  </button>
-                </div>
-              </div>
-            )
-          ) : (
-            messages.map((m, i) => (
-              <MessageItem
-                key={i}
-                m={m}
-                isLast={i === messages.length - 1}
-                onRegenerate={onRegenerate}
-                onEdit={() => onEditUser(i)}
-                toast={toast}
-                onPreview={(code, lang) => setPreview({ code, lang })}
-              />
-            ))
-          )}
+        <div className="chat-col">
+          {messages.map((m, i) => (
+            <MessageItem
+              key={i}
+              m={m}
+              isLast={i === messages.length - 1}
+              onRegenerate={onRegenerate}
+              onEdit={() => onEditUser(i)}
+              toast={toast}
+              onPreview={(code, lang) => setPreview({ code, lang })}
+            />
+          ))}
         </div>
       </div>
 
       <div className="composer-wrap">
-        <div className={`composer-inner${conf.mode === "code" ? " wide" : ""}`}>
+        {isEmpty && (
+          <div className="sugg-chips" role="group" aria-label="提案">
+            <button type="button" className="sugg-chip" onClick={() => onSend("今日のおすすめを教えて", [])}>
+              <Icon name="chat" className="ic sm" />今日のおすすめを教えて
+            </button>
+            <button
+              type="button"
+              className="sugg-chip"
+              onClick={() => {
+                setInput("このコードを解説して：");
+                requestAnimationFrame(() => taRef.current?.focus());
+              }}
+            >
+              <Icon name="codeB" className="ic sm" />このコードを解説して
+            </button>
+            <button
+              type="button"
+              className="sugg-chip"
+              onClick={() => {
+                analyzeAfterPick.current = true;
+                fileRef.current?.click();
+              }}
+            >
+              <Icon name="img" className="ic sm" />この画像を分析して
+            </button>
+            <button type="button" className="sugg-chip" onClick={() => onSend("勉強のコツを教えて", [])}>
+              <Icon name="bulb" className="ic sm" />勉強のコツを教えて
+            </button>
+          </div>
+        )}
+        <div className="composer-inner">
           {!targetLabel.ok && provider && (
             <button type="button" className="keywarn" onClick={onOpenSettings}>
               <Icon name="alert" className="ic sm" />
@@ -518,23 +435,6 @@ export function ChatPane({
               onClick={() => update({ conf: { ...getState().conf, agent: !conf.agent } })}
             >
               {conf.agent ? "ON" : "OFF"}
-            </button>
-          </div>
-          <div className="switch-row">
-            <div className="grow">
-              <div className="ttl">コードモード</div>
-              <div className="dsc">完成コードとプレビューで作業します</div>
-            </div>
-            <button
-              type="button"
-              className={`tool-toggle${conf.mode === "code" ? " on" : ""}`}
-              aria-pressed={conf.mode === "code"}
-              onClick={() => {
-                update({ conf: { ...getState().conf, mode: conf.mode === "code" ? "chat" : "code" } });
-                setMoreOpen(false);
-              }}
-            >
-              {conf.mode === "code" ? "ON" : "OFF"}
             </button>
           </div>
           <div className="switch-row col">

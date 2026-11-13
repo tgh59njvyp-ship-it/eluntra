@@ -1,4 +1,4 @@
-/* Eluntra Developer: 描画層（ShellMain と各パネル）
+/* Playgrounds: 描画層（ShellMain と各パネル）
    状態の正は DeveloperApp.tsx が持ち、ここは props 経由で描画と操作を行う。 */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -6,7 +6,6 @@ import { resolveAuto } from "../lib/auto";
 import { downloadZip, zipFileNameForProject } from "../lib/files";
 import { allProviders, getState, hasCredentials, modelListOf, providerDefOf, selectedModel, update } from "../lib/store";
 import type { AppConfig, ChatMessage, Effort } from "../lib/types";
-import { Logo } from "../components/Logo";
 import { Icon } from "../components/icons";
 import {
   DEV_MODES, READONLY_MODES, runDevAgent, type AgentEvent, type ChangeRecord, type DevMode,
@@ -244,10 +243,9 @@ export function ShellMain(p: ShellProps) {
           <DIcon name="back" className="dev-ic sm" /> Eluntra
         </a>
         <div className="dev-title">
-          <Logo size={30} />
           <div className="dev-title-text">
-            <span className="dev-appname">Eluntra Developer</span>
-            <span className="dev-version">v7.3.3 ・ AIソフトウェア開発環境</span>
+            <span className="dev-appname">Playgrounds</span>
+            <span className="dev-version">v8.0.0 ・ AIコード生成</span>
           </div>
         </div>
         <button
@@ -295,11 +293,11 @@ export function ShellMain(p: ShellProps) {
             </button>
             <button type="button" className={p.mobileTab === "editor" ? "on" : ""} onClick={() => goMobile("editor")}>
               <Icon name="code" className="ic" />
-              <span>エディタ</span>
+              <span>コード</span>
             </button>
             <button type="button" className={p.mobileTab === "ai" ? "on" : ""} onClick={() => goMobile("ai")}>
               <Icon name="bot" className="ic" />
-              <span>AI</span>
+              <span>AIに指示</span>
             </button>
             <button type="button" className={p.mobileTab === "preview" ? "on" : ""} onClick={() => goMobile("preview")}>
               <DIcon name="monitor" className="dev-ic" />
@@ -324,7 +322,7 @@ export function ShellMain(p: ShellProps) {
             <button type="button" className={p.bottomTab === "database" ? "on" : ""} onClick={() => goBottom("database")}>
               <DIcon name="db" className="dev-ic sm" /> データベース
             </button>
-            <span className="dev-desktopbar-note">実行環境はブラウザ内です（Node.js=WebContainer / Python=Pyodide / DB=SQLite・PostgreSQL）。</span>
+            <span className="dev-desktopbar-note">ターミナルはコマンドを実行する場所です。実行環境はブラウザ内です（Node.js=WebContainer / Python=Pyodide / DB=SQLite・PostgreSQL）。</span>
           </div>
         </>
       )}
@@ -406,12 +404,12 @@ function DashboardView(props: ShellProps & { askConfirm: AskConfirm; onNewProjec
           <div>
             <h2 className="dev-dash-title">プロジェクト</h2>
             <p className="dev-dash-sub">
-              プロジェクトを選んで開発を始めてください。AIチャットはプロジェクトごとに分かれて保存されます。
+              作りたいものをプロジェクトとして管理します。「プロジェクトを作る」から始めて、AIに作りたいものを伝えるだけでコードが生成されます。AIへの指示（チャット）はプロジェクトごとに分かれて保存されます。
             </p>
           </div>
           <div className="dev-dash-actions">
             <button type="button" className="btn primary" onClick={props.onNewProject} disabled={p.agentRunning}>
-              <Icon name="plus" className="ic sm" /> 新規プロジェクト
+              <Icon name="plus" className="ic sm" /> プロジェクトを作る
             </button>
             <button type="button" className="btn" onClick={() => importRef.current?.click()} disabled={p.agentRunning}>
               <Icon name="download" className="ic sm" /> JSON読み込み
@@ -435,11 +433,24 @@ function DashboardView(props: ShellProps & { askConfirm: AskConfirm; onNewProjec
 
         {p.projects.length === 0 && (
           <div className="dev-dash-empty">
-            まだプロジェクトがありません。「新規プロジェクト」から作成するか、GitHubのリポジトリを開いてください。
+            <p className="dev-dash-empty-title">まだプロジェクトがありません。まずは1つ作りましょう。</p>
+            <ol className="dev-dash-steps">
+              <li>「プロジェクトを作る」を押して、テンプレートを選ぶ（空でもOK）</li>
+              <li>右側の「AIに指示」に、作りたいものを日本語で伝える</li>
+              <li>AIがコードを書き、プレビューでそのまま確認できる</li>
+            </ol>
+            <button type="button" className="btn primary" onClick={props.onNewProject} disabled={p.agentRunning}>
+              <Icon name="plus" className="ic sm" /> プロジェクトを作る
+            </button>
           </div>
         )}
 
         <div className="dev-dash-grid">
+          <button type="button" className="dev-card dev-card-new" onClick={props.onNewProject} disabled={p.agentRunning}>
+            <span className="dev-card-new-plus"><Icon name="plus" /></span>
+            <span className="dev-card-new-title">新しいプロジェクトを作る</span>
+            <span className="dev-card-new-sub">テンプレートを選んで、AIに作りたいものを伝えるだけ</span>
+          </button>
           {p.projects.map((pr) => {
             const chatCount = chatMessageCount(getProjectChat(p.chats, pr.id));
             const isLast = pr.id === p.lastActiveId && p.projects.length > 0;
@@ -477,6 +488,14 @@ function DashboardView(props: ShellProps & { askConfirm: AskConfirm; onNewProjec
                     </span>
                   </div>
                 )}
+                <div className="dev-card-next">
+                  次にやること：
+                  {Object.keys(pr.files).length === 0
+                    ? "開いて、AIに作りたいものを伝える（最初のファイルが自動で作られます）"
+                    : chatCount === 0
+                      ? "開いて、右の「AIに指示」から最初の指示を送る"
+                      : "「開く」から続きを開発する（AIへの指示もそのまま再開できます）"}
+                </div>
                 <div className="dev-card-btns">
                   {renamingId === pr.id ? (
                     <>
@@ -852,9 +871,8 @@ if (!project) {
 return (
 <section className="dev-center">
 <div className="dev-center-empty">
-<Logo size={72} />
-<h2>Eluntra Developer</h2>
-<p>プロジェクトを作成すると、ファイル編集・AI開発・ターミナル・プレビューが使えます。</p>
+<h2>Playgrounds</h2>
+<p>プロジェクトを作成すると、AIへの指示・ファイル編集・ターミナル・プレビューが使えます。</p>
 <button type="button" className="btn primary" onClick={props.onNewProject}>
 <Icon name="plus" className="ic sm" /> プロジェクトを作成
 </button>
@@ -1389,7 +1407,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
   return (
     <aside className="dev-right">
       <div className="dev-sec-head" style={{ padding: "10px 12px 0" }}>
-        <span>AI Developer</span>
+        <span>AIに指示</span>
         <span className="dev-head-btns">
           <button
             type="button"
@@ -1408,7 +1426,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
       <div className="dev-chat-proj">
         {p.project ? `「${p.project.name}」のチャット（プロジェクトごとに保存されます）` : "プロジェクト未選択"}
       </div>
-      <div className="dev-modes" role="tablist" aria-label="開発モード">
+      <div className="dev-modes" role="tablist" aria-label="AIの進め方（モード）">
         {DEV_MODES.map((m) => (
           <button
             key={m.id}
@@ -1447,7 +1465,7 @@ function RightPanel(props: ShellProps & { askConfirm: AskConfirm; onOpenModel: (
           if (s.type === "msg") {
             return (
               <div key={s.msg.id} className={`dev-msg ${s.msg.role}`}>
-                <div className="dev-msg-role">{s.msg.role === "user" ? "あなた" : s.msg.role === "assistant" ? "AI Developer" : "案内"}</div>
+                <div className="dev-msg-role">{s.msg.role === "user" ? "あなた" : s.msg.role === "assistant" ? "AI" : "案内"}</div>
                 <div className="dev-msg-body">{s.msg.content}</div>
               </div>
             );
@@ -1963,17 +1981,18 @@ return (
 <div className="dev-sheet-back" onClick={onClose}>
 <div className="dev-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="新規プロジェクト">
 <div className="dev-sheet-head">
-<span>新規プロジェクト</span>
+<span>プロジェクトを作る</span>
 <button type="button" className="btn sm" onClick={onClose}>
 <Icon name="x" className="ic sm" />
 </button>
 </div>
+<p className="dev-sheet-note">名前と最初の形（テンプレート）を選ぶだけです。作ったあとは、右の「AIに指示」に作りたいものを伝えるだけでコードが生成されます。</p>
 <label className="dev-field">
 <span>名前</span>
 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="プロジェクト名" autoFocus />
 </label>
 <div className="dev-field">
-<span>テンプレート</span>
+<span>テンプレート（最初のファイルのひな形）</span>
 {TEMPLATES.map((t) => (
 <label key={t.id} className={`dev-tpl${tpl === t.id? " on": ""}`}>
 <input type="radio" name="tpl" checked={tpl === t.id} onChange={() => setTpl(t.id)} />
@@ -2194,7 +2213,7 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
   const push = () =>
     run("push", async () => {
       if (!project || !link) throw new Error("プロジェクトがGitHubと紐付いていません");
-      const msg = commitMsg.trim() || "Update from Eluntra Developer";
+      const msg = commitMsg.trim() || "Update from Playgrounds";
       const sha = await ghPush(project, link, msg);
       p.updateProject(project.id, (pr) => ({
         ...pr,
@@ -2299,7 +2318,7 @@ function GitHubSheet(props: ShellProps & { onClose: () => void; askConfirm: AskC
     run("pr", async () => {
       if (!link) throw new Error("プロジェクトがGitHubと紐付いていません");
       if (link.branch === prBase) throw new Error("headブランチとbaseブランチが同じです。別のbaseを選ぶか、「ブランチ」欄で新しいブランチを作成して切り替えてください");
-      const pr = await ghCreatePR(link.owner, link.repo, prTitle.trim() || "Eluntra Developer からの変更", prBody, link.branch, prBase);
+      const pr = await ghCreatePR(link.owner, link.repo, prTitle.trim() || "Playgrounds からの変更", prBody, link.branch, prBase);
       return `Pull Request #${pr.number} を作成しました: ${pr.url}`;
     });
 

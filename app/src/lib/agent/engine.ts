@@ -224,7 +224,7 @@ const STEP_LABEL: Record<string, string> = {
 };
 
 /**
- * 本体エージェントのツール群を、他のエージェント（Eluntra Developer 等）から
+ * 本体エージェントのツール群を、他のエージェント（Playgrounds 等）から
  * そのまま再利用するための公開実行口。実装は execTool と完全に同一で、
  * 進捗（steps / sources）の収集だけ呼び出し側の責務として切り離している。
  * 未接続チェックや Supabase の接続情報の読み取りも execTool 側の実装どおりに動く。

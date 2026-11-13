@@ -110,6 +110,8 @@ export interface AppConfig {
   agent: boolean;
   /** 検索ピル：ONのとき送信はエージェント経由で、まずWeb検索してから回答する */
   webSearch: boolean;
+  /** v8.0.0 でコードモードは廃止しチャット一本化した。旧データ互換のため "code" の値は
+     読み込み時に "chat" へ寄せる（store.ts の initialState）。型は互換のため残す。 */
   mode: "chat" | "code";
   effort: Effort;
   proxyOn: boolean;

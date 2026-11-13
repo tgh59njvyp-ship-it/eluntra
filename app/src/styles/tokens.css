@@ -26,10 +26,17 @@
   --warning-bg: #fdf8ec;
   --pill-bg: #f1f5fb;
   --scrim: rgba(10, 20, 40, 0.42);
-  /* ヒーローの波（ブランド要素。本体UIの装飾には使わない） */
-  --wave-1: #e8f1ff;
-  --wave-2: #dce9ff;
-  --wave-3: #cfe2ff;
+
+  /* ---- 浮く透明感（v8.0.0：フローティング要素だけに使うガラス質感） ----
+     適用先は上部バー／コンポーザー／チップ列／シート／ドロワー／確認カード等の
+     「浮いている面」に限定する。全面ガラス化はしない（DESIGN.md の線引きを参照）。
+     不透明度は、文字の下地として実効コントラストが AA を割らない値に固定する：
+     白 80% を白地に重ねても本文 --ink のコントラストはほぼ不変 */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-bg-strong: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(174, 198, 228, 0.65);
+  --glass-blur: blur(18px) saturate(1.5);
+  --shadow-float: 0 10px 34px rgba(15, 30, 58, 0.1), 0 1px 3px rgba(15, 30, 58, 0.06);
 
   /* ---- 影（原則なし。浮く面だけ無彩色に近い弱い影） ---- */
   --shadow-card: none;
@@ -110,9 +117,11 @@
   --warning-bg: #38300f;
   --pill-bg: #14294d;
   --scrim: rgba(0, 0, 0, 0.55);
-  --wave-1: #0e2142;
-  --wave-2: #0c1c38;
-  --wave-3: #0a1730;
+  /* v8.0.0：ダーク側のガラス。暗い地（--bg #0a1424）に重ねても文字 --ink が読める明度を保つ */
+  --glass-bg: rgba(16, 34, 61, 0.78);
+  --glass-bg-strong: rgba(16, 34, 61, 0.92);
+  --glass-border: rgba(51, 84, 138, 0.65);
+  --shadow-float: 0 10px 34px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-composer: 0 1px 2px rgba(0, 0, 0, 0.4);
   --sheet-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
 }

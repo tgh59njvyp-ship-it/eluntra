@@ -1,4 +1,4 @@
-/* Eluntra Developer: WebContainer ラッパー
+/* Playgrounds: WebContainer ラッパー
    ターミナルと開発サーバープレビューの実体。遅延起動し、失敗理由を正直に保持する。
    WebContainer は Node.js のみ（Python等の他言語ランタイムは動かない）。 */
 

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatPane } from "./components/ChatPane";
-import { CodePreview } from "./components/CodeMode";
 import { Icon } from "./components/icons";
-import { extractHtml } from "./components/Markdown";
 import { ModelSheet } from "./components/ModelSheet";
 import { SearchSheet } from "./components/SearchSheet";
 import { Settings } from "./components/Settings";
@@ -46,7 +44,6 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [codeShow, setCodeShow] = useState(false);
   const toastTimer = useRef<number>(0);
   const session = currentSession();
 
@@ -89,7 +86,7 @@ export default function App() {
   useEffect(() => {
     if (entered && !currentSession()) ensureSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entered, conf.mode]);
+  }, [entered]);
 
   const target = useMemo(() => {
     if (conf.provider === "auto") {
@@ -229,16 +226,6 @@ export default function App() {
             }
             pushRecent(provider.id, model);
             patchSession(s.id, (x) => ({ ...x, providerAtSend: provider!.id }));
-            // コードモード：完成コードをプレビューへ反映
-            if (getState().conf.mode === "code") {
-              const st = getState();
-              const sess = st.sessions.find((x) => x.id === s.id);
-              const lastAi = sess?.messages[sess.messages.length - 1];
-              if (lastAi) {
-                const html = extractHtml(lastAi.content);
-                if (html) update({ codes: { ...st.codes, [s.id]: html } });
-              }
-            }
             void pushSync();
             done = true;
           } catch (e) {
@@ -409,12 +396,18 @@ export default function App() {
             </button>
           </div>
           <div className="tb-zone tb-right">
-            {conf.mode === "code" && (
-              <button type="button" className="btn secondary sm only-sp" onClick={() => setCodeShow(true)}>
-                プレビュー
-              </button>
-            )}
-            <button type="button" className="iconbtn" aria-label="会話を検索" onClick={() => setSearchOpen(true)}>
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label="新しいチャット"
+              onClick={() => {
+                update({ currentId: null });
+                createSession();
+              }}
+            >
+              <Icon name="plus" />
+            </button>
+            <button type="button" className="iconbtn tb-search" aria-label="会話を検索" onClick={() => setSearchOpen(true)}>
               <Icon name="search" />
             </button>
             <button type="button" className="accountbtn" aria-label="アカウントと設定" onClick={() => setSheet("settings")}>
@@ -423,43 +416,19 @@ export default function App() {
           </div>
         </header>
 
-        {conf.mode === "code" ? (
-          <div className="code-wrap">
-            <div className="code-split">
-              <div className="code-chat">
-                <ChatPane
-                  session={session}
-                  generating={generating}
-                  targetLabel={{ providerId: target.providerId, ok: target.ok }}
-                  onSend={(t, a) => void send(t, a)}
-                  onImageGenerate={(t) => void sendImage(t)}
-                  onStop={stop}
-                  onRegenerate={regenerate}
-                  onEditUser={editUser}
-                  onOpenSettings={() => setSheet("settings")}
-                  toast={toast}
-                  draft={editDraft}
-                  placeholder="作りたいサイトやアプリを伝えてください"
-                />
-              </div>
-              <CodePreview sessionId={session?.id ?? null} show={codeShow} onClose={() => setCodeShow(false)} />
-            </div>
-          </div>
-        ) : (
-          <ChatPane
-            session={session}
-            generating={generating}
-            targetLabel={{ providerId: target.providerId, ok: target.ok }}
-            onSend={(t, a) => void send(t, a)}
-            onImageGenerate={(t) => void sendImage(t)}
-            onStop={stop}
-            onRegenerate={regenerate}
-            onEditUser={editUser}
-            onOpenSettings={() => setSheet("settings")}
-            toast={toast}
-            draft={editDraft}
-          />
-        )}
+        <ChatPane
+          session={session}
+          generating={generating}
+          targetLabel={{ providerId: target.providerId, ok: target.ok }}
+          onSend={(t, a) => void send(t, a)}
+          onImageGenerate={(t) => void sendImage(t)}
+          onStop={stop}
+          onRegenerate={regenerate}
+          onEditUser={editUser}
+          onOpenSettings={() => setSheet("settings")}
+          toast={toast}
+          draft={editDraft}
+        />
       </div>
 
       <ModelSheet open={sheet === "model"} onClose={() => setSheet("none")} toast={toast} />

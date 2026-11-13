@@ -1,4 +1,4 @@
-/* Eluntra Developer: データベースパネル
+/* Playgrounds: データベースパネル
    SQLite（sql.js）と PostgreSQL（PGlite）をブラウザ内で実際に動かす。
    データは端末の IndexedDB に保存され、サーバーは使わない。 */
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getState, sessionKindOf, update, useStore } from "../lib/store";
+import { update, useStore } from "../lib/store";
 import { Icon } from "./icons";
 
 interface Props {
@@ -27,12 +27,6 @@ export function SearchSheet({ open, onClose }: Props) {
   }, [sessions, query]);
 
   const jump = (id: string) => {
-    const s = getState().sessions.find((x) => x.id === id);
-    if (!s) return;
-    const kind = sessionKindOf(s);
-    if (kind !== getState().conf.mode) {
-      update({ conf: { ...getState().conf, mode: kind } });
-    }
     update({ currentId: id });
     onClose();
   };
@@ -62,7 +56,6 @@ export function SearchSheet({ open, onClose }: Props) {
             {list.map((s) => (
               <button key={s.id} type="button" className="session-item" onClick={() => jump(s.id)}>
                 <span className="t">{s.title || "新しいチャット"}</span>
-                <span className="pill-state">{sessionKindOf(s) === "code" ? "コード" : "チャット"}</span>
               </button>
             ))}
           </div>

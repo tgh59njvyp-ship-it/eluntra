@@ -1,4 +1,4 @@
-/* Eluntra Developer: ブラウザ内データベース（SQLite / PostgreSQL）
+/* Playgrounds: ブラウザ内データベース（SQLite / PostgreSQL）
    - SQLite: sql.js（SQLite の WASM 版）。データは IndexedDB にバイト列で永続化する。
    - PostgreSQL: PGlite（PostgreSQL の WASM 版）。データは PGlite 自身が IndexedDB に永続化する（idb://）。
    どちらも自サイト配信のアセットだけで動作し、サーバーは使わない。
