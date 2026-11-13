@@ -81,13 +81,19 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 .iconbtn:active { background: var(--accent-soft); transform: scale(0.94); }
 
 /* 上部バー（v7.3.1：Apple系の骨格に寄せた、細く静かなバー。地色＋極薄の下罫線のみで区切る）
-   v7.3.2：ブランドロゴは上部バーに置かない（サイドバーとヒーローに集約）。バーは操作だけに使う */
+   v7.3.2：ブランドロゴは上部バーに置かない（サイドバーとヒーローに集約）。バーは操作だけに使う
+   v7.3.3：左／中央／右の3ゾーン構成（左右は等幅グリッド）にし、モデル選択をバーの幾何学的な中央に置く */
 .topbar {
-  display: flex; align-items: center; gap: 6px; padding: 0 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 6px; padding: 0 12px;
   height: 52px; flex: none; position: relative; z-index: 2;
   background: var(--bg); border-bottom: 1px solid var(--line);
 }
-.topbar .spacer { flex: 1; }
+.tb-zone { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tb-zone.tb-center { justify-content: center; }
+.tb-zone.tb-right { justify-content: flex-end; }
+/* コードモードのプレビューボタンは、狭幅でアイコン類を押し潰さないよう縮小・省略を許可する */
+.tb-zone .btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .accountbtn {
   width: 40px; height: 40px; border-radius: 999px; border: none; flex: none;
   background: transparent; color: var(--ink);
@@ -97,7 +103,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
 .accountbtn:hover { background: var(--bg-sub); }
 .accountbtn:active { background: var(--accent-soft); transform: scale(0.94); }
 .modelpill {
-  display: inline-flex; align-items: center; gap: 5px; max-width: 27vw; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; max-width: 27vw; min-width: 0; min-height: 44px;
   border: none; background: transparent; border-radius: 999px;
   padding: 8px 10px; color: var(--ink); font-size: 13.5px; font-weight: 600;
 }

@@ -391,31 +391,36 @@ export default function App() {
       />
       <div className="main">
         <header className="topbar">
-          <button type="button" className="iconbtn only-sp" aria-label="メニュー" onClick={() => setSidebarOpen(true)}>
-            <Icon name="menu" />
-          </button>
-          <span className="spacer" />
-          {conf.mode === "code" && (
-            <button type="button" className="btn secondary sm only-sp" onClick={() => setCodeShow(true)}>
-              プレビュー
+          <div className="tb-zone tb-left">
+            <button type="button" className="iconbtn only-sp" aria-label="メニュー" onClick={() => setSidebarOpen(true)}>
+              <Icon name="menu" />
             </button>
-          )}
-          <button
-            type="button"
-            className="modelpill"
-            onClick={() => setSheet("model")}
-            aria-label="モデルを選ぶ"
-            title={conf.provider === "auto" ? "Eluntra Auto（自動選択）" : `${pillProvider?.name ?? ""} / ${target.model}`}
-          >
-            <span className="mp-model">{conf.provider === "auto" ? "Eluntra Auto" : target.model || pillProvider?.name || "モデル"}</span>
-            <Icon name="chevron" className="ic sm" />
-          </button>
-          <button type="button" className="iconbtn" aria-label="会話を検索" onClick={() => setSearchOpen(true)}>
-            <Icon name="search" />
-          </button>
-          <button type="button" className="accountbtn" aria-label="アカウントと設定" onClick={() => setSheet("settings")}>
-            <Icon name="user" />
-          </button>
+          </div>
+          <div className="tb-zone tb-center">
+            <button
+              type="button"
+              className="modelpill"
+              onClick={() => setSheet("model")}
+              aria-label="モデルを選ぶ"
+              title={conf.provider === "auto" ? "Eluntra Auto（自動選択）" : `${pillProvider?.name ?? ""} / ${target.model}`}
+            >
+              <span className="mp-model">{conf.provider === "auto" ? "Eluntra Auto" : target.model || pillProvider?.name || "モデル"}</span>
+              <Icon name="chevron" className="ic sm" />
+            </button>
+          </div>
+          <div className="tb-zone tb-right">
+            {conf.mode === "code" && (
+              <button type="button" className="btn secondary sm only-sp" onClick={() => setCodeShow(true)}>
+                プレビュー
+              </button>
+            )}
+            <button type="button" className="iconbtn" aria-label="会話を検索" onClick={() => setSearchOpen(true)}>
+              <Icon name="search" />
+            </button>
+            <button type="button" className="accountbtn" aria-label="アカウントと設定" onClick={() => setSheet("settings")}>
+              <Icon name="user" />
+            </button>
+          </div>
         </header>
 
         {conf.mode === "code" ? (
