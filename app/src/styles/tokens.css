@@ -77,10 +77,16 @@
   --icon: 22px;
   --icon-sm: 16px;
 
-  /* ---- モーション ---- */
-  --motion-fast: 120ms;
-  --motion: 180ms;
-  --ease: ease;
+  /* ---- モーション（v7.3.1：ぬるっとした動きの体系化。定義と原則は DESIGN.md のモーション章） ---- */
+  --motion-fast: 120ms; /* 短：状態変化（hover/active 等の小さな反応） */
+  --motion: 200ms; /* 中：要素の登場・面の出現 */
+  --motion-slow: 340ms; /* 長：シート/ドロワー/パネル級の移動 */
+  /* 標準：滑らかな減速（状態変化全般） */
+  --ease: cubic-bezier(0.33, 1, 0.68, 1);
+  /* 出現：速く出て、ゆっくり止まる（要素の登場） */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* 滑走：シート/ドロワーのスライド（iOS系のシートカーブ） */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 [data-theme="dark"] {

@@ -22,10 +22,10 @@ input, select, textarea { font-family: inherit; }
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
   border-radius: var(--radius-pill); padding: 8px 14px; font-size: 13px; cursor: pointer;
   min-height: var(--control-h-sm); text-decoration: none; white-space: nowrap;
-  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), filter var(--motion-fast) var(--ease);
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), filter var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
 .btn:hover { background: var(--bg-sub); border-color: var(--accent); }
-.btn:active { background: var(--accent-soft); }
+.btn:active { background: var(--accent-soft); transform: scale(0.98); }
 .btn:disabled { opacity: 0.45; cursor: default; filter: none; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn.primary:hover { background: var(--accent); filter: brightness(0.94); }
@@ -54,7 +54,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 /* 全体レイアウト */
 .dev-root { display: flex; flex-direction: column; height: var(--dev-viewport-height, 100dvh); overflow: hidden; }
 .dev-header {
-  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
   border-bottom: 1px solid var(--line); flex-wrap: wrap;
 }
 .dev-back { display: inline-flex; align-items: center; gap: 2px; color: var(--text-2); text-decoration: none; font-size: 13px; min-height: 44px; }
@@ -120,7 +120,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 }
 .dev-tree-row:hover { background: var(--bg-sub); }
 .dev-tree-row.on { background: var(--accent-soft); font-weight: 700; }
-.dev-tree-chev { display: inline-flex; transition: transform 0.15s; color: var(--text-3); }
+.dev-tree-chev { display: inline-flex; transition: transform var(--motion-fast) var(--ease-out); color: var(--text-3); }
 .dev-tree-chev.open { transform: rotate(90deg); }
 .dev-tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dev-tree-acts { display: none; gap: 2px; }
@@ -173,6 +173,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-bottom: none;
   background: var(--bg-sub); color: var(--text-2); border-radius: var(--radius-sm) var(--radius-sm) 0 0; padding: 7px 10px;
   font-size: 12.5px; cursor: pointer; min-height: 36px; white-space: nowrap;
+  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
 }
 .dev-tab.on { background: var(--surface); color: var(--ink); font-weight: 700; }
 .dev-tab .x { display: inline-flex; color: var(--text-3); border-radius: 4px; }
@@ -233,6 +234,13 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-tool-active-label { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent); flex: none; }
 @media (prefers-reduced-motion: reduce) {
   .dev-spinner { animation: none; }
+  /* Developer 全体の遷移・アニメーションもほぼゼロまで短くする（v7.3.1） */
+  .dev-root *, .dev-sheet, .dev-confirm-card {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .dev-spinner { animation: none !important; }
 }
 .dev-modes { display: flex; gap: 5px; flex-wrap: wrap; padding: 10px 12px 4px; }
 .dev-mode {
@@ -245,7 +253,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-mode.on:hover { color: var(--accent-ink); filter: brightness(0.94); }
 .dev-mode-desc { padding: 2px 12px 8px; font-size: 12px; color: var(--text-2); }
 .dev-stream { flex: 1; overflow-y: auto; padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-.dev-msg { border-radius: var(--radius-md); padding: 9px 12px; font-size: 13.5px; }
+.dev-msg { border-radius: var(--radius-md); padding: 9px 12px; font-size: 13.5px; animation: dev-fade-in var(--motion) var(--ease-out); }
 .dev-msg.user { background: var(--user-bubble); align-self: stretch; }
 .dev-msg.assistant { background: var(--bg-sub); }
 .dev-msg.system { background: var(--error-bg); color: var(--ink); font-size: 13px; }
@@ -277,6 +285,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 /* 下部パネル */
 .dev-bottom { display: none; border-top: 1px solid var(--line); background: var(--surface); }
 .dev-bottom.open { display: block; height: 288px; flex: none; }
+.dev-bottom.open .dev-pane { animation: dev-pane-in var(--motion) var(--ease-out); }
+@keyframes dev-pane-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 .dev-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .dev-pane-head {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -331,15 +344,22 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-desktopbar-note { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
 .dev-mobiletabs { display: none; }
 
-/* シート・確認 */
+/* シート・確認（v7.3.1：暗幕はフェード、シートは下からの滑走で現れる） */
 .dev-sheet-back, .dev-confirm-back {
   position: fixed; inset: 0; background: var(--scrim); z-index: 60;
   display: flex; align-items: flex-end; justify-content: center;
+  animation: dev-fade-in var(--motion) var(--ease);
 }
+@keyframes dev-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .dev-sheet {
   background: var(--surface); color: var(--ink); width: 100%; max-width: 560px; max-height: 90dvh; overflow-y: auto;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--sheet-shadow); padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
+  animation: dev-sheet-in var(--motion-slow) var(--ease-sheet);
+}
+@keyframes dev-sheet-in {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
 }
 .dev-sheet.wide { max-width: 780px; }
 .dev-sheet-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; }
@@ -361,6 +381,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-confirm-card {
   background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--sheet-shadow);
   padding: 18px; max-width: 440px; width: 100%;
+  animation: dev-pop-in var(--motion) var(--ease-out);
+}
+@keyframes dev-pop-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
 }
 .dev-confirm-title { display: flex; align-items: center; gap: 7px; font-weight: 800; margin-bottom: 8px; }
 .dev-confirm-card p { margin: 0 0 14px; font-size: 13.5px; }
@@ -410,6 +435,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   .dev-sheet-back { align-items: center; padding: 20px; }
   .dev-sheet { border-radius: var(--radius-lg); }
   .dev-pane-close { display: none; }
+  /* チャット拡大/縮小は幅を滑らかに遷移させる（v7.3.1） */
+  .dev-right { transition: width var(--motion-slow) var(--ease-out); }
   /* チャット拡大（v7.2.7）：チャットを画面の約62%幅にする集中レイアウト。左パネルは畳む */
   .dev-root[data-chatwide="1"] .dev-right { width: min(62vw, 1150px); }
   .dev-root[data-chatwide="1"] .dev-left { display: none; }
@@ -426,6 +453,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
     border: none; background: transparent; color: var(--text-2); font-size: 10.5px;
     padding: 8px 2px 6px; cursor: pointer; min-height: 52px;
+    transition: color var(--motion-fast) var(--ease);
   }
   .dev-mobiletabs button.on { color: var(--accent); }
   .dev-main { position: relative; }
@@ -508,7 +536,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 .dev-dashbtn.on { background: var(--accent); color: var(--accent-ink); }
 .dev-dashbtn:disabled { opacity: 0.45; cursor: default; }
 .dev-proj-item:disabled { opacity: 0.5; cursor: default; }
-.dev-dash { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg); }
+.dev-dash { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg); animation: dev-fade-in var(--motion) var(--ease); }
 .dev-dash-inner { max-width: 1080px; margin: 0 auto; padding: 22px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
 .dev-dash-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .dev-dash-title { margin: 0; font-size: 22px; font-weight: 800; }
