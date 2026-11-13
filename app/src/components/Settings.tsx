@@ -434,7 +434,7 @@ function ConnectorItem({ id, name, mono, color, supported, desc, fieldLabel, fie
         <span style={{ flex: 1 }}>
           <span className="nm">{name}</span>
           <br />
-          <span className="st" style={{ color: connected ? "var(--success, #1E6B4A)" : "var(--text-3)" }}>
+          <span className="st" style={{ color: connected ? "var(--success)" : "var(--text-3)" }}>
             {statusText}
           </span>
           <br />
@@ -670,7 +670,7 @@ export function Settings({ open, onClose, toast, onLogoutToWelcome }: Props) {
       <section className={`sheet wideSheet${open ? " on" : ""}`} aria-hidden={!open}>
         <div className="sheet-head">
           <h2>設定</h2>
-          <span className="pill-state">現在の版：v7.2.13</span>
+          <span className="pill-state">現在の版：v7.3.0</span>
           <button type="button" className="iconbtn" onClick={onClose} aria-label="閉じる">
             <Icon name="x" />
           </button>

@@ -31,11 +31,10 @@ const EFFORTS: Array<{ id: Effort; label: string }> = [
   { id: "super", label: "Super high" },
 ];
 
-/** ヒーローの背景：淡いブルーの波（下部）と右上の淡い光 */
+/** ヒーローの背景：淡いブルーの波（下部のみ。v7.3.0で右上の光のにじみは装飾過剰として除去） */
 function HeroBackground() {
   return (
     <div className="hero-bg" aria-hidden="true">
-      <div className="hero-blob" />
       <svg className="hero-waves" viewBox="0 0 1440 620" preserveAspectRatio="none" focusable="false">
         <path
           style={{ fill: "var(--wave-1)" }}
@@ -492,7 +491,7 @@ export function ChatPane({
               {moreActive && <span className="dot" aria-hidden="true" />}
             </button>
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-3)", textAlign: "center", paddingTop: 6 }}>
+          <div className="composer-note">
             AIの回答は誤ることがあります。重要な内容は出典や公式情報で確認してください。
           </div>
         </div>

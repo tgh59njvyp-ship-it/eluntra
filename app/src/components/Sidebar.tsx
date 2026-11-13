@@ -45,7 +45,7 @@ export function Sidebar({ open, onClose, onNew, onOpenSettings, onSelect }: Prop
         <div className="side-head">
           <Logo size={32} />
           <span className="logo">Eluntra</span>
-          <span className="pill-state">v7.2.13</span>
+          <span className="pill-state">v7.3.0</span>
         </div>
         <div className="logo-sub">30社のAIを、自分のキーで使うチャット</div>
         <div style={{ display: "flex", gap: 6, padding: "0 12px 10px" }}>

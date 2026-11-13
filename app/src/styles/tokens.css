@@ -1,15 +1,19 @@
-/* Eluntra v7 デザイントークン
-   参考デザインの再現：白＋淡いブルーの波、ネイビー文字、青アクセント、
-   ロゴの青→紫グラデーション、丸みのあるフォントと柔らかい影。 */
+/* Eluntra デザイントークン（v7.3.0 でデザインシステムとして形式化）
+   色・余白・文字・半径・影・高さ・モーションの唯一の定義場所。
+   本体（app.css）と Developer（dev.css）はこのトークンだけを参照する。
+   値の根拠と使い分けは app/DESIGN.md を参照。色の実測値は v7.0 から不変。 */
 :root {
+  /* ---- カラー ---- */
   --bg: #ffffff;
   --bg-sub: #f4f8ff;
   --surface: #ffffff;
   --ink: #0f1e3a;
-  --text-2: #68758c;
-  --text-3: #93a1b8;
-  --line: #e6edf7;
-  --line-strong: #d3dff2;
+  /* v7.3.0 視認性是正：text-2 は約5.7:1、text-3 は約4.0:1（対白）まで濃くした。
+     罫線も輪郭が分かる濃さに引き上げ、影ではなく線と濃度で形を作る */
+  --text-2: #55677f;
+  --text-3: #6d7f9c;
+  --line: #ccd9ec;
+  --line-strong: #aec6e4;
   --accent: #2e7cf6;
   --accent-ink: #ffffff;
   --accent-soft: #eaf2ff;
@@ -17,20 +21,66 @@
   --error: #c62f3b;
   --error-bg: #fdf0f0;
   --success: #1e7d55;
-  --sheet-shadow: 0 18px 48px rgba(23, 58, 122, 0.2);
-  --shadow-card: 0 10px 28px rgba(31, 78, 160, 0.09);
-  --shadow-composer: 0 14px 36px rgba(31, 78, 160, 0.13);
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --font-body: ui-rounded, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", -apple-system, sans-serif;
-  --font-head: ui-rounded, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", -apple-system, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --success-bg: #edf7f2;
+  --warning: #b8860b;
+  --warning-bg: #fdf8ec;
   --pill-bg: #f1f5fb;
+  --scrim: rgba(10, 20, 40, 0.42);
+  /* ヒーローの波（ブランド要素。本体UIの装飾には使わない） */
   --wave-1: #e8f1ff;
   --wave-2: #dce9ff;
   --wave-3: #cfe2ff;
-  --blob: #eaf3ff;
+
+  /* ---- 影（原則なし。浮く面だけ無彩色に近い弱い影） ---- */
+  --shadow-card: none;
+  --shadow-composer: 0 1px 2px rgba(15, 30, 58, 0.06);
+  --sheet-shadow: 0 18px 48px rgba(10, 20, 40, 0.18);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
+
+  /* ---- 半径 ---- */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* ---- 余白スケール（4の倍数） ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ---- タイポグラフィ ---- */
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 13.5px;
+  --text-base: 15.5px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-title: 22px;
+  --leading-tight: 1.35;
+  --leading-normal: 1.6;
+  --leading-body: 1.75;
+  --tracking-label: 0.06em;
+  --font-body: ui-rounded, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", -apple-system, sans-serif;
+  --font-head: ui-rounded, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ---- コントロールの寸法 ---- */
+  --control-h: 44px;
+  --control-h-sm: 36px;
+  --control-h-xs: 32px;
+  --input-h: 44px;
+  --icon: 22px;
+  --icon-sm: 16px;
+
+  /* ---- モーション ---- */
+  --motion-fast: 120ms;
+  --motion: 180ms;
+  --ease: ease;
 }
 
 [data-theme="dark"] {
@@ -39,9 +89,9 @@
   --surface: #10223d;
   --ink: #eaf1ff;
   --text-2: #9db0cc;
-  --text-3: #68799a;
-  --line: #1e3355;
-  --line-strong: #2a4470;
+  --text-3: #7e93b5;
+  --line: #26426e;
+  --line-strong: #33548a;
   --accent: #5b97ff;
   --accent-ink: #081226;
   --accent-soft: #16294d;
@@ -49,12 +99,14 @@
   --error: #ff9a92;
   --error-bg: #3a1f24;
   --success: #7ed3a8;
-  --sheet-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
-  --shadow-card: 0 10px 28px rgba(0, 0, 0, 0.35);
-  --shadow-composer: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --success-bg: #123528;
+  --warning: #e3b341;
+  --warning-bg: #38300f;
   --pill-bg: #14294d;
+  --scrim: rgba(0, 0, 0, 0.55);
   --wave-1: #0e2142;
   --wave-2: #0c1c38;
   --wave-3: #0a1730;
-  --blob: #0d1e3a;
+  --shadow-composer: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sheet-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
 }
